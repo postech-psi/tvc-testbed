@@ -36,6 +36,30 @@ gz sim --version    # → Gazebo Sim, version 8.x
 
 If both print a version, the environment is ready. From here, edit code normally; files are synced live between your machine and the container (see "workspaceMount" in `devcontainer.json` — it's a bind mount, meaning the container is looking at the exact same files on disk as your editor, not a copy).
 
+## Git & GitHub setup
+
+This repo lives at `github.com/postech-psi/tvc-testbed`. A few things are worth knowing about how git interacts with the container:
+
+**Cloning (first time only):**
+```bash
+git clone https://github.com/postech-psi/tvc-testbed.git
+cd tvc-testbed
+code .
+```
+
+**Git identity** — the container does *not* automatically inherit your host machine's git identity (name/email used to label commits). Set it once per machine:
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
+You can run this either in a normal terminal on your host, or inside the VS Code terminal while attached to the container — they're separate environments, so pick whichever one you'll actually be committing from. Most people commit from the host side (VS Code's Source Control panel works the same either way) and only use the container terminal for ROS2/build commands.
+
+**Authentication** — GitHub no longer accepts your account password for `git push`/`git pull` over HTTPS. Use one of:
+- **A Personal Access Token (PAT)**: GitHub → Settings → Developer settings → Personal access tokens → generate one, then use it in place of a password when git prompts for credentials. VS Code's built-in GitHub sign-in (bottom-left account icon) can also handle this for you automatically.
+- **SSH keys**: generate a key pair (`ssh-keygen -t ed25519`), add the public key to GitHub → Settings → SSH keys, then use the `git@github.com:...` remote URL instead of `https://`.
+
+Either works; PAT + VS Code's built-in sign-in is the simplest for a first-time setup.
+
 ## What's inside, and why
 
 | Tool | What it generally does | Why this project needs it | Phase |
