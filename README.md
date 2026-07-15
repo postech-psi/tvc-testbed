@@ -1,85 +1,123 @@
-# TVC 6-DOF Attitude Simulator — Interactive GUI
+# Docker Dev Environment — TVC VTVL UGRP
 
-Polished Step 2 simulator with an interactive desktop GUI: edit vehicle
-parameters, control gains, and target/disturbance conditions, click **Run
-Simulation**, and see the attitude/rate/gimbal response update immediately in
-embedded plots.
+This gets you a development environment — ROS2 Jazzy + Gazebo Harmonic + the PX4 bridge tool — that is identical on every machine it runs on, whether that's your laptop, a teammate's, or a lab workstation. That sameness is the entire point of using Docker here: "it works on my machine" stops being a possible excuse, because everyone's machine is running the same container.
 
-## ROS2 / Gazebo development environment
+Looking for the Phase 1/2 standalone simulator (the plain-Python/Tkinter GUI, no Docker needed) instead? See [SIMULATOR.md](SIMULATOR.md).
 
-Phases 3–5 of this project (ROS2, Gazebo SIL testing, PX4 SITL bridging) run
-inside a Docker dev container so the whole team shares an identical setup.
-See [DOCKER_README.md](DOCKER_README.md) to get started — it only takes a
-few clicks once Docker Desktop and VS Code are installed.
+## Concepts, briefly (skip if you already know Docker)
 
-## Files
+Three words come up constantly and are worth being precise about:
 
-- `tvc_physics.py` — physics core (quaternion kinematics, Newton-Euler
-  dynamics, gimbal actuator model, cascaded PID controller, simulation
-  driver). Runnable standalone as a headless smoke test:
-  ```
-  python3 tvc_physics.py
-  ```
-- `tvc_gui.py` — the interactive Tkinter GUI. Run this for normal use:
-  ```
-  python3 tvc_gui.py
-  ```
+- **Image** — a built, read-only template (think: a class, not an instance). Defined by a `Dockerfile`. Building an image doesn't run anything; it just produces the template.
+- **Container** — a running instance of an image (the instance of that class). You can start, stop, and delete containers freely without touching the image they came from.
+- **Rebuild** — re-running the Dockerfile's instructions to produce a new image, needed whenever the Dockerfile itself changes. Editing your project's code does *not* require a rebuild — only editing the Dockerfile does.
 
-## Requirements
+A **Dev Container** (what VS Code's "Reopen in Container" button uses) is a further convention on top of plain Docker: a `.devcontainer/devcontainer.json` file tells VS Code which Dockerfile to build, which folder to mount your code into, and which editor extensions to install *inside* the container. The effect is that VS Code's terminal, IntelliSense, and debugger all operate inside the container, while you keep editing files as if they were local.
 
-```
-pip install -r requirements.txt
+## Quick Start
+
+**1. Install two things, once:**
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — during install, choose "install for this user" (no admin rights needed)
+- [VS Code](https://code.visualstudio.com/) + its **Dev Containers** extension (`Ctrl+Shift+X` → search "Dev Containers" → Install)
+
+**2. Open the project:**
+```bash
+cd tvc-testbed
+code .
 ```
 
-`tkinter` is required and is normally bundled with the standard Python
-installer on Windows/macOS. On Debian/Ubuntu Linux, if `python3 -c "import
-tkinter"` fails, install it with:
+**3. Click "Reopen in Container"** when VS Code prompts you (a notification appears in the bottom-right corner).
+
+What happens next, concretely: VS Code reads `.devcontainer/devcontainer.json`, which points at the `Dockerfile`; Docker builds an image from it (downloading each tool listed there); then VS Code starts a container from that image and reopens itself inside it. First time, this takes roughly 10 minutes, because every layer has to be downloaded and built. After that, Docker caches the result — reopening is a matter of seconds, and even a full rebuild after a small Dockerfile edit only redoes the layers after your change.
+
+**4. Verify it worked.** Open a terminal inside VS Code (`` Ctrl+` ``) — this terminal is running inside the container, not on your host machine — and run:
+```bash
+ros2 --version      # → ROS 2 release 'jazzy'
+gz sim --version    # → Gazebo Sim, version 8.x
+```
+
+If both print a version, the environment is ready. From here, edit code normally; files are synced live between your machine and the container (see "workspaceMount" in `devcontainer.json` — it's a bind mount, meaning the container is looking at the exact same files on disk as your editor, not a copy).
+
+## Git & GitHub setup
+
+This repo lives at `github.com/postech-psi/tvc-testbed`. A few things are worth knowing about how git interacts with the container:
+
+**Cloning (first time only):**
+```bash
+git clone https://github.com/postech-psi/tvc-testbed.git
+cd tvc-testbed
+code .
+```
+
+**Git identity** — the container does *not* automatically inherit your host machine's git identity (name/email used to label commits). Set it once per machine:
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
+You can run this either in a normal terminal on your host, or inside the VS Code terminal while attached to the container — they're separate environments, so pick whichever one you'll actually be committing from. Most people commit from the host side (VS Code's Source Control panel works the same either way) and only use the container terminal for ROS2/build commands.
+
+**Authentication** — GitHub no longer accepts your account password for `git push`/`git pull` over HTTPS. Use one of:
+- **A Personal Access Token (PAT)**: GitHub → Settings → Developer settings → Personal access tokens → generate one, then use it in place of a password when git prompts for credentials. VS Code's built-in GitHub sign-in (bottom-left account icon) can also handle this for you automatically.
+- **SSH keys**: generate a key pair (`ssh-keygen -t ed25519`), add the public key to GitHub → Settings → SSH keys, then use the `git@github.com:...` remote URL instead of `https://`.
+
+Either works; PAT + VS Code's built-in sign-in is the simplest for a first-time setup.
+
+## What's inside, and why
+
+| Tool | What it generally does | Why this project needs it | Phase |
+|---|---|---|---|
+| ROS2 Jazzy | Middleware for message-passing between processes ("nodes") over "topics" | The nodes you'll write for the vehicle's control loop communicate this way | 3 |
+| Gazebo Harmonic | Physics simulator | Lets you test control code against simulated vehicle dynamics before real hardware exists (SIL: Simulation-In-the-Loop) | 4 |
+| Micro-XRCE-DDS-Agent | Protocol bridge | Translates between ROS2's messaging format and PX4's own (uXRCE-DDS), so a ROS2 node can command a PX4 flight controller | 5 |
+| numpy / scipy / matplotlib | Numerical computing / plotting | Same stack `tvc_physics.py` already uses, so results are identical whether run on your host or in this container | all |
+
+Nothing here targets a Raspberry Pi or real flight hardware yet (Phase 6) — that will be a separate, smaller image built specifically for deployment, once there's an actual Pixhawk to talk to. Building that now would be maintaining a second thing with no way yet to test it.
+
+**Deliberately excluded:** the ARM cross-compiler toolchain (`arm-none-eabi-gcc`). That toolchain compiles PX4 *firmware* for the Pixhawk's own microcontroller — a different target than the plain x86_64 build used by PX4 SITL (the simulated version used in Phases 4–5, which builds with the same compiler as everything else here). If a later phase needs to compile custom firmware, that's a one-line addition then, not a reason to carry it now.
+
+## Project layout
 
 ```
-sudo apt-get install python3-tk
+Dockerfile             the image definition — see inline comments for what each instruction does
+.devcontainer/          tells VS Code how to build and open the container
+.dockerignore           files Docker should not copy into the build context (build artifacts, .git, etc.)
 ```
 
-## What you can adjust in the GUI
+The `.dockerignore` file matters for a reason worth understanding generally: every file in your project folder (except what's excluded here) gets sent to the Docker build process as the "build context," even for files no instruction ever references. On a large repo with build artifacts or a `.git` history, that can make builds slow for no benefit — hence excluding them.
 
-**Vehicle Parameters** — mass, roll/pitch/yaw inertia, axial TVC lever arm
-`L` (gimbal pivot → CM, per the corrected physics — NOT a lateral offset),
-and optional lateral CM-misalignment disturbance terms `dx`/`dy`.
+## Adding a library later
 
-**Actuator Limits** — max/min thrust, gimbal mechanical limit (deg), gimbal
-servo slew rate (deg/s).
+The general shape of adding anything to a Docker image is: edit the Dockerfile, then rebuild. Two common cases:
 
-**Cascaded PID Gains** — outer-loop angle gain, inner-loop rate PID gains,
-and the rate-loop integrator anti-windup clamp.
+**A system/ROS2 package** (installed via `apt`) — add it to the relevant `apt-get install` block:
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-cv-bridge \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+```
 
-**Simulation / Target** — sim duration, control period, target roll/pitch,
-and initial roll/pitch disturbance (the "3° roll / -4° pitch → 0°/+5° target"
-style test case from Step 2 is the default).
+**A Python package** (installed via `pip`) — add it to the `pip3 install` line:
+```dockerfile
+RUN pip3 install --break-system-packages --no-cache-dir \
+    numpy scipy matplotlib pyyaml jinja2 empy opencv-python
+```
 
-## Reading the output
+Then in VS Code: `Ctrl+Shift+P` → **"Dev Containers: Rebuild Container"**. Docker only redoes the layer you changed and everything after it — layers before your edit are reused from cache — so this is usually 1–2 minutes, not a full 10-minute rebuild.
 
-Three stacked plots:
+**Testing something before committing to it:** you can also install a package directly inside a running container (`sudo apt-get install ...` or `pip3 install --break-system-packages ...`), without touching the Dockerfile at all. It works immediately but disappears the next time the container is rebuilt — useful for trying something out before deciding it's worth adding permanently.
 
-1. **Attitude Response** — roll/pitch Euler angles vs. time, with dashed
-   lines marking the target setpoints.
-2. **Body Angular Velocity** — ω_x, ω_y, ω_z in deg/s.
-3. **Gimbal Command** — δ₁ (pitch-plane) and δ₂ (roll-plane) gimbal angles,
-   with dotted lines at the configured mechanical limit.
+## Troubleshooting
 
-A metrics panel below the control form reports final roll/pitch error, 2%-
-band settling time (on pitch), and max gimbal deflection with percent-of-
-limit utilization — including a warning if the gimbal is saturating (>90%
-of its mechanical limit), which usually means the disturbance is too large
-or the gains need retuning.
+| Problem | What's likely happening | Fix |
+|---|---|---|
+| "Docker daemon not running" | Docker Desktop isn't started, or hasn't finished starting | Launch Docker Desktop and wait for the whale icon to stop animating |
+| Build fails partway through | Usually a network hiccup mid-download | Click "Reopen in Container" again — Docker resumes from the last successfully-built layer, it doesn't start over |
+| `ros2: command not found` | You're running a command on your host machine, not inside the container | Check the bottom-left corner of VS Code — it should show the container name; if it shows your local machine, you're not connected |
+| Edited the Dockerfile but nothing changed | Editing the Dockerfile only takes effect on the next build | `Ctrl+Shift+P` → "Dev Containers: Rebuild Container" |
+| Gazebo's GUI window doesn't appear | Expected on Windows/Mac — the simulator runs headless there by default | Use `ros2 topic echo <topic-name>` to inspect data instead of relying on the window |
+| **Windows**: "Container failed to start" (WSLg socket error) | VS Code's Dev Containers extension tries to forward your Wayland socket from WSL2 into the container so Linux GUI apps can display. WSL2 has a known limitation where Unix domain sockets don't survive the `\\wsl.localhost` network bridge, causing the mount to fail. | `Ctrl+Shift+P` → "Preferences: Open User Settings (JSON)" → add `"dev.containers.mountWaylandSocket": false` → save → rebuild the container. This disables GUI socket forwarding (not needed anyway, since Gazebo runs headless on Windows). |
+| Source Control panel is empty / git commands say "detected dubious ownership" | Git (since v2.35.2) refuses to operate on a repo whose file ownership doesn't match the current user as a security check. The container's `postCreateCommand` changes `/workspace`'s ownership to the `ros` user, which can trip this check. | Run `git config --global --add safe.directory /workspace` once inside the container terminal, then reload the VS Code window. |
 
-## Physics notes carried over from Step 1 / de Lajarte Ch. 4
+## For teammates joining later
 
-- The TVC moment arm is the **axial** distance `L` from the gimbal pivot to
-  the vehicle center of mass (along body +z) — not a lateral CM offset. A
-  lateral offset crossed with an on-axis thrust vector gives zero torque to
-  leading order; `dx`/`dy` are kept only as optional disturbance terms.
-- Roll/yaw about the thrust axis (body z) has no gimbal authority — real
-  yaw control comes from differential RPM between the coax motors, not
-  modeled in this attitude-only simulator.
-- Attitude is propagated with quaternions throughout (never Euler angles
-  internally) to avoid gimbal lock; Euler angles are computed only for
-  readout/plotting.
+Same Quick Start steps above apply to everyone. Since the image only needs to be built once per machine and Docker caches the result afterward, a second person's first build is also fast (2–3 minutes) — the slow first build only happens once, on whichever machine builds this particular image for the very first time.
