@@ -114,6 +114,7 @@ Then in VS Code: `Ctrl+Shift+P` → **"Dev Containers: Rebuild Container"**. Doc
 | Edited the Dockerfile but nothing changed | Editing the Dockerfile only takes effect on the next build | `Ctrl+Shift+P` → "Dev Containers: Rebuild Container" |
 | Gazebo's GUI window doesn't appear | Expected on Windows/Mac — the simulator runs headless there by default | Use `ros2 topic echo <topic-name>` to inspect data instead of relying on the window |
 | **Windows**: "Container failed to start" (WSLg socket error) | VS Code's Dev Containers extension tries to forward your Wayland socket from WSL2 into the container so Linux GUI apps can display. WSL2 has a known limitation where Unix domain sockets don't survive the `\\wsl.localhost` network bridge, causing the mount to fail. | `Ctrl+Shift+P` → "Preferences: Open User Settings (JSON)" → add `"dev.containers.mountWaylandSocket": false` → save → rebuild the container. This disables GUI socket forwarding (not needed anyway, since Gazebo runs headless on Windows). |
+| Source Control panel is empty / git commands say "detected dubious ownership" | Git (since v2.35.2) refuses to operate on a repo whose file ownership doesn't match the current user as a security check. The container's `postCreateCommand` changes `/workspace`'s ownership to the `ros` user, which can trip this check. | Run `git config --global --add safe.directory /workspace` once inside the container terminal, then reload the VS Code window. |
 
 ## For teammates joining later
 
