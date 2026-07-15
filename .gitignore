@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+*.egg
+venv/
+.venv/
+
+# ROS2 / colcon workspace artifacts (created starting Phase 4)
+build/
+install/
+log/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~

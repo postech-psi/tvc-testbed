@@ -1,0 +1,42 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Build & ROS artifacts
+build/
+install/
+log/
+*.o
+*.a
+*.so
+*.deb
+*.egg-info/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+*.egg
+node_modules/
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.editorconfig
+
+# Documentation (keep .md in context)
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/

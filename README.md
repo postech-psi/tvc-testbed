@@ -5,6 +5,13 @@ parameters, control gains, and target/disturbance conditions, click **Run
 Simulation**, and see the attitude/rate/gimbal response update immediately in
 embedded plots.
 
+## ROS2 / Gazebo development environment
+
+Phases 3–5 of this project (ROS2, Gazebo SIL testing, PX4 SITL bridging) run
+inside a Docker dev container so the whole team shares an identical setup.
+See [DOCKER_README.md](DOCKER_README.md) to get started — it only takes a
+few clicks once Docker Desktop and VS Code are installed.
+
 ## Files
 
 - `tvc_physics.py` — physics core (quaternion kinematics, Newton-Euler
