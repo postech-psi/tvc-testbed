@@ -56,9 +56,7 @@ git config --global user.email "your.email@example.com"
 ```
 You can run this either in a normal terminal on your host, or inside the VS Code terminal while attached to the container — they're separate environments, so pick whichever one you'll actually be committing from. Most people commit from the host side (VS Code's Source Control panel works the same either way) and only use the container terminal for ROS2/build commands.
 
-**Authentication** — GitHub no longer accepts your account password for `git push`/`git pull` over HTTPS. Use one of:
-- **A Personal Access Token (PAT)**: GitHub → Settings → Developer settings → Personal access tokens → generate one, then use it in place of a password when git prompts for credentials. VS Code's built-in GitHub sign-in (bottom-left account icon) can also handle this for you automatically.
-- **SSH keys**: generate a key pair (`ssh-keygen -t ed25519`), add the public key to GitHub → Settings → SSH keys, then use the `git@github.com:...` remote URL instead of `https://`.
+
 
 Either works; PAT + VS Code's built-in sign-in is the simplest for a first-time setup.
 
