@@ -121,10 +121,22 @@ RUN rosdep init 2>/dev/null || true && rosdep update
 # ROS2 Jazzy officially pairs with, used here for SIL (Software-In-the-Loop)
 # testing — running the control nodes against simulated vehicle physics
 # before any real hardware exists to test them on.
+#
+# `arch=` must be derived, not hardcoded. An apt source line names which CPU
+# architectures apt may pull from that repo, and a container's architecture is
+# whatever the host CPU is — arm64 on an Apple Silicon Mac or an ARM server,
+# amd64 on Intel/AMD. Hardcoding `arch=amd64` makes apt try to install x86
+# Gazebo binaries into an arm64 image; those packages depend on libc6:amd64,
+# libstdc++6:amd64 and python3:amd64, none of which exist there, so the whole
+# dependency tree fails to resolve ("held broken packages", exit 100).
+# `dpkg --print-architecture` runs inside the build and reports the image's own
+# architecture, so this line is correct on every host. osrfoundation publishes
+# Gazebo Harmonic for both amd64 and arm64, as does packages.ros.org for the
+# ros-jazzy-* packages below, so both paths resolve natively — no emulation.
 # ------------------------------------------------------------------------------
 RUN mkdir -p /usr/share/keyrings && \
     curl -sSL https://packages.osrfoundation.org/gazebo.gpg -o /usr/share/keyrings/gazebo-keyring.gpg && \
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/gazebo-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gazebo-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
     > /etc/apt/sources.list.d/gazebo-stable.list && \
     apt-get update && apt-get install -y --no-install-recommends \
     gz-harmonic \
