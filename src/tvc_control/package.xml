@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tvc_control</name>
+  <version>0.0.1</version>
+  <description>Phase 4: simulator_node + controller_node, splitting tvc_physics.py's 6-DOF dynamics and cascaded PID across a ROS2 topic boundary</description>
+  <maintainer email="kyber06@icloud.com">devkyber</maintainer>
+  <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tvc_msgs</depend>
+  <depend>python3-numpy</depend>
+  <depend>python3-scipy</depend>
+
+  <!-- Phase 5 (Gazebo): the bridge node and gazebo.launch.py -->
+  <depend>actuator_msgs</depend>
+  <depend>nav_msgs</depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

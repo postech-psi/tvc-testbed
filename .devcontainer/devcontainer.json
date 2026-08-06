@@ -1,5 +1,6 @@
 {
   "name": "TVC VTVL UGRP - ROS2 Jazzy Development",
+  "runArgs": ["--name=tvc-devcontainer"],
   "dockerFile": "../Dockerfile",
   "context": "..",
   "remoteUser": "ros",

@@ -38,6 +38,16 @@ gz sim --version    # → Gazebo Sim, version 8.x
 
 If both print a version, the environment is ready. From here, edit code normally; files are synced live between your machine and the container (see "workspaceMount" in `devcontainer.json` — it's a bind mount, meaning the container is looking at the exact same files on disk as your editor, not a copy).
 
+**5. Run your first ROS2 pipeline.** `src/tvc_demo/` is a minimal ROS2 package — a publisher node counting up once a second and a subscriber node printing what it receives — included specifically to prove the whole ROS2 pipeline (build → run → topics → messages) works before any real physics code is involved. This is the pattern Phase 4's actual simulator/controller nodes will follow, just with a counter instead of vehicle attitude.
+
+In the container terminal:
+```bash
+colcon build              # compiles every package under src/
+source install/setup.bash # makes the new packages available on this shell
+ros2 launch tvc_demo demo.launch.py
+```
+You should see alternating `Publishing: N` and `Received: N` log lines. `Ctrl+C` to stop. `colcon build` only needs to be re-run after you change or add package source; `source install/setup.bash` needs to be re-run in any *new* terminal you open (each terminal is a separate shell, so nothing from the last one carries over).
+
 ## Git & GitHub setup
 
 This repo lives at `github.com/postech-psi/tvc-testbed`. A few things are worth knowing about how git interacts with the container:

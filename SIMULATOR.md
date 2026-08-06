@@ -14,11 +14,12 @@ Docker Desktop and VS Code are installed.
 
 ## Files
 
-- `tvc_physics.py` — physics core (quaternion kinematics, Newton-Euler
-  dynamics, gimbal actuator model, cascaded PID controller, simulation
-  driver). Runnable standalone as a headless smoke test:
+- `src/tvc_control/tvc_control/physics.py` — physics core (quaternion
+  kinematics, Newton-Euler dynamics, gimbal actuator model, cascaded PID
+  controller, simulation driver). Single source of truth, also used by the
+  ROS2 nodes in Phase 4+. Runnable standalone as a headless smoke test:
   ```
-  python3 tvc_physics.py
+  python3 src/tvc_control/tvc_control/physics.py
   ```
 - `tvc_gui.py` — the interactive Tkinter GUI. Run this for normal use:
   ```

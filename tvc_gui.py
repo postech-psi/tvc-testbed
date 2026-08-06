@@ -24,7 +24,10 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
-from tvc_physics import VehicleParams, ControlGains, SimConfig, simulate
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "tvc_control"))
+from tvc_control.physics import VehicleParams, ControlGains, SimConfig, simulate
 
 
 # =============================================================================

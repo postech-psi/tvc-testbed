@@ -1,12 +1,13 @@
 """
-tvc_physics.py
-==============
+physics.py (tvc_control package)
+=================================
 Core 6-DOF rigid-body dynamics, quaternion kinematics, actuator model, and
 cascaded PID attitude controller for a coax-motor + 2-axis-gimbal VTVL vehicle.
 
-This module is GUI-agnostic and display-agnostic -- it is imported by both the
-interactive GUI (tvc_gui.py) and can be run/tested headlessly from the command
-line or a test script.
+This module is GUI-agnostic and display-agnostic -- it is the single source of
+truth imported by both the standalone GUI (tvc_gui.py, at the repo root) and
+the ROS2 simulator_node/controller_node in this package, and can also be
+run/tested headlessly from the command line or a test script.
 
 Physics corrections and conventions carried over from Step 1 / Step 2 notes:
   - The TVC moment arm is the AXIAL distance L from the gimbal pivot to the
@@ -374,7 +375,7 @@ def _compute_metrics(t_arr, euler_arr, delta_arr, cfg: SimConfig, band=0.02):
 
 if __name__ == "__main__":
     # Headless smoke test -- verifies the physics/controller integrate cleanly
-    # without requiring a display. Run: python3 tvc_physics.py
+    # without requiring a display. Run: python3 src/tvc_control/tvc_control/physics.py
     vp = VehicleParams()
     gains = ControlGains()
     cfg = SimConfig()
