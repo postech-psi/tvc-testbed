@@ -159,8 +159,18 @@ class ThrustTorqueSurface:
         away authority on the strong side or promises what the weak side cannot
         deliver. Earlier code did the latter and lost up to 0.09 N*m.
 
-        Both ends already carry SOLVER_MARGIN, so every value in the returned
-        interval is one the inverse can actually hit.
+        Both ends carry SOLVER_MARGIN, so values in the returned interval are
+        ones the inverse can actually hit -- with one stated exception.
+
+        KNOWN LIMITATION, MEASURED. The table is binned: 200 bins across ~18 N,
+        so ~0.09 N per bin, and each bin reports the extreme torque of ANY grid
+        point that lands in it. Where the reachable set is changing fast in
+        thrust -- below ~8% throttle and above ~95%, where it is collapsing
+        toward a corner -- that over-promises by up to 0.007 N*m. The inverse
+        then trades the excess torque away to keep thrust exact (see inverse()),
+        so the failure mode is a slightly weaker roll response at the very ends
+        of the throttle, never a thrust shortfall. Asserted in
+        tests/test_effectiveness.py rather than left as a comment.
         """
         if not self._built:
             self._build()
@@ -237,6 +247,39 @@ class ThrustTorqueSurface:
         self._warm = (a, b)
         return a, b, T, Q
 
+    def _diagonal(self, T_t, iters=48):
+        """Solve f_T(t, t) = T_t for the balanced command t. Thrust only.
+
+        The last resort of the thrust-priority ladder, and the only step that
+        cannot fail. On the diagonal a = b the thrust polynomial reduces to
+
+            f_T(t,t) = 6.876 + 8.844 t + 1.945 t^2 + 0.129 t^3
+
+        whose derivative 8.844 + 3.890 t + 0.387 t^2 is positive everywhere on
+        [-1, 1], so f_T is strictly increasing there and spans the surface's
+        entire thrust range (-0.152 N to 17.794 N). A bisection therefore always
+        converges, in a fixed 48 steps -- about 1e-14 of the interval.
+
+        Why this is needed at all: within ~0.05 N of the ceiling the reachable
+        set collapses toward the single corner a = b = 1, and the binned
+        headroom table (200 bins over 18 N, so ~0.09 N per bin) reports the
+        torque interval of the bin rather than of the exact thrust. Asking for a
+        torque that is feasible 0.05 N lower leaves the 2-D Newton stalled on the
+        boundary, 0.32 N of thrust short. Giving up ALL torque instead costs
+        roll authority the vehicle barely has up there, and buys back lift it
+        certainly does.
+        """
+        lo, hi = self._norm(self.pwm_min), self._norm(self.pwm_max)
+        for _ in range(iters):
+            mid = 0.5 * (lo + hi)
+            if self._eval(self.c_T, mid, mid) < T_t:
+                lo = mid
+            else:
+                hi = mid
+        t = 0.5 * (lo + hi)
+        T, Q = self.forward_norm(t, t)
+        return t, t, T, Q
+
     def inverse(self, thrust_n, torque_nm, iters=40, tol=1e-9, thrust_tol=1e-4):
         """(thrust, roll torque) -> (PWM A, PWM B, achieved T, achieved tau_P).
 
@@ -247,10 +290,19 @@ class ThrustTorqueSurface:
         THRUST HAS PRIORITY, and enforcing that takes more than clamping the
         torque. The boundary of the reachable set is exactly where the Jacobian
         degenerates, so a target sitting ON it is the one case Newton cannot
-        solve -- it stalls with a large thrust residual and would silently
-        return a command producing over a newton less lift than asked. When that
-        happens, back the torque off in stages and re-solve: the vehicle gives
-        up roll authority, never lift.
+        solve -- it stalls with a large thrust residual and would silently return
+        a command producing over a newton less lift than asked.
+
+        So the solve is a LADDER. Try the requested torque; if the thrust
+        residual is still too large, ask for less torque and re-solve; and if
+        even zero torque fails, fall back to the balanced-command bisection in
+        _diagonal(), which cannot fail. The vehicle gives up roll authority,
+        never lift.
+
+        The last rung is not decorative: near the thrust ceiling the reachable
+        set collapses toward a single corner and every 2-D solve stalls there.
+        Without it the vehicle loses 1.8% of its lift at full throttle -- at the
+        one moment it has none to spare.
         """
         t_lo, t_hi = self.thrust_limits()
         T_t = min(max(thrust_n, t_lo), t_hi)
@@ -261,7 +313,9 @@ class ThrustTorqueSurface:
         for shrink in (1.0, 0.97, 0.9, 0.7, 0.4, 0.0):
             a, b, T, Q = self._solve(T_t, Q_t * shrink, iters, tol)
             if abs(T - T_t) <= thrust_tol:
-                break
+                return self._denorm(a), self._denorm(b), T, Q
+
+        a, b, T, Q = self._diagonal(T_t)
         return self._denorm(a), self._denorm(b), T, Q
 
 

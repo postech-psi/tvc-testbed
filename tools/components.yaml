@@ -4,7 +4,7 @@
 #
 # COORDINATE FRAME: millimeters, the STEP assembly frame. +z is the vehicle's
 # long/thrust axis. Origin near the gimbal pivot. Useful landmarks measured
-# from the CAD (docs/MASS_BUDGET.md has the full list):
+# from the CAD (docs/MASS-BUDGET.md has the full list):
 #
 #     z = -78    feet
 #     z =  47    motor + propeller assembly
@@ -91,7 +91,7 @@ point_masses:
 
 # Unmodeled remainder: mass known to exist from the weight budget but neither
 # in cad_parts.csv nor itemized above. Set to null to disable. See
-# docs/MASS_BUDGET.md for the reconciliation against the 1328 g design target.
+# docs/MASS-BUDGET.md for the reconciliation against the 1328 g design target.
 design_total_mass_g: 1328
 remainder_position_mm: [0, 0, 150]
 

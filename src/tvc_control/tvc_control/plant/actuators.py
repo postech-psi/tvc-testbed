@@ -1,7 +1,24 @@
 """
 Actuator dynamics: what the commanded deflection actually does. Simulation only.
 ================================================================================
-Moved verbatim from physics.py.
+The rigid body integrates what the actuators ACHIEVED, never what was commanded.
+Feeding it the command instead makes every gain look better than it is, by
+exactly the amount of lag that was skipped.
+
+Two stages, with different physics and different consequences:
+
+    GimbalActuator   30 ms transport deadtime, then a per-ring slew limit
+                     (403 deg/s inner, 235 outer). The deadtime is what costs
+                     phase margin -- 18 deg at the lateral crossover.
+
+    MotorLag         the measured ~100 ms motor response, applied to the pair
+                     (T, tau_P). Switchable between a delay and a lag, because
+                     the bench did not say which it is and the answer decides
+                     whether the roll channel is controllable. See its docstring
+                     and docs/2-THEORY.md section 7.
+
+ActuatorChain bundles them so no harness can model a different subset than
+another -- which would make every cross-plant comparison unattributable.
 """
 
 import numpy as np

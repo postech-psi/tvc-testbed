@@ -33,10 +33,11 @@ class VehicleParams:
     Angles are stored in DEGREES for the GUI's convenience and converted to
     radians via properties where the dynamics need them.
 
-    AXIS NAMING: body x and y are the LATERAL axes (the two the gimbal tilts
-    thrust about); body z is the ROLL/thrust axis. The field names below still
-    use the old quadcopter convention (Ix = "pitch" = body x); the rename to the
-    rocket convention is a later, separate commit. See docs/CONVENTIONS.md.
+    AXIS NAMING follows the rocket convention (docs/3-CONVENTIONS.md): body x
+    and y are the LATERAL axes, the two the gimbal tilts thrust about, carrying
+    pitch and yaw; body z is the thrust axis, carrying ROLL. The inertia fields
+    are named after the AXIS (Ix = about body x), not after the rotation, so
+    they do not have to change if the naming ever does.
     """
 
     m: float                        # kg, total mass
@@ -137,16 +138,18 @@ class ControlGains:
     constant (~100 ms measured), which is why roll authority being larger does
     not mean the roll loop can be faster.
 
-    These are the analytic simulator's historical values, which have never been
-    flown. sim/hover.py's set is 24.9x stiffer in the rate loop and IS flight-
-    validated; reconciling the two is a later, deliberate commit.
+    THE DEFAULTS HERE ARE NOT THE FLOWN SET. They are the analytic simulator's
+    historical values, kept so that pre-existing plots and the frozen baseline
+    reproduce. The set that has actually flown is the `flight_validated` profile
+    in control_gains.yaml, which is the file default and what every pipeline
+    loads. Construct ControlGains directly only when you specifically want these.
     """
 
     # UNITS: the rate loop outputs ANGULAR ACCELERATION [rad/s^2], not torque.
     # Inertia is applied once, in AttitudeController. The values below are the
-    # historical torque-unit gains divided by their axis inertia, so behaviour
-    # is unchanged; what changes is that they can now be compared against
-    # sim/hover.py's set, which was always written this way.
+    # historical torque-unit gains divided by their axis inertia, so behaviour is
+    # unchanged; what changed is that they became comparable with the flown set,
+    # which was always written this way.
     kp_angle: float = 4.0      # attitude loop: angle error -> rate setpoint
     kp_rate: float = 0.8843296781     # rate loop: rate error -> angular accel
     ki_rate: float = 0.0884329678
@@ -171,7 +174,7 @@ class ControlGains:
     i_limit_vz: float = 4.0    # m/s^2 of integral authority
     vz_max: float = 2.0        # m/s, climb/descent rate limit
 
-    # --- position hold: horizontal error -> commanded tilt (from sim/hover.py) ---
+    # --- position hold: horizontal error -> commanded tilt ---
     # Deliberately ~10x slower than the attitude loop; see gnc/position.py for
     # why closing that gap produces a coning limit cycle rather than a faster
     # response.

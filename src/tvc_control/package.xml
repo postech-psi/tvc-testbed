@@ -3,7 +3,7 @@
 <package format="3">
   <name>tvc_control</name>
   <version>0.0.1</version>
-  <description>Phase 4: simulator_node + controller_node, splitting tvc_physics.py's 6-DOF dynamics and cascaded PID across a ROS2 topic boundary</description>
+  <description>TVC VTVL flight code, plant models and ROS 2 nodes (POSTECH UGRP coaxial thrust-vectored demonstrator)</description>
   <maintainer email="kyber06@icloud.com">devkyber</maintainer>
   <license>TODO: License declaration</license>
 
@@ -15,7 +15,7 @@
   <depend>python3-numpy</depend>
   <depend>python3-scipy</depend>
 
-  <!-- Phase 5 (Gazebo): the bridge node and gazebo.launch.py -->
+  <!-- Gazebo software-in-the-loop: gazebo_bridge_node + gazebo.launch.py -->
   <depend>actuator_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>rosgraph_msgs</depend>

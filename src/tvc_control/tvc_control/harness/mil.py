@@ -1,7 +1,18 @@
 """
 Model-in-the-loop harness: analytic plant + flight code, fixed step.
 ================================================================================
-Moved verbatim from physics.py.
+    python tvc.py validate      runs the scenarios built on this
+    python tvc.py gui           drives it from a form
+
+The fastest pipeline and the only one whose output can be frozen as a numerical
+baseline, because it is the only one that is bit-reproducible: a fixed-rate
+zero-order-hold loop over solve_ivp with a fixed max_step and no randomness
+anywhere.
+
+One iteration is estimator -> controller -> actuator chain -> integrator, and
+each of those is a seam that a different harness swaps for something else. What
+this file owns, and what gnc/ therefore does not, is the CLOCK: dt is passed in,
+never read.
 """
 
 import numpy as np
@@ -21,9 +32,9 @@ from ..plant.sensors import PerfectEstimator
 class SimConfig:
     """Simulation run configuration: horizon, control period, targets, disturbance.
 
-    att_pitch_des_deg / att_yaw_des_deg are the LATERAL setpoints (body x / body y);
-    att_roll_des_deg is the thrust-axis channel the paper calls pitch. See the
-    axis-naming note in the module docstring.
+    att_pitch_des_deg and att_yaw_des_deg are the LATERAL setpoints -- rotations
+    about body x and body y, the two the gimbal drives. att_roll_des_deg is the
+    thrust-axis channel, driven by tau_P alone. docs/3-CONVENTIONS.md.
     """
 
     t_final: float = 5.0
@@ -215,9 +226,8 @@ def _compute_metrics(t_arr, euler_arr, delta_arr, cfg: SimConfig, band=0.02,
         "yaw_error_deg": yaw_err,
         "max_gimbal_inner_deg": max_d1,
         "max_gimbal_outer_deg": max_d2,
-        "gimbal_max_deg": np.rad2deg(0.0),  # filled in by caller if needed
         "settling_time_s": settling_time,
-        # Roll channel (the paper's pitch axis).
+        # Roll channel: rotation about the thrust axis, driven by tau_P.
         "final_roll_deg": euler_arr[-1, 2],
         "roll_error_deg": euler_arr[-1, 2] - cfg.att_roll_des_deg,
     }

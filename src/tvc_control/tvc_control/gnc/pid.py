@@ -1,7 +1,20 @@
 """
 The one PID used by every loop in the cascade.
 ================================================================================
-Moved verbatim from physics.py.
+Position, altitude, attitude and rate all use this class; there is no second
+implementation anywhere in the repository. Parallel form,
+
+    u = kp*e + ki*integral(e) + kd*de/dt
+
+with two deliberate features and nothing else:
+
+  * `dt` is an ARGUMENT. Nothing here reads a clock, which is what lets the
+    whole controller be stepped deterministically by a harness, and what makes
+    a run reproducible.
+  * `freeze` is conditional anti-windup. The caller sets it when the actuator
+    this PID drives is saturated: continuing to integrate against a pinned
+    actuator only builds a charge that must be paid back as overshoot once the
+    limit clears. The proportional and derivative terms still respond.
 """
 
 from .mathx import clamp

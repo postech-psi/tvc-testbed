@@ -1,9 +1,9 @@
 """
 Position hold: horizontal position error -> attitude setpoint.
 ================================================================================
-Ported from sim/hover.py, which is the only controller in this project that has
-ever flown. It outputs an ATTITUDE setpoint rather than a torque, so it stacks
-outboard of the attitude cascade without touching it.
+It outputs an ATTITUDE setpoint rather than a torque, so it stacks outboard of
+the attitude cascade without touching it. The gains come from the Gazebo hover
+demo, the only controller in this project that has ever flown.
 
 WHY THIS LOOP MUST BE MUCH SLOWER THAN THE ATTITUDE LOOP
     What diverges on this vehicle is position, not attitude. With the gimbal
@@ -32,9 +32,8 @@ def _clamp(v, lo, hi):
 class PositionController:
     """Horizontal position + velocity error -> commanded tilt, in radians.
 
-    Returns (pitch_des, yaw_des) in the CURRENT repo convention: pitch about
-    body x, yaw about body y. Renamed with everything else in a later commit
-    (docs/CONVENTIONS.md).
+    Returns (pitch_des, yaw_des) in radians -- pitch about body x, yaw about
+    body y, per docs/3-CONVENTIONS.md. Both are clamped to gains.max_tilt.
     """
 
     def __init__(self, gains):
@@ -50,8 +49,8 @@ class PositionController:
         g = self.gains
         lim = g.max_tilt
 
-        # Sign derivation, preserved verbatim from sim/hover.py because both
-        # signs were wrong once and the comment is what caught it:
+        # Sign derivation, kept verbatim because both signs were wrong once and
+        # this comment is what caught it:
         #
         #   Rotating body +z into the world: +yaw tips thrust toward +x, and
         #   +pitch tips it toward -y. So to come BACK to the origin the demands

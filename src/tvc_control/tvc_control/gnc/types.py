@@ -30,8 +30,8 @@ WHY ActuatorSetpoint LOOKS THE WAY IT DOES
     external controller supplies ActuatorMotors/ActuatorServos directly --
     normalized, and in the FRD body frame. Both the near-term offboard path and
     a future in-tree PX4 module converge on that same uORB interface, so the
-    frame conversion (docs/CONVENTIONS.md, PX4 boundary) belongs in hal_px4 and
-    appears nowhere in this package.
+    frame conversion (docs/3-CONVENTIONS.md, PX4 boundary) belongs in a PX4 HAL
+    and appears nowhere in this package.
 
     thrust_n and tau_p_nm are the values the allocation EXPECTS to achieve, not
     commands. They are carried for logging and cross-plant comparison; a caller
@@ -50,7 +50,7 @@ def _v3():
 class EstimatedState:
     """Vehicle state as the controller believes it to be.
 
-    Frames per docs/CONVENTIONS.md: body +z is the thrust axis; the quaternion
+    Frames per docs/3-CONVENTIONS.md: body +z is the thrust axis; the quaternion
     is (qw, qx, qy, qz), body <- inertial; rates are body-frame.
     """
 
@@ -70,9 +70,8 @@ class Setpoint:
     silently reading a default.
     """
 
-    # attitude targets, rad. Names follow the CURRENT repo convention
-    # (pitch = body x, yaw = body y, roll = body z); the rename to the rocket
-    # convention is a later, separate commit -- see docs/CONVENTIONS.md.
+    # Attitude targets, radians, rocket convention: pitch about body x, yaw
+    # about body y, roll about body z (the thrust axis). docs/3-CONVENTIONS.md.
     pitch_des: float = 0.0
     yaw_des: float = 0.0
     roll_des: float = 0.0
@@ -101,8 +100,8 @@ class ActuatorSetpoint:
 
     motor_a: float = 0.0             # [0,1], normalized against the surface
     motor_b: float = 0.0
-    gimbal_inner_rad: float = 0.0   # inner ring, yaw plane (current naming)
-    gimbal_outer_rad: float = 0.0   # outer ring, pitch plane  (current naming)
+    gimbal_inner_rad: float = 0.0    # inner ring -> yaw plane   (about body y)
+    gimbal_outer_rad: float = 0.0    # outer ring -> pitch plane (about body x)
 
     thrust_n: float = 0.0            # expected achievement, not a command
     tau_p_nm: float = 0.0

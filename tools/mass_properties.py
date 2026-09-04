@@ -1,7 +1,8 @@
 """
 Final vehicle mass properties: total mass, center of gravity, and inertia
-tensor about the CG -> the VehicleParams used by tvc_control/physics.py and
-the <inertial> blocks in sim/models/tvc_vehicle/model.sdf.
+tensor about the CG -> the mass_properties block of vehicle_params.yaml, from
+which everything else is derived: the VehicleParams the flight code reads and
+the <inertial> blocks in gazebo/models/tvc_vehicle/model.sdf.
 
 Three mass sources, combined in one place:
 
@@ -181,7 +182,7 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
               "dropped there -- carry the full tensor into the SDF instead, "
               "which does accept products of inertia." % (100 * off / dm))
 
-    print("\n--- VehicleParams (tvc_control/physics.py) ---")
+    print("\n--- VehicleParams (tvc_control/gnc/params.py) ---")
     print("    m: float = %.4f" % total_mass)
     print("    Ix: float = %.6f" % I[0, 0])
     print("    Iy: float = %.6f" % I[1, 1])
@@ -191,7 +192,7 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
         print("    dx: float = %.4f   # lateral CG offset (disturbance term)" % cg[0])
         print("    dy: float = %.4f" % cg[1])
 
-    print("\n--- SDF <inertial> for base_link (sim/models/tvc_vehicle/model.sdf) ---")
+    print("\n--- SDF <inertial> for base_link (gazebo/models/tvc_vehicle/model.sdf) ---")
     print("    Note the SDF's base_link <pose> should place the CG at z=%.3f m." % cg[2])
     print("      <mass>%.4f</mass>" % total_mass)
     print("      <inertia>")
@@ -206,7 +207,7 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
 def emit_params_yaml(path, total_mass, cg, I):
     """Rewrite ONLY the mass_properties block (between the EMIT sentinel
     markers) of the single-source-of-truth vehicle_params.yaml, preserving
-    every other line and comment. This keeps physics.py / hover.py / the SDF
+    every other line and comment. This keeps the flight code / the SDF
     generator all reading one authoritative set of numbers -- see that file's
     header for the full contract."""
     start = "# <<<EMIT:mass_properties"

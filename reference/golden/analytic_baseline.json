@@ -1,0 +1,194 @@
+{
+  "allocation_roundtrip": {
+    "cases_unsaturated": 2000,
+    "worst_moment_error_Nm_measured": 4.286e-13,
+    "worst_moment_error_Nm_under": 1e-09
+  },
+  "authority_at_hover": {
+    "T_hover_N": 13.02768,
+    "roll_headroom_Nm": 0.088807895,
+    "roll_limit_hi_Nm": 0.147329518,
+    "roll_limit_lo_Nm": -0.088807895,
+    "roll_limits_vs_thrust": {
+      "10.00": [
+        -0.160955684,
+        0.156930846
+      ],
+      "12.00": [
+        -0.113313235,
+        0.165224842
+      ],
+      "13.03": [
+        -0.088798676,
+        0.147322435
+      ],
+      "15.00": [
+        -0.044929209,
+        0.10082211
+      ],
+      "17.00": [
+        -0.000130555,
+        0.042530075
+      ],
+      "8.00": [
+        -0.130230032,
+        0.124658623
+      ]
+    }
+  },
+  "scenarios": {
+    "climb and hold": {
+      "detail": "final z = 2.000 m (err +0.000), thrust 6.36-17.79 N, saturated 2% of the run",
+      "metrics": {
+        "altitude_error_m": 2.496e-05,
+        "final_pitch_deg": 0.0,
+        "final_roll_deg": 6e-09,
+        "final_yaw_deg": 0.0,
+        "final_z_m": 2.00002496,
+        "gimbal_sat_frac": 0.0,
+        "max_alt_sag_m": 1.999820696,
+        "max_gimbal_inner_deg": 0.508785138,
+        "max_gimbal_outer_deg": 0.189799814,
+        "max_tau_p_Nm": 0.056099234,
+        "pitch_error_deg": 0.0,
+        "roll_error_deg": 6e-09,
+        "roll_sat_frac": 0.07,
+        "settling_time_s": 0.83,
+        "thrust_sat_frac": 0.019166667,
+        "yaw_error_deg": 0.0
+      },
+      "pass": true
+    },
+    "lateral upset recovery": {
+      "detail": "final lateral = (+0.000, +0.000) deg, peak gimbal 6.46/6.66 deg of 7.0, saturated 1% of the run",
+      "metrics": {
+        "altitude_error_m": -0.266807367,
+        "final_pitch_deg": 2e-09,
+        "final_roll_deg": 2.577e-06,
+        "final_yaw_deg": 3e-09,
+        "final_z_m": -0.266807367,
+        "gimbal_sat_frac": 0.006666667,
+        "max_alt_sag_m": 0.266807367,
+        "max_gimbal_inner_deg": 6.46,
+        "max_gimbal_outer_deg": 6.664031622,
+        "max_tau_p_Nm": 0.008900724,
+        "pitch_error_deg": 2e-09,
+        "roll_error_deg": 2.577e-06,
+        "roll_sat_frac": 0.0,
+        "settling_time_s": 0.64,
+        "thrust_sat_frac": 0.0,
+        "yaw_error_deg": 3e-09
+      },
+      "pass": true
+    },
+    "motor lag model (roll channel)": {
+      "detail": "as a LAG: final roll 0.000 deg (stable). AS A DELAY: peak roll 72.5 deg, 97% saturated -- UNRESOLVED, needs one bench run",
+      "metrics": {
+        "altitude_error_m": -0.000838947,
+        "final_pitch_deg": 8.3e-08,
+        "final_roll_deg": 0.000114505,
+        "final_yaw_deg": 1.48e-07,
+        "final_z_m": -0.000838947,
+        "gimbal_sat_frac": 0.0,
+        "max_alt_sag_m": 0.000838947,
+        "max_gimbal_inner_deg": 0.652334683,
+        "max_gimbal_outer_deg": 0.29540956,
+        "max_tau_p_Nm": 0.088807895,
+        "pitch_error_deg": 8.3e-08,
+        "roll_error_deg": 0.000114505,
+        "roll_sat_frac": 0.055,
+        "settling_time_s": 0.36,
+        "thrust_sat_frac": 0.0,
+        "yaw_error_deg": 1.48e-07
+      },
+      "pass": true
+    },
+    "roll upset recovery": {
+      "detail": "final roll = +0.000 deg, peak |tau_P| = 0.0888 N.m of 0.0888 available at hover (100%), capped 6% of the run",
+      "metrics": {
+        "altitude_error_m": -0.000838947,
+        "final_pitch_deg": 8.3e-08,
+        "final_roll_deg": 0.000114505,
+        "final_yaw_deg": 1.48e-07,
+        "final_z_m": -0.000838947,
+        "gimbal_sat_frac": 0.0,
+        "max_alt_sag_m": 0.000838947,
+        "max_gimbal_inner_deg": 0.652334683,
+        "max_gimbal_outer_deg": 0.29540956,
+        "max_tau_p_Nm": 0.088807895,
+        "pitch_error_deg": 8.3e-08,
+        "roll_error_deg": 0.000114505,
+        "roll_sat_frac": 0.055,
+        "settling_time_s": 0.36,
+        "thrust_sat_frac": 0.0,
+        "yaw_error_deg": 1.48e-07
+      },
+      "pass": true
+    },
+    "tilted hover (1/cos compensation)": {
+      "detail": "peak altitude sag 0.0010 m with compensation vs 0.0061 m without (84% less); final tilt +6.00 deg",
+      "metrics": {
+        "altitude_error_m": 7e-09,
+        "final_pitch_deg": -0.0,
+        "final_roll_deg": -0.0,
+        "final_yaw_deg": 6.0,
+        "final_z_m": 2.000000007,
+        "gimbal_sat_frac": 0.0,
+        "max_alt_sag_m": 0.000980862,
+        "max_gimbal_inner_deg": 5.424783223,
+        "max_gimbal_outer_deg": 0.041364836,
+        "max_tau_p_Nm": 0.011753823,
+        "pitch_error_deg": -0.0,
+        "roll_error_deg": -0.0,
+        "roll_sat_frac": 0.0,
+        "settling_time_s": 0.63,
+        "thrust_sat_frac": 0.0,
+        "yaw_error_deg": -0.0
+      },
+      "pass": true
+    }
+  },
+  "smoke_test": {
+    "altitude_error_m": -0.483906091,
+    "final_pitch_deg": 5.92e-07,
+    "final_roll_deg": 6.739e-06,
+    "final_yaw_deg": 5.000000009,
+    "final_z_m": -0.483906091,
+    "gimbal_sat_frac": 0.01,
+    "max_alt_sag_m": 0.483906091,
+    "max_gimbal_inner_deg": 6.46,
+    "max_gimbal_outer_deg": 2.17799366,
+    "max_tau_p_Nm": 0.012419248,
+    "pitch_error_deg": 5.92e-07,
+    "roll_error_deg": 6.739e-06,
+    "roll_sat_frac": 0.0,
+    "settling_time_s": 0.64,
+    "thrust_sat_frac": 0.0,
+    "yaw_error_deg": 9e-09
+  },
+  "vehicle": {
+    "Ix": 0.022616,
+    "Iy": 0.022581,
+    "Iz": 0.001957,
+    "L": 0.2111,
+    "T_max": 17.79,
+    "T_min": 5.0,
+    "delta_max_deg": [
+      6.98,
+      6.86
+    ],
+    "delta_min_deg": [
+      -6.46,
+      -6.77
+    ],
+    "delta_rate_max_deg": [
+      403.0,
+      235.0
+    ],
+    "g": 9.81,
+    "gimbal_deadtime_s": 0.03,
+    "gimbal_max_deg": 7.0,
+    "m": 1.328,
+    "surface_present": true
+  }
+}

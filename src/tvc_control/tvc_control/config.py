@@ -1,34 +1,38 @@
 """
 config.py -- the ONLY place vehicle numbers enter the program.
 ================================================================================
-This module reads vehicle_params.yaml and builds the plain structs the flight
-code consumes. It is deliberately NOT in `gnc/`: flight code does no file I/O,
-and a parameter block is injected once at startup rather than looked up. That is
-how PX4's parameter system works, and keeping the same shape is what makes the
-eventual C++ port a port rather than a redesign.
+Reads vehicle_params.yaml and control_gains.yaml and builds the plain structs the
+flight code consumes.
 
-There is no fallback. Previous versions of this project carried literal default
-constants for the case where the YAML could not be found, and those defaults
-went stale -- a superseded 20.0 N max thrust survived in three separate files
-after the bench measured 17.79 N, and a 180 deg/s slew rate outlived its
-measurement at 235/403. A number that can silently disagree with the source of
-truth WILL, so a missing or unreadable YAML is now an error.
-Every simulator imports this instead of hard-coding mass / inertia / lever-arm /
-thrust constants, so there is exactly one place those numbers live. See
-sim/vehicle_params.yaml for the data and the provenance of each field.
+WHY THIS IS NOT IN gnc/
+    Flight code does no file I/O. A parameter block is injected once at startup,
+    never looked up during a control step. That is how PX4's parameter system
+    works, and keeping the same shape is what makes the eventual C++ port a port
+    rather than a redesign. tests/test_gnc_purity.py enforces it.
 
-Usage:
-    from vehicle_params import load
-    vp = load()
-    vp.mass, vp.Ix, vp.Iy, vp.Iz     # kg, kg*m^2
-    vp.L                             # m, control lever arm (mode-dependent)
-    vp.cg                            # (x, y, z) in METERS
-    vp.gimbal_max_deg, vp.gimbal_rate_max_deg
-    vp.max_rot_velocity, vp.motor_constant, vp.thrust_at_max_n, vp.moment_constant
-    vp.tau_p_max_nm                  # N*m or None (see the YAML)
-    vp.gimbal_deadtime_s             # s
-    vp.g
-    vp.raw                           # the full parsed dict, for less-common fields
+WHY THERE IS NO FALLBACK
+    Earlier versions carried literal default constants for the case where the
+    YAML could not be found. Those defaults went stale: a superseded 20.0 N max
+    thrust survived in three separate files after the bench measured 17.79 N,
+    and a 180 deg/s gimbal slew outlived its measurement at 235/403 deg/s.
+    Nothing failed -- the simulation quietly described a different vehicle.
+    A number that CAN silently disagree with the source of truth eventually WILL,
+    so a missing or unreadable YAML is now an error.
+
+THE THREE ENTRY POINTS
+
+    load()                 -> Vehicle       the YAML, flattened and unit-normalized
+    load_vehicle_params()  -> VehicleParams what gnc/ consumes (SI, no defaults)
+    load_gains(profile)    -> ControlGains  a named profile from control_gains.yaml
+
+`Vehicle` keeps the full parsed dict on `.raw` for the fields without a
+convenience accessor -- the rotor solver constants, the measured fit statistics,
+the motor-dynamics block. Consumers that need those read `.raw`, so adding a
+field to the YAML does not require touching this file.
+
+Print everything, with provenance:
+
+    python tvc.py params
 """
 import os
 from dataclasses import dataclass
@@ -39,7 +43,7 @@ _DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "vehicle_params.yaml")
 
 # The axis convention the YAML (and therefore every consumer) is written in.
-# See docs/CONVENTIONS.md. Loading a file that predates or postdates the rename
+# See docs/3-CONVENTIONS.md. Loading a file that predates or postdates the rename
 # must fail loudly rather than reinterpret its numbers under the wrong names.
 SUPPORTED_AXIS_CONVENTIONS = ("rocket_v2",)
 
@@ -96,7 +100,7 @@ def load(path=None):
     conv = d.get("axis_convention", "rocket_v2")
     if conv not in SUPPORTED_AXIS_CONVENTIONS:
         raise ValueError(
-            "unknown axis_convention %r in %s -- see docs/CONVENTIONS.md"
+            "unknown axis_convention %r in %s -- see docs/3-CONVENTIONS.md"
             % (conv, path))
 
     mp = d["mass_properties"]
@@ -231,28 +235,138 @@ def load_gains(profile=None, path=None):
     )
 
 
-if __name__ == "__main__":
-    vp = load()
-    print("Loaded sim/vehicle_params.yaml:")
-    print("  mass         %.4f kg" % vp.mass)
-    print("  CG           (%.1f, %.1f, %.1f) mm"
-          % tuple(c * 1000 for c in vp.cg))
-    print("  inertia      Ix=%.6f Iy=%.6f Iz=%.6f" % (vp.Ix, vp.Iy, vp.Iz))
-    print("  lever arm L  %.4f m   (mode=%s, rotor_z=%.1f mm)"
-          % (vp.L, vp.lever_arm_mode, vp.rotor_z * 1000))
-    print("  gimbal       +/-%.1f deg, %.0f deg/s, deadtime %.0f ms"
-          % (vp.gimbal_max_deg, vp.gimbal_rate_max_deg,
-             vp.gimbal_deadtime_s * 1000))
-    print("  tau_P cap    %s"
-          % ("%.4f N.m (measured)" % vp.tau_p_max_nm
-             if vp.tau_p_max_nm else "analytic headroom (none measured)"))
-    print("  thrust max   %.2f N   (T/W = %.2f)"
-          % (vp.thrust_at_max_n, vp.thrust_at_max_n / vp.weight_n))
-    print("  surface      %s" % (vp.surface.get("type") or "NONE (analytic fallback)"))
+# =============================================================================
+# The parameter report: every number, its value, and where it came from.
+# =============================================================================
+# ONE generator, two consumers: `python tvc.py params` prints it, and
+# tools/gen_docs.py splices it into docs/4-PARAMETERS.md between EMIT markers.
+# A documented number that can drift from the YAML is a number that will, so the
+# document is generated and CI fails when it is stale.
+#
+# The `source` column is the point of the table. "measured" and "estimated" are
+# different kinds of claim, and a reader deciding how far to trust a simulation
+# result needs to see which is which without opening the YAML.
+
+# provenance tags, in decreasing order of how much they are worth
+MEASURED = "measured"        # from a bench run, with a stated fit error
+DERIVED = "derived"          # computed from measured or CAD inputs
+CAD = "CAD"                  # from the STEP/STL model: design intent, not metrology
+ESTIMATED = "estimated"      # someone's assumption; no measurement exists
+CHOSEN = "chosen"            # a modelling or control decision, not a property
+SOLVER = "solver"            # a constant that exists to make a numeric method work
+
+
+def parameter_rows(v=None):
+    """-> [(section, name, value, unit, source, note)] for the whole vehicle."""
+    v = v or load()
+    mp, gim, rot = v.raw["mass_properties"], v.raw["gimbal"], v.raw["rotors"]
+    surf, md = v.raw.get("thrust_torque_surface") or {}, v.motor_dynamics
+    fit = surf.get("fit") or {}
+    R = []
+
+    R.append(("Mass properties", "mass", "%.4f" % v.mass, "kg", CAD,
+              "components.yaml + a lumped remainder to the 1328 g design total"))
+    for i, ax in enumerate("xyz"):
+        R.append(("Mass properties", "CG %s" % ax, "%+.1f" % (v.cg[i] * 1000),
+                  "mm", DERIVED, "computed from the itemized masses"))
+    for nm, val in (("Ixx", v.Ix), ("Iyy", v.Iy), ("Izz", v.Iz)):
+        R.append(("Mass properties", nm, "%.6f" % val, "kg*m^2", DERIVED,
+                  "mesh inertia for CAD solids, m*d^2 for point masses"))
+    for nm, val in (("Ixy", v.Ixy), ("Ixz", v.Ixz), ("Iyz", v.Iyz)):
+        R.append(("Mass properties", nm, "%+.6f" % val, "kg*m^2", DERIVED,
+                  "product of inertia -- NOT negligible here: Iyz is %.0f%% "
+                  "of Izz" % (100 * abs(v.Iyz) / v.Iz) if nm == "Iyz"
+                  else "product of inertia, carried in full"))
+
+    R.append(("Geometry", "lever arm L", "%.4f" % v.L, "m", ESTIMATED,
+              "mode=%s; UNMEASURED and it sets all lateral authority"
+              % v.lever_arm_mode))
+    R.append(("Geometry", "rotor plane z", "%.1f" % (v.rotor_z * 1000), "mm", CAD,
+              "where the multicopter plugin applies thrust"))
+
+    R.append(("Gimbal", "travel (nominal)", "+/-%.1f" % v.gimbal_max_deg, "deg",
+              MEASURED, "symmetric summary; the SDF joint stops use it"))
     for name in ("inner", "outer"):
-        ax = vp.gimbal_axes.get(name)
-        if ax:
-            print("  gimbal %-5s %+.2f .. %+.2f deg, %.4f deg/us @ %.1f us, "
-                  "%.0f deg/s, BW %.0f Hz"
-                  % (name, ax["min_deg"], ax["max_deg"], ax["gain_deg_per_us"],
-                     ax["neutral_pwm"], ax["rate_max_deg"], ax["bandwidth_hz"]))
+        a = (v.gimbal_axes or {}).get(name)
+        if not a:
+            continue
+        plane = "yaw plane (body y)" if name == "inner" else "pitch plane (body x)"
+        R.append(("Gimbal", "%s travel" % name,
+                  "%+.2f .. %+.2f" % (a["min_deg"], a["max_deg"]), "deg", MEASURED,
+                  "%s; asymmetric about its own neutral" % plane))
+        R.append(("Gimbal", "%s slew" % name, "%.0f" % a["rate_max_deg"],
+                  "deg/s", MEASURED, "peak measured rate"))
+        R.append(("Gimbal", "%s bandwidth" % name, "%.0f" % a["bandwidth_hz"],
+                  "Hz", MEASURED, "-3 dB; resonance +%.0f dB is NOT modelled"
+                  % a.get("resonance_db", 0.0)))
+        f = a.get("fit") or {}
+        R.append(("Gimbal", "%s angle fit" % name,
+                  "RMSE %.3f" % f.get("rmse_deg", 0.0), "deg", MEASURED,
+                  "R2 %.4f, hysteresis up to %.2f deg (unmodelled)"
+                  % (f.get("r2", 0.0), f.get("hysteresis_max_deg", 0.0))))
+    R.append(("Gimbal", "transport deadtime", "%.0f" % (v.gimbal_deadtime_s * 1000),
+              "ms", MEASURED, "pure delay; costs phase at every frequency"))
+
+    R.append(("Rotors", "max thrust", "%.2f" % v.thrust_at_max_n, "N", MEASURED,
+              "f_T(1,1) of the surface; T/W = %.2f" % (v.thrust_at_max_n / v.weight_n)))
+    R.append(("Rotors", "motor_constant", "%.3g" % v.motor_constant,
+              "N/(rad/s)^2", DERIVED, "from max thrust; used by the gz plugin"))
+    R.append(("Rotors", "moment_constant", "%.3g" % v.moment_constant, "m", SOLVER,
+              "NOT a drag ratio -- scaling for the Gazebo command-side inversion"))
+    R.append(("Rotors", "max_rot_velocity", "%.0f" % v.max_rot_velocity, "rad/s",
+              SOLVER, "solver headroom, not a physical RPM limit"))
+    R.append(("Rotors", "rotor drag / rolling", "0.0", "-", CHOSEN,
+              "zeroed for plant parity: they scale with a fictitious omega"))
+
+    if surf:
+        R.append(("Thrust/torque surface", "form", surf.get("type", "-"), "-",
+                  MEASURED, "cubic in a=(A-1500)/500, b=(B-1500)/500"))
+        t, q = fit.get("thrust") or {}, fit.get("torque") or {}
+        R.append(("Thrust/torque surface", "thrust fit",
+                  "RMSE %.3f" % t.get("rmse_n", 0.0), "N", MEASURED,
+                  "R2 %.4f over 119 of 121 swept points" % t.get("r2", 0.0)))
+        R.append(("Thrust/torque surface", "torque fit",
+                  "RMSE %.4f" % q.get("rmse_nm", 0.0), "N*m", MEASURED,
+                  "R2 %.4f; fresh-pack, no derating modelled" % q.get("r2", 0.0)))
+
+    R.append(("Motor dynamics", "response", "%.0f" % (md.get("response_delay_s", 0) * 1000),
+              "ms", MEASURED,
+              "OPEN: delay or lag is not recorded, and it decides roll controllability"))
+    R.append(("Motor dynamics", "model", str(md.get("model")), "-", CHOSEN,
+              "the optimistic reading of the line above"))
+    R.append(("Motor dynamics", "tau_s", "%.3f" % md.get("tau_s", 0.0), "s", CHOSEN,
+              "first-order time constant on (T, tau_P)"))
+    sl = md.get("sustained_load") or {}
+    if sl:
+        R.append(("Motor dynamics", "sustained derate",
+                  "%.1f -> %.1f" % (sl["thrust_start_n"], sl["thrust_end_n"]), "N",
+                  MEASURED, "over 7 x 60 s; recorded, NOT modelled"))
+
+    R.append(("Environment", "gravity", "%.2f" % v.g, "m/s^2", CHOSEN, ""))
+    return R
+
+
+def format_parameter_table(rows=None, markdown=True):
+    """-> a printable table. markdown=False gives fixed-width text for a terminal."""
+    rows = rows if rows is not None else parameter_rows()
+    out, section = [], None
+    if markdown:
+        for sec, name, val, unit, src, note in rows:
+            if sec != section:
+                section, _ = sec, out.extend(
+                    ["", "### %s" % sec, "",
+                     "| quantity | value | unit | source | note |",
+                     "|---|---|---|---|---|"])
+            out.append("| %s | `%s` | %s | **%s** | %s |"
+                       % (name, val, unit or "-", src, note))
+        return "\n".join(out).strip()
+    for sec, name, val, unit, src, note in rows:
+        if sec != section:
+            section = sec
+            out.append("")
+            out.append(sec)
+            out.append("-" * len(sec))
+
+        out.append("  %-22s %14s %-9s %-10s %s"
+                   % (name, val, unit or "", src, note))
+    return "\n".join(out).strip()

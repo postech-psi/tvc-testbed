@@ -1,7 +1,17 @@
 """
 6-DOF rigid-body dynamics. Simulation only -- this never flies.
 ================================================================================
-Moved verbatim from physics.py.
+Newton-Euler for a rigid body with one gimballed thrust vector applied below the
+centre of mass, plus the propellers' reaction torque about that same tilted axis.
+13 states: position, velocity (both inertial), attitude quaternion, body rates.
+
+The full moment derivation, and the three things that follow from it, are in
+docs/2-THEORY.md section 3. The short version: the gimbal has NO authority about
+the thrust axis, tau_P is NOT absent from the lateral axes, and lateral authority
+is proportional to T*L so it falls during descent.
+
+This is the only place scipy and numpy appear on the fast path, and it is the
+reason both are forbidden in gnc/: an integrator is not flight code.
 """
 
 import numpy as np

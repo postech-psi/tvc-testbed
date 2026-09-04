@@ -24,14 +24,17 @@ setup(
     zip_safe=True,
     maintainer='devkyber',
     maintainer_email='kyber06@icloud.com',
-    description='Phase 4: simulator_node + controller_node, splitting tvc_physics.py across a ROS2 topic boundary',
+    description='TVC VTVL flight code, plant models and ROS 2 nodes for the '
+                'POSTECH UGRP coaxial thrust-vectored demonstrator',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'simulator_node = tvc_control.simulator_node:main',
-            'controller_node = tvc_control.controller_node:main',
-            'gazebo_bridge_node = tvc_control.gazebo_bridge_node:main',
+            'simulator_node = tvc_control.nodes.simulator:main',
+            'controller_node = tvc_control.nodes.controller:main',
+            'gazebo_bridge_node = tvc_control.nodes.gazebo_bridge:main',
+            # The same CLI as ./tvc.py, available once the package is installed.
+            'tvc = tvc_control.__main__:main',
         ],
     },
 )

@@ -3,7 +3,7 @@
 <package format="3">
   <name>tvc_msgs</name>
   <version>0.0.1</version>
-  <description>Custom message definitions for the TVC VTVL control stack (gimbal commands)</description>
+  <description>ActuatorCommand: everything the TVC flight code decides in one control step, in one time-aligned message</description>
   <maintainer email="kyber06@icloud.com">devkyber</maintainer>
   <license>TODO: License declaration</license>
 

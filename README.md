@@ -1,177 +1,146 @@
-# Docker Dev Environment — TVC VTVL UGRP
+# tvc-testbed
 
-This gets you a development environment — ROS2 Jazzy + Gazebo Harmonic + the PX4 bridge tool — that is identical on every machine it runs on, whether that's your laptop, a teammate's, or a lab workstation. That sameness is the entire point of using Docker here: "it works on my machine" stops being a possible excuse, because everyone's machine is running the same container.
+Simulator and flight code for a **coaxial thrust-vector-controlled VTVL
+demonstrator** — POSTECH UGRP 2026. Two counter-rotating propellers on a 2-axis
+gimbal, 1.33 kg, T/W 1.37. The goal is a vehicle that takes off vertically,
+hovers under thrust vector control, and lands: a testbed for reusable-launch-
+vehicle GNC that the next team can extend rather than rebuild.
 
-**Looking for the simulator?** Jump to [Running the simulator](#running-the-simulator) below. Start with [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — frames, axis names and signs live there and nowhere else — and read [docs/CREDIBILITY.md](docs/CREDIBILITY.md) before trusting any number that comes out.
+This repository answers *what will the vehicle do, and what code flies it*. The
+companion repository `tvc-data` answers *what does the hardware actually do*, and
+the dependency runs one way: bench measurements parameterise this model, never
+the reverse.
 
-## Running the simulator
+---
 
-One vehicle model, one controller, three ways to fly it. The flight code in
-`tvc_control/gnc/` is identical in all three — only the plant and the transport
-change, which is what makes a result obtained in one of them evidence about the
-others.
-
-| what | command | needs |
-|---|---|---|
-| **Fast analytic loop** — no ROS, no Gazebo. The inner loop for tuning and the fastest way to attribute a failure to control rather than physics. | `python sim/validate_control.py --verbose` | Python only |
-| **Interactive** — the Tkinter GUI and the 3D viewer over the same analytic plant. | `python tvc_gui.py` | Python + tkinter |
-| **Gazebo, no ROS** — the standalone gz-transport controller. Fewest moving parts of the two Gazebo paths. | `bash sim/run_hover.sh --duration 30 --altitude 2.0` | devcontainer |
-| **Gazebo + ROS 2** — the full stack: gz plant, ros_gz_bridge, controller node. | `ros2 launch tvc_control gazebo.launch.py` | devcontainer + `colcon build` |
-| **ROS 2, no Gazebo** — same nodes, analytic plant. Differs from the line above only in which plant process runs. | `ros2 launch tvc_control phase4.launch.py` | devcontainer + `colcon build` |
-
-Checks, all of which CI runs:
+## Start here
 
 ```bash
-python -m pytest tests/ -q            # porting discipline, axis convention, allocation
-python sim/capture_golden.py --check  # the frozen numerical baseline
-python tools/gen_model_sdf.py --check # the Gazebo model matches the parameters
+python tvc.py --help          # every runnable thing in this repository
+python tvc.py validate        # 5 closed-loop scenarios, ~20 s, no dependencies
+python tvc.py params          # every vehicle number, with its provenance
 ```
 
-The ROS 2 packages have **never been built**. Before the first launch:
+`tvc.py` is the only executable file at the top level. Everything else is a
+library, an asset, or a document.
 
-```bash
-colcon build --packages-select tvc_msgs
-source install/setup.bash
-colcon build --packages-select tvc_control
-```
+Then read, in order:
 
-### Where things live
+| | |
+|---|---|
+| [docs/1-ARCHITECTURE.md](docs/1-ARCHITECTURE.md) | the six layers, the two seams, and a file-by-file map |
+| [docs/2-THEORY.md](docs/2-THEORY.md) | every equation the simulator implements, derived, with references |
+| [docs/3-CONVENTIONS.md](docs/3-CONVENTIONS.md) | frames, axis names, signs, units — the single source |
+| [docs/4-PARAMETERS.md](docs/4-PARAMETERS.md) | every number, where it came from, how much to trust it |
+| [docs/5-RUNNING.md](docs/5-RUNNING.md) | the four pipelines, what each one is for, what its output means |
+| [docs/6-CREDIBILITY.md](docs/6-CREDIBILITY.md) | **read before believing any result.** Validation is level 0 |
+| [docs/7-ROADMAP.md](docs/7-ROADMAP.md) | what is next, what is deferred, what is genuinely unknown |
 
-```
-tvc_control/gnc/      FLIGHT CODE. Controller, allocation, actuator effectiveness.
-                      Pure Python by rule (tests/test_gnc_purity.py enforces it)
-                      so the eventual PX4 module is a port, not a rewrite.
-tvc_control/plant/    SIMULATION ONLY. Rigid body, actuator lag, sensors.
-                      gnc must never import from here.
-tvc_control/hal/      Transport adapters. No control.
-tvc_control/harness/  Owns the clock and the I/O.
-docs/CONVENTIONS.md   Frames, axis names, signs, identifiers. The single source.
-docs/CREDIBILITY.md   How much to trust the output, and on what evidence.
-sim/golden/           Frozen numbers. A change here must be deliberate.
-```
+Supporting: [docs/MASS-BUDGET.md](docs/MASS-BUDGET.md) (where the mass and
+inertia come from) and [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) (the Docker
+environment, needed only for ROS 2 and Gazebo).
 
-## Concepts, briefly (skip if you already know Docker)
+---
 
-Three words come up constantly and are worth being precise about:
+## The four pipelines
 
-- **Image** — a built, read-only template (think: a class, not an instance). Defined by a `Dockerfile`. Building an image doesn't run anything; it just produces the template.
-- **Container** — a running instance of an image (the instance of that class). You can start, stop, and delete containers freely without touching the image they came from.
-- **Rebuild** — re-running the Dockerfile's instructions to produce a new image, needed whenever the Dockerfile itself changes. Editing your project's code does *not* require a rebuild — only editing the Dockerfile does.
+One controller, four ways to run it. The flight code in `gnc/` is **identical**
+in all four — only the plant and the transport change, which is what makes a
+result obtained in one of them evidence about the others.
 
-A **Dev Container** (what VS Code's "Reopen in Container" button uses) is a further convention on top of plain Docker: a `.devcontainer/devcontainer.json` file tells VS Code which Dockerfile to build, which folder to mount your code into, and which editor extensions to install *inside* the container. The effect is that VS Code's terminal, IntelliSense, and debugger all operate inside the container, while you keep editing files as if they were local.
-
-## Quick Start
-
-**1. Install two things, once:**
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — during install, choose "install for this user" (no admin rights needed)
-- [VS Code](https://code.visualstudio.com/) + its **Dev Containers** extension (`Ctrl+Shift+X` → search "Dev Containers" → Install)
-
-**2. Open the project:**
-```bash
-cd tvc-testbed
-code .
-```
-
-**3. Click "Reopen in Container"** when VS Code prompts you (a notification appears in the bottom-right corner).
-
-What happens next, concretely: VS Code reads `.devcontainer/devcontainer.json`, which points at the `Dockerfile`; Docker builds an image from it (downloading each tool listed there); then VS Code starts a container from that image and reopens itself inside it. First time, this takes roughly 10 minutes, because every layer has to be downloaded and built. After that, Docker caches the result — reopening is a matter of seconds, and even a full rebuild after a small Dockerfile edit only redoes the layers after your change.
-
-**4. Verify it worked.** Open a terminal inside VS Code (`` Ctrl+` ``) — this terminal is running inside the container, not on your host machine — and run:
-```bash
-ros2 --version      # → ROS 2 release 'jazzy'
-gz sim --version    # → Gazebo Sim, version 8.x
-```
-
-If both print a version, the environment is ready. From here, edit code normally; files are synced live between your machine and the container (see "workspaceMount" in `devcontainer.json` — it's a bind mount, meaning the container is looking at the exact same files on disk as your editor, not a copy).
-
-**5. Run your first ROS2 pipeline.** `src/tvc_demo/` is a minimal ROS2 package — a publisher node counting up once a second and a subscriber node printing what it receives — included specifically to prove the whole ROS2 pipeline (build → run → topics → messages) works before any real physics code is involved. This is the pattern Phase 4's actual simulator/controller nodes will follow, just with a counter instead of vehicle attitude.
-
-In the container terminal:
-```bash
-colcon build              # compiles every package under src/
-source install/setup.bash # makes the new packages available on this shell
-ros2 launch tvc_demo demo.launch.py
-```
-You should see alternating `Publishing: N` and `Received: N` log lines. `Ctrl+C` to stop. `colcon build` only needs to be re-run after you change or add package source; `source install/setup.bash` needs to be re-run in any *new* terminal you open (each terminal is a separate shell, so nothing from the last one carries over).
-
-## Git & GitHub setup
-
-This repo lives at `github.com/postech-psi/tvc-testbed`. A few things are worth knowing about how git interacts with the container:
-
-**Cloning (first time only):**
-```bash
-git clone https://github.com/postech-psi/tvc-testbed.git
-cd tvc-testbed
-code .
-```
-
-**Git identity** — the container does *not* automatically inherit your host machine's git identity (name/email used to label commits). Set it once per machine:
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-```
-You can run this either in a normal terminal on your host, or inside the VS Code terminal while attached to the container — they're separate environments, so pick whichever one you'll actually be committing from. Most people commit from the host side (VS Code's Source Control panel works the same either way) and only use the container terminal for ROS2/build commands.
-
-
-
-Either works; PAT + VS Code's built-in sign-in is the simplest for a first-time setup.
-
-## What's inside, and why
-
-| Tool | What it generally does | Why this project needs it | Phase |
+| pipeline | command | plant | needs |
 |---|---|---|---|
-| ROS2 Jazzy | Middleware for message-passing between processes ("nodes") over "topics" | The nodes you'll write for the vehicle's control loop communicate this way | 3 |
-| Gazebo Harmonic | Physics simulator | Lets you test control code against simulated vehicle dynamics before real hardware exists (SIL: Simulation-In-the-Loop) | 4 |
-| Micro-XRCE-DDS-Agent | Protocol bridge | Translates between ROS2's messaging format and PX4's own (uXRCE-DDS), so a ROS2 node can command a PX4 flight controller | 5 |
-| numpy / scipy / matplotlib | Numerical computing / plotting | Same stack `tvc_physics.py` already uses, so results are identical whether run on your host or in this container | all |
+| **MIL** — analytic, fixed-step, deterministic | `python tvc.py validate` | `plant/` | Python |
+| **Interactive** — same plant, with a form and a 3D view | `python tvc.py gui` | `plant/` | + a display |
+| **SIL, no ROS** — gz-sim over gz-transport | `bash gazebo/run_hover.sh` | Gazebo | devcontainer |
+| **SIL, full stack** — gz-sim + ROS 2 nodes | `ros2 launch tvc_control gazebo.launch.py` | Gazebo | devcontainer + `colcon build` |
 
-Nothing here targets a Raspberry Pi or real flight hardware yet (Phase 6) — that will be a separate, smaller image built specifically for deployment, once there's an actual Pixhawk to talk to. Building that now would be maintaining a second thing with no way yet to test it.
+A fifth, `ros2 launch tvc_control analytic.launch.py`, runs the ROS 2 nodes
+against the analytic plant. It differs from the line above it only in which
+plant process starts, which is how a failure gets attributed to the control code
+or to the physics engine.
 
-**Deliberately excluded:** the ARM cross-compiler toolchain (`arm-none-eabi-gcc`). That toolchain compiles PX4 *firmware* for the Pixhawk's own microcontroller — a different target than the plain x86_64 build used by PX4 SITL (the simulated version used in Phases 4–5, which builds with the same compiler as everything else here). If a later phase needs to compile custom firmware, that's a one-line addition then, not a reason to carry it now.
+Full detail, including what each output means: [docs/5-RUNNING.md](docs/5-RUNNING.md).
 
-## Project layout
+---
+
+## What is in the repository
 
 ```
-Dockerfile             the image definition — see inline comments for what each instruction does
-.devcontainer/          tells VS Code how to build and open the container
-.dockerignore           files Docker should not copy into the build context (build artifacts, .git, etc.)
+tvc.py                 the entry point. --help lists everything.
+docs/                  seven numbered documents; read them in order.
+src/
+  tvc_control/         the ROS 2 python package -- ALL the code lives here
+    tvc_control/
+      gnc/             FLIGHT CODE. Runs on the vehicle. Pure Python by rule.
+      plant/           SIMULATION ONLY. Rigid body, actuator lag, sensors.
+      hal/             transport adapters. No control.
+      harness/         owns the clock and the I/O. mil.py and gz.py.
+      nodes/           ROS 2 wrappers. Thin: no control math.
+      apps/            GUI, 3D viewer, plotter, GIF recorder.
+      verify/          the scenario suite and the frozen baseline.
+      config.py        the ONLY place vehicle numbers enter the program.
+      vehicle_params.yaml   what the hardware IS (measured)
+      control_gains.yaml    what we CHOSE (tuned)
+    launch/            two launch files, differing only in the plant.
+  tvc_msgs/            one message: ActuatorCommand.
+gazebo/                the SDF model, the worlds, and run_hover.sh.
+tools/                 generators: CAD -> mass properties -> parameters -> SDF.
+tests/                 the merge gate. Pure Python, no ROS, no Gazebo.
+reference/             frozen baselines, the PX4 airframe, a servo sketch.
 ```
 
-The `.dockerignore` file matters for a reason worth understanding generally: every file in your project folder (except what's excluded here) gets sent to the Docker build process as the "build context," even for files no instruction ever references. On a large repo with build artifacts or a `.git` history, that can make builds slow for no benefit — hence excluding them.
+The double `src/tvc_control/tvc_control/` is ROS 2's convention, not a mistake:
+a colcon package directory contains a Python package of the same name.
 
-## Adding a library later
+### Three rules the tests enforce
 
-The general shape of adding anything to a Docker image is: edit the Dockerfile, then rebuild. Two common cases:
+1. **`gnc/` imports only `math`, `dataclasses` and `typing`.** No numpy, no
+   scipy, no file I/O, no `while` loops, no reach into `plant/`. That is what
+   makes the eventual PX4 C++ module a port rather than a rewrite, and
+   `tests/test_gnc_purity.py` parses the source to enforce it.
+2. **Numbers live in one place.** `vehicle_params.yaml` is the source of truth;
+   `model.sdf` and `docs/4-PARAMETERS.md` are generated from it and CI fails if
+   either has drifted. There is no fallback constant anywhere — a missing YAML
+   is an error, because defaults that can disagree with a measurement eventually
+   do. (A superseded 20 N max thrust once survived in three files after the
+   bench measured 17.79 N.)
+3. **One controller.** Every pipeline reaches the control law through
+   `TvcController`. `tests/test_consistency.py` fails if a gain constant appears
+   anywhere outside `control_gains.yaml`.
 
-**A system/ROS2 package** (installed via `apt`) — add it to the relevant `apt-get install` block:
-```dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-jazzy-cv-bridge \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+---
+
+## Checks
+
+All three run in CI, and the first is the merge gate.
+
+```bash
+python -m pytest tests/ -q         # 54 tests: purity, conventions, allocation, scenarios
+python tvc.py golden --check       # the frozen numerical baseline
+python tools/gen_model_sdf.py --check   # the Gazebo model matches the parameters
+python tools/gen_docs.py --check        # the documented numbers match the YAML
 ```
 
-**A Python package** (installed via `pip`) — add it to the `pip3 install` line:
-```dockerfile
-RUN pip3 install --break-system-packages --no-cache-dir \
-    numpy scipy matplotlib pyyaml jinja2 empy opencv-python
-```
+---
 
-Then in VS Code: `Ctrl+Shift+P` → **"Dev Containers: Rebuild Container"**. Docker only redoes the layer you changed and everything after it — layers before your edit are reused from cache — so this is usually 1–2 minutes, not a full 10-minute rebuild.
+## The honest status
 
-**Testing something before committing to it:** you can also install a package directly inside a running container (`sudo apt-get install ...` or `pip3 install --break-system-packages ...`), without touching the Dockerfile at all. It works immediately but disappears the next time the container is rebuilt — useful for trying something out before deciding it's worth adding permanently.
+Read [docs/6-CREDIBILITY.md](docs/6-CREDIBILITY.md) before trusting output. The
+headline, repeated wherever results are shown:
 
-## Troubleshooting
+> **This simulator has never been compared against flight data.** It reproduces
+> bench-measured *actuator* behaviour; it has not been shown to reproduce
+> *vehicle* behaviour. Validation is level 0 of 4.
 
-| Problem | What's likely happening | Fix |
-|---|---|---|
-| "Docker daemon not running" | Docker Desktop isn't started, or hasn't finished starting | Launch Docker Desktop and wait for the whale icon to stop animating |
-| Build fails partway through | Usually a network hiccup mid-download | Click "Reopen in Container" again — Docker resumes from the last successfully-built layer, it doesn't start over |
-| `ros2: command not found` | You're running a command on your host machine, not inside the container | Check the bottom-left corner of VS Code — it should show the container name; if it shows your local machine, you're not connected |
-| Edited the Dockerfile but nothing changed | Editing the Dockerfile only takes effect on the next build | `Ctrl+Shift+P` → "Dev Containers: Rebuild Container" |
-| Gazebo's GUI window doesn't appear | Expected on Windows/Mac — the simulator runs headless there by default | Use `ros2 topic echo <topic-name>` to inspect data instead of relying on the window |
-| **Windows**: "Container failed to start" (WSLg socket error) | VS Code's Dev Containers extension tries to forward your Wayland socket from WSL2 into the container so Linux GUI apps can display. WSL2 has a known limitation where Unix domain sockets don't survive the `\\wsl.localhost` network bridge, causing the mount to fail. | `Ctrl+Shift+P` → "Preferences: Open User Settings (JSON)" → add `"dev.containers.mountWaylandSocket": false` → save → rebuild the container. This disables GUI socket forwarding (not needed anyway, since Gazebo runs headless on Windows). |
-| Source Control panel is empty / git commands say "detected dubious ownership" | Git (since v2.35.2) refuses to operate on a repo whose file ownership doesn't match the current user as a security check. The container's `postCreateCommand` changes `/workspace`'s ownership to the `ros` user, which can trip this check. | Run `git config --global --add safe.directory /workspace` once inside the container terminal, then reload the VS Code window. |
+Two specific things to know:
 
-## For teammates joining later
-
-Same Quick Start steps above apply to everyone. Since the image only needs to be built once per machine and Docker caches the result afterward, a second person's first build is also fast (2–3 minutes) — the slow first build only happens once, on whichever machine builds this particular image for the very first time.
+- **The ROS 2 packages have never been built.** `colcon build` has not run
+  against them. See [docs/5-RUNNING.md](docs/5-RUNNING.md) for the first-build
+  procedure and what to expect.
+- **The highest-value measurement outstanding** is whether the bench's 100 ms
+  motor response is a transport delay or a first-order lag. Modelled both ways:
+  as a lag the roll channel recovers cleanly; as a delay it winds up to ~72° and
+  saturates 97% of the run. One bench run decides whether that channel is
+  controllable at the current gains. `python tvc.py validate` prints both
+  numbers on every run so the question cannot quietly stop being asked.

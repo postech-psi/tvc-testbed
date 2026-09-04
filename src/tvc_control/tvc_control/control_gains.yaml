@@ -9,11 +9,12 @@
 #
 # UNITS. The rate loop outputs ANGULAR ACCELERATION [rad/s^2 per rad/s], not
 # torque; inertia is applied once inside AttitudeController. This is what makes
-# the two historical gain sets comparable -- sim/hover.py always wrote
-# tau = I*KP_RATE*err and physics.py wrote tau = kp_rate*err, so the same name
-# meant two things differing by a factor of I.
+# the two historical gain sets comparable -- the Gazebo hover demo always wrote
+# tau = I*KP_RATE*err while the analytic simulator wrote tau = kp_rate*err, so
+# the same name meant two quantities differing by a factor of I, and they looked
+# 24.9x apart while describing nearly the same loop.
 #
-# Before adopting anything here, read docs/CREDIBILITY.md: only one of these
+# Before adopting anything here, read docs/6-CREDIBILITY.md: only one of these
 # profiles has ever been near a plant.
 
 axis_convention: rocket_v2
@@ -22,17 +23,19 @@ profiles:
 
   # ---------------------------------------------------------------------------
   # The set that has actually flown, in Gazebo, repeatedly. Ported from
-  # sim/hover.py's module constants, whose comments record the tuning history:
+  # the Gazebo hover demo's module constants, whose comments recorded the
+  # tuning history:
   # 6/15 gave zeta 0.79 and the position loop rang at its 9.5 rad/s natural
   # frequency, so 5/22 was chosen for zeta ~1.05; position 0.22/0.35 put the
   # two loops only 6.5x apart and produced a +/-9 deg coning limit cycle, so
   # 0.10/0.20 restored ~10x separation.
   #
-  # CAVEAT, and it is not small: sim/hover.py models NO gimbal deadtime and NO
-  # slew limit, while the analytic plant models both (30 ms, 403/235 deg/s).
-  # 30 ms of pure delay at the ~9.5 rad/s crossover this implies costs roughly
-  # 16 deg of phase margin that hover.py never paid. If this profile is less
-  # stable here than there, that is a fact about the vehicle, not a porting bug.
+  # CAVEAT, and it is not small: the demo these came from modelled NO gimbal
+  # deadtime and NO slew limit, while the plant models both (30 ms, 403/235
+  # deg/s). 30 ms of pure delay at the 10.5 rad/s crossover this implies costs
+  # 18 deg of phase margin the demo never paid. If this profile is less stable
+  # here than it was there, that is a fact about the vehicle, not a porting bug.
+  # (Measured: it is not -- see the note at the bottom of this file.)
   # ---------------------------------------------------------------------------
   flight_validated:
     attitude: {kp_angle: 5.0, kp_rate: 22.0, ki_rate: 0.0, kd_rate: 0.0, i_limit: 50.0}
@@ -59,7 +62,7 @@ profiles:
     position: {kp_pos: 0.10, kd_pos: 0.20, max_tilt_deg: 8.0}
 
 # MEASURED, not assumed. The worry was that 30 ms of modelled gimbal deadtime --
-# which sim/hover.py does not model -- would destabilise the flown set. It does
+# which the demo did not model -- would destabilise the flown set. It does
 # not: A/B over lateral upset, roll upset and a ground climb shows no
 # divergence and essentially no difference between 30 ms and 0 ms. It also halves
 # the climb transient the analytic set suffers (66.4 -> 36.9 deg peak).

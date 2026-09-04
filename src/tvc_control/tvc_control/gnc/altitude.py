@@ -1,7 +1,14 @@
 """
 Altitude cascade with tilt feedforward.
 ================================================================================
-Moved verbatim from physics.py.
+Two nested loops and one feedforward term:
+
+    altitude error   --(P)-->    climb-rate demand, clamped to vz_max
+    climb-rate error --(PID)-->  vertical acceleration demand
+    vertical accel   -------->   thrust,  T = m(g + a_z) / cos(theta)
+
+The division by cos(theta) is the part worth understanding; see the class
+docstring below. docs/2-THEORY.md, section 5.
 """
 
 from .params import VehicleParams, ControlGains
@@ -34,8 +41,9 @@ class AltitudeController:
         self.gains = gains
         self.cos_min = cos_min
         # tilt_compensation=False divides by 1 instead of the projection. Only
-        # useful for the A/B in sim/validate_control.py that shows what the
-        # feedforward is actually buying; flying without it is strictly worse.
+        # useful for the A/B in verify/scenarios.py that measures what the
+        # feedforward buys (84% less altitude sag at a 6 deg tilt); flying
+        # without it is strictly worse.
         self.tilt_compensation = tilt_compensation
         self.pid_vz = PID(kp=gains.kp_vz, ki=gains.ki_vz, kd=gains.kd_vz,
                           i_limit=gains.i_limit_vz)

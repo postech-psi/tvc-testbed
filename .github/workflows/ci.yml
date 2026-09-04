@@ -2,16 +2,23 @@ name: ci
 
 # Two jobs, deliberately unequal in status.
 #
-# `unit` is the merge gate. It is pure Python -- no ROS, no Gazebo, no GUI --
-# so it runs in seconds and is never flaky, and it is what guards the two
-# invariants this project cannot check by eye: the flight code's porting
-# discipline, and the axis convention. Both fail silently otherwise. A numpy
-# import sneaking into gnc/ breaks nothing until someone attempts the PX4 port;
-# a mistyped SDF joint name produces a gimbal that never moves and reads as a
-# control bug.
+# `unit` is the merge gate. Pure Python -- no ROS, no Gazebo, no display -- so it
+# runs in seconds and is never flaky. It guards the four things this project
+# cannot check by eye, all of which fail SILENTLY otherwise:
 #
-# `sitl` is not a gate yet. Gazebo in CI is slow and flaky, and making it
-# blocking before it has been green for a while trains people to ignore red.
+#   the flight code's porting discipline   a numpy import sneaking into gnc/
+#                                          breaks nothing until someone attempts
+#                                          the PX4 port
+#   the axis convention                    a mistyped SDF joint name produces a
+#                                          gimbal that never moves and reads as a
+#                                          control bug
+#   the generated artefacts                a documented or modelled number that
+#                                          has drifted from vehicle_params.yaml
+#   the frozen baseline                    a refactor that claimed to move no
+#                                          numbers and moved some
+#
+# `sitl` is not a gate. Gazebo in CI is slow and flaky, and making it blocking
+# before it has been green for a while trains people to ignore red.
 
 on:
   push:
@@ -26,29 +33,37 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install
-        run: pip install numpy scipy pyyaml matplotlib pillow pytest
+        run: pip install -r requirements.txt
+
       - name: Tests
         run: python -m pytest tests/ -q
 
       # The Gazebo model is generated from vehicle_params.yaml and must never be
-      # hand-edited; --check fails if the file on disk differs from what the
-      # generator produces, and also that the composite mass properties still
-      # reproduce the YAML's.
-      - name: Gazebo model is in sync with the parameters
+      # hand-edited. --check re-solves base_link and fails if the file on disk
+      # differs, or if the composite mass properties no longer reproduce the YAML.
+      - name: The Gazebo model matches the parameters
         run: python tools/gen_model_sdf.py --check
 
-      # The frozen numerical baseline. Any change here must be deliberate and
-      # explained in a commit message -- see sim/golden/README.md.
-      - name: Analytic baseline unchanged
-        run: python sim/capture_golden.py --check
+      # Same rule for the numbers in docs/4-PARAMETERS.md. A documented number
+      # that can drift from the source of truth is a number that will.
+      - name: The documented numbers match the parameters
+        run: python tools/gen_docs.py --check
 
+      # The frozen numerical baseline. Any change here must be deliberate and
+      # explained in its own commit -- see reference/golden/README.md.
+      - name: Analytic baseline unchanged
+        run: python tvc.py golden --check
+
+      # Also run as a test, but run here too so the authority budget appears in
+      # the CI log where a reviewer will see it.
       - name: Control scenarios
-        run: python sim/validate_control.py
+        run: python tvc.py validate --verbose
 
   sitl:
-    # Non-blocking until it has been reliably green. Enable the schedule and
-    # drop continue-on-error once that is true.
+    # Non-blocking until it has been reliably green. Enable the schedule and drop
+    # continue-on-error once that is true.
     runs-on: ubuntu-latest
     continue-on-error: true
     if: github.event_name == 'pull_request'
@@ -61,4 +76,4 @@ jobs:
           echo "  colcon build --packages-select tvc_msgs"
           echo "  colcon build --packages-select tvc_control"
           echo "  ros2 launch tvc_control gazebo.launch.py gui:=false"
-          echo "See docs/CREDIBILITY.md -- the ROS2 path has never been built."
+          echo "See docs/6-CREDIBILITY.md -- the ROS2 path has never been built."

@@ -1,0 +1,190 @@
+"""
+The numbers that live in two places must agree.
+================================================================================
+Every check here guards a duplicate that already caused a real bug once. The
+pattern is always the same: a value gets copied, one copy is updated, nothing
+errors, and the simulator quietly describes a different vehicle than the one the
+controller was tuned for.
+
+    the Gazebo model vs the YAML .......... the composite CG once landed at
+                                            161 mm while everything else assumed
+                                            211 mm
+    the plugin ceiling vs the vehicle ..... 2*k*wmax^2 and thrust_at_max_n were
+                                            independently edited fields that
+                                            happened to agree to 0.02%
+    the sign of tau_P ..................... three independent choices that agree
+                                            by coincidence
+    the two plants' actuator chains ....... one modelling a lag the other does
+                                            not is an unattributable difference
+
+The fix for a duplicate is usually to generate one side from the other. Where
+that is done, the test is that the generator's output matches the file on disk.
+"""
+import os
+import re
+import subprocess
+import sys
+
+import numpy as np
+import pytest
+
+
+# --- generated artefacts -----------------------------------------------------
+
+def test_the_gazebo_model_is_what_the_generator_produces(repo):
+    """model.sdf is generated from vehicle_params.yaml and must never be
+    hand-edited. --check re-solves base_link and compares the composite mass
+    properties against the YAML's, so a hand edit or a stale file both fail."""
+    r = subprocess.run([sys.executable,
+                        os.path.join(repo, "tools", "gen_model_sdf.py"), "--check"],
+                       cwd=repo, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "-> OK" in r.stdout
+
+
+def test_the_parameter_document_is_in_sync(repo):
+    """docs/4-PARAMETERS.md is generated from the YAML. A documented number that
+    can drift from the source of truth is a number that will."""
+    r = subprocess.run([sys.executable,
+                        os.path.join(repo, "tools", "gen_docs.py"), "--check"],
+                       cwd=repo, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+# --- solver constants vs physical limits -------------------------------------
+
+def test_solver_constants_are_headroom_not_physics(vp, vehicle):
+    """max_rot_velocity must EXCEED what the real vehicle can produce.
+
+    It used to EQUAL it -- 2*k*wmax^2 was 17.787 N against a measured 17.79 --
+    and the standalone hover controller calibrated thrust->omega from that
+    coincidence while the plugin used motor_constant. The two are deliberately
+    different now, so the old equality would be a bug and the inequality is the
+    invariant.
+    """
+    rot = vehicle.raw["rotors"]
+    ceiling = 2.0 * rot["motor_constant"] * rot["max_rot_velocity"] ** 2
+    assert ceiling > vp.T_max * 1.1, \
+        "no solver headroom: plugin ceiling %.2f N vs vehicle %.2f N" \
+        % (ceiling, vp.T_max)
+
+
+def test_the_measured_surface_and_thrust_at_max_agree(vp, vehicle):
+    """thrust_at_max_n is quoted separately from the surface it came from."""
+    T, _ = vp.surface.forward_norm(1.0, 1.0)
+    assert T == pytest.approx(vehicle.raw["rotors"]["thrust_at_max_n"], abs=0.01)
+
+
+def test_gimbal_nominal_limit_bounds_the_measured_travel(vp):
+    """gimbal.max_deg is the symmetric summary the SDF joints use; every
+    measured per-ring travel must fit inside it, or Gazebo's stops are tighter
+    than the allocator's."""
+    for lo, hi in zip(vp.delta_min, vp.delta_max):
+        assert abs(lo) <= vp.gimbal_max + 1e-9
+        assert abs(hi) <= vp.gimbal_max + 1e-9
+
+
+def test_the_slowest_measured_ring_sets_the_nominal_slew(vp):
+    """gimbal.rate_max_deg is a worst-case summary. If it were the faster ring,
+    any consumer using it would let the outer ring move faster than it can."""
+    assert vp.gimbal_rate_max <= min(vp.delta_rate_max) + 1e-9
+
+
+# --- the two plants -----------------------------------------------------------
+
+def test_both_plants_use_the_same_actuator_chain(repo):
+    """The analytic harness and the ROS simulator node must not model different
+    subsets of the actuator dynamics -- a difference there is an unattributable
+    difference in every cross-plant comparison."""
+    base = os.path.join(repo, "src", "tvc_control", "tvc_control")
+    for path in (os.path.join(base, "harness", "mil.py"),
+                 os.path.join(base, "nodes", "simulator.py")):
+        src = open(path, encoding="utf-8").read()
+        assert "ActuatorChain" in src, "%s builds its own actuator model" % path
+
+
+def test_only_one_controller_implementation_exists(repo):
+    """The whole point of the layer split.
+
+    Every pipeline must reach the control law through TvcController. A file that
+    computes a rate demand or a thrust command itself is a second controller,
+    and this repository had exactly that problem for a long time: the Gazebo
+    demo flew one implementation while the tests exercised another.
+    """
+    base = os.path.join(repo, "src", "tvc_control", "tvc_control")
+    entry_points = [
+        os.path.join(base, "harness", "mil.py"),
+        os.path.join(base, "harness", "gz.py"),
+        os.path.join(base, "nodes", "controller.py"),
+    ]
+    for path in entry_points:
+        src = open(path, encoding="utf-8").read()
+        assert "TvcController" in src, \
+            "%s does not go through TvcController" % os.path.basename(path)
+
+    # And no gain constant may be defined outside the gains file.
+    offenders = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for name in filenames:
+            if not name.endswith(".py") or name == "params.py":
+                continue
+            path = os.path.join(dirpath, name)
+            for n, line in enumerate(open(path, encoding="utf-8"), 1):
+                code = line.split("#")[0]
+                for token in ("KP_", "KD_", "KI_"):
+                    if token in code and "=" in code:
+                        offenders.append("%s:%d %s" % (name, n, line.strip()[:70]))
+    assert not offenders, ("control gains defined in code rather than in "
+                           "control_gains.yaml:\n  " + "\n  ".join(offenders))
+
+
+# --- the sign of tau_P, end to end -------------------------------------------
+
+def test_tau_p_sign_chain_agrees_end_to_end(vp, vehicle):
+    """Surface, allocator and Gazebo plugin must mean the same thing by +tau_P.
+
+    Commanding MORE on rotor B than rotor A must give POSITIVE roll torque in
+    all three. The surface says so through its gradients (dTz/db > 0 > dTz/da);
+    the plugin says so through tau = c*(T_b - T_a); the allocator inherits it.
+    Nothing forced these three independent choices to agree -- they do by
+    coincidence, so it is asserted rather than trusted. If one flips, the vehicle
+    spins up instead of correcting and it reads as a control bug.
+    """
+    from tvc_control.gnc.allocation import allocate
+    from tvc_control.hal.gazebo import plugin_forward, rotor_speeds
+
+    rot = vehicle.raw["rotors"]
+    k, c, wmax = (rot["motor_constant"], rot["moment_constant"],
+                  rot["max_rot_velocity"])
+
+    # 1. the measured surface: more B than A -> positive
+    _, q_more_b = vp.surface.forward_norm(-1.0, +1.0)
+    _, q_more_a = vp.surface.forward_norm(+1.0, -1.0)
+    assert q_more_b > 0.0 > q_more_a
+
+    # 2. the plugin, driven by the inversion: a positive tau_P request must put
+    #    the faster rotor on B
+    wa, wb = rotor_speeds(13.0, +0.05, k, c, wmax)
+    assert wb > wa
+    _, q = plugin_forward(wa, wb, k, c)
+    assert q > 0.0
+
+    # 3. and the allocator agrees about which way M_z points
+    assert allocate((0.0, 0.0, +0.05), 13.0, vp).tau_p > 0.0
+
+
+def test_the_plotter_reads_columns_the_harness_actually_writes(repo):
+    """A silent coupling across two files: the Gazebo harness writes a CSV and
+    the plotter reads it by column NAME. A renamed column produces a KeyError
+    after a 30-second flight, which is the most annoying possible moment."""
+    from tvc_control.harness.gz import CSV_HEADER
+
+    path = os.path.join(repo, "src", "tvc_control", "tvc_control", "apps",
+                        "plot.py")
+    src = open(path, encoding="utf-8").read()
+    used = set(re.findall(r'd\["([a-z_0-9]+)"\]', src))
+    missing = sorted(used - set(CSV_HEADER))
+    assert not missing, (
+        "apps/plot.py reads columns the flight log does not contain: %s"
+        % missing)

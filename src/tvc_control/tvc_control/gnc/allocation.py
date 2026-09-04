@@ -1,13 +1,31 @@
 """
 Control allocation: desired moment + thrust -> actuator commands.
 ================================================================================
-Moved verbatim from physics.py. The layer exists because this vehicle is
-over-actuated in the sense that matters: the high-level loops ask for a virtual
-control effort (a body moment and a total thrust) and something has to decide
-which effectors produce it, subject to a feasible set that is neither a box nor
-symmetric. Keeping that decision in its own layer -- rather than folded into the
-attitude controller -- is the standard hierarchy (Johansen & Fossen 2013) and is
-what lets the same controller drive a different effector suite later.
+The layer exists because this vehicle is over-actuated in the sense that
+matters: the high-level loops ask for a virtual control effort (a body moment
+and a total thrust) and something has to decide which effectors produce it,
+subject to a feasible set that is neither a box nor symmetric. Keeping that
+decision in its own layer -- rather than folding it into the attitude
+controller -- is the standard hierarchy (Johansen & Fossen 2013) and is what
+lets the same controller drive a different effector suite later.
+
+    motion control  ->  virtual control effort  ->  ALLOCATION  ->  effectors
+    attitude.py         (M_x, M_y, M_z) and T                      delta, u_a, u_b
+
+WHAT MAKES THIS ONE INTERESTING
+    The feasible set is not a box. tau_P is bought with a thrust SPLIT between
+    the two props, so roll authority is a function of total thrust: it peaks
+    near half throttle and vanishes at both idle and the ceiling. It is also
+    ASYMMETRIC, because the lower prop runs in the upper prop's wake -- at hover
+    the reachable interval is [-0.089, +0.147] N*m, not +/- anything.
+
+    And the axes are coupled through the gimbal. The props ride ON the gimbal,
+    so their reaction torque tilts with the thrust and leaks into the lateral
+    axes; conversely only tau_P*cos(d1)*cos(d2) of the commanded roll torque
+    reaches body z. Both couplings are handled by the two-pass solve in
+    allocate().
+
+Derivation: docs/2-THEORY.md, section 4.
 """
 
 import math
@@ -45,16 +63,18 @@ class Allocation:
 def roll_headroom(T, params: VehicleParams):
     """Max |tau_P| available at total thrust T [N] -> N*m.
 
-    tau_P is bought with a thrust SPLIT between the props, and the split has to
-    fit inside the per-rotor limits: with T1 = (T-s)/2 and T2 = (T+s)/2 both in
-    [0, T_max/2], the split s is bounded by min(T, T_max - T). So roll
-    authority is largest at half throttle and vanishes at both idle and full
-    throttle -- at hover (T = 13.03 N of 20 N) the binding side is the top one,
-    leaving 6.97 N of split, i.e. 0.112 N*m.
+    This is the ANALYTIC fallback, used only when no measured surface is
+    loaded. tau_P is bought with a thrust SPLIT between the props, and the split
+    must fit the per-rotor limits: with T1 = (T-s)/2 and T2 = (T+s)/2 both in
+    [0, T_max/2], the split s is bounded by min(T, T_max - T). So roll authority
+    is largest at half throttle and vanishes at both idle and full throttle.
+
+    With the measured surface loaded -- the normal case -- the figure comes off
+    the surface instead, and at hover it is 0.0888 N*m.
 
     A measured cap (params.tau_p_max) is applied on top when available; see the
-    tau_p_max_nm note in sim/vehicle_params.yaml for why the bench number and
-    this analytic number currently disagree.
+    tau_p_max_nm note in vehicle_params.yaml for why the bench headline figure
+    and what is actually available at hover are different numbers.
     """
     if params.surface is not None:
         tau = params.surface.max_torque_at(T)
@@ -95,10 +115,11 @@ def mix_motors(T, tau_p, params: VehicleParams):
     This is the ANALYTIC path. The real vehicle needs the measured two-input
     surfaces T = f_T(u1, u2), tau_P = f_Q(u1, u2), because the lower prop runs
     inside the upper prop's wake and the two commands are therefore coupled --
-    a separable per-motor model does not hold. When that bench data lands in
-    sim/vehicle_params.yaml's PWM maps, this function is the seam to replace
-    (a 2-D Newton solve or a precomputed inverse lookup); nothing above it
-    changes, because everything above speaks in (T, tau_P).
+    a separable per-motor model does not hold. That surface EXISTS and is loaded by default (vehicle_params.yaml,
+    thrust_torque_surface), so this branch runs only when a caller deliberately
+    builds a VehicleParams without one. Nothing above this function had to
+    change when the surface arrived, because everything above speaks in
+    (T, tau_P) and not in commands.
     """
     return motor_setpoint(T, tau_p, params)[2:]
 

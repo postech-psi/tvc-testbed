@@ -1,29 +1,31 @@
 # Everything the flight code decided in one control step, in one message.
 #
-# Replaces GimbalCommand, which carried only the two gimbal angles. The thrust
-# and roll-torque commands were computed and then DISCARDED by controller_node,
-# so the ROS2 path had no altitude loop and no roll authority at all -- both
-# rotors were held at the same speed by the bridge.
+# ONE MESSAGE, NOT SEVERAL TOPICS. Thrust, gimbal and tau_P must be
+# time-aligned: the 1/cos(theta) thrust feedforward and the tau_P cross-terms in
+# the allocation are computed against each other, so splitting them across
+# topics lets a subscriber pair values from different control steps and quietly
+# fly a different vehicle.
 #
-# ONE MESSAGE, NOT SEVERAL TOPICS. Thrust, gimbal and tau_P must be time-aligned:
-# the 1/cos(theta) feedforward and the tau_P cross-terms in the allocation are
-# computed against each other, so splitting them lets a subscriber pair values
-# from different control steps and quietly get a different vehicle.
-#
-# Frames and axis names follow docs/CONVENTIONS.md. The convention token travels
-# with the data so a stale node talking to a fresh one fails loudly instead of
-# reinterpreting numbers under the wrong names.
+# Frames, axis names and signs: docs/3-CONVENTIONS.md. The convention token
+# travels WITH the data so a stale node talking to a fresh one fails loudly
+# instead of reinterpreting numbers under the wrong names -- the failure mode
+# that makes an axis rename dangerous.
 
 std_msgs/Header header
 
-uint8 AXIS_CONVENTION_ROCKET_V2 = 1
+# 0 is not a valid convention. A default-constructed message therefore fails the
+# receiver's check instead of being accepted as whatever the enum's first entry
+# happens to be.
+uint8 AXIS_CONVENTION_UNSET = 0
 uint8 AXIS_CONVENTION_ROCKET_V2 = 2
 uint8 axis_convention
 
 # --- gimbal, radians ---------------------------------------------------------
-# delta1 is the inner ring (yaw plane), delta2 the outer ring (pitch plane).
-# Named by index rather than by axis until the rename lands, so the field names
-# do not have to change meaning when it does.
+# Named after the mechanical RING, not the axis. A ring is a fact about the
+# hardware and is invariant under any naming convention, so a future revision of
+# the convention does not have to touch this message, the SDF, or the gz topics.
+#   inner ring -> yaw plane   (rotates about body y)
+#   outer ring -> pitch plane (rotates about body x)
 float64 gimbal_inner_rad
 float64 gimbal_outer_rad
 
@@ -35,15 +37,18 @@ float64 motor_a
 float64 motor_b
 
 # --- what those commands are expected to achieve -----------------------------
-# Predictions, not commands. Carried for logging and cross-plant comparison: a
-# consumer that records the request instead of the achievement reports authority
-# the vehicle never had.
+# PREDICTIONS, NOT COMMANDS. The allocator clamps to the vehicle's feasible set,
+# so what was asked for and what will be produced differ whenever a limit binds.
+# Carried for logging and cross-plant comparison: a consumer that records the
+# request instead of the achievement reports authority the vehicle never had.
 float64 thrust_n
 float64 tau_p_nm
 
 # Rotor speeds for gz-sim's MulticopterMotorModel. A CONTROL ALLOCATION
-# VARIABLE, not a physical RPM -- see tvc_control/hal/gazebo.py. Zero on any
-# non-Gazebo transport.
+# VARIABLE, NOT A PHYSICAL RPM -- the Gazebo HAL inverts the plugin's own
+# algebra so it reproduces the measured surface exactly, which makes
+# momentConstant a solver scaling and maxRotVelocity solver headroom. See
+# tvc_control/hal/gazebo.py. Zero on any non-Gazebo transport.
 float64 rotor_a_speed_rads
 float64 rotor_b_speed_rads
 

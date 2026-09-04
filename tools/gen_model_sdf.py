@@ -1,6 +1,6 @@
 """
-gen_model_sdf.py -- regenerate sim/models/tvc_vehicle/model.sdf from the single
-source of truth (tvc_control/vehicle_params.yaml).
+gen_model_sdf.py -- regenerate gazebo/models/tvc_vehicle/model.sdf from the
+single source of truth (tvc_control/vehicle_params.yaml).
 ================================================================================
 WHY THIS EXISTS
 The hand-written SDF used to split the vehicle mass across six links whose
@@ -29,11 +29,10 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-SIM = os.path.join(REPO, "sim")
-sys.path.insert(0, SIM)
-import vehicle_params as vp  # noqa: E402
+sys.path.insert(0, os.path.join(REPO, "src", "tvc_control"))
+from tvc_control import config as vp  # noqa: E402
 
-OUT_PATH = os.path.join(SIM, "models", "tvc_vehicle", "model.sdf")
+OUT_PATH = os.path.join(REPO, "gazebo", "models", "tvc_vehicle", "model.sdf")
 
 # --- nominal token links (small; subtracted from base_link) ------------------
 # name, mass_kg, z_m, (ixx, iyy, izz).  x=y=0 for all of them (on the axis).
@@ -356,7 +355,7 @@ def render(v, base_mass, base_pos, I_base_own):
       </axis>
     </joint>
 
-    <!-- ================= plugins (constants from vehicle_params.yaml) ===== -->
+    <!-- ============ plugins (constants from vehicle_params.yaml) ========= -->
 {motor_plugin('rotor_a_joint', 'rotor_a', 'ccw', 0)}
 
 {motor_plugin('rotor_b_joint', 'rotor_b', 'cw', 1)}
@@ -405,7 +404,7 @@ def main(argv=None):
 
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(render(v, base_mass, base_pos, I_base_own))
-    print("Wrote %s" % OUT_PATH)
+    print("Wrote %s" % os.path.relpath(OUT_PATH, REPO))
     return 0
 
 

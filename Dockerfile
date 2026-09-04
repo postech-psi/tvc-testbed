@@ -212,10 +212,11 @@ USER ros
 # something you'd type by hand each session.
 RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc \
     && echo "export ROS_DOMAIN_ID=0" >> ~/.bashrc \
-    && # The models live at sim/models, not models/. This pointed at a directory
-    # that does not exist in this repo, so every run depended on run_hover.sh
-    # or the launch file overriding it.
-    && echo "export GZ_SIM_RESOURCE_PATH=/workspace/sim/models" >> ~/.bashrc
+    && # The Gazebo assets live at gazebo/models. This has pointed at a
+    # non-existent directory twice; when it does, every run silently depends on
+    # run_hover.sh or the launch file overriding it, and a bare `gz sim` fails
+    # to find the mesh.
+    && echo "export GZ_SIM_RESOURCE_PATH=/workspace/gazebo/models" >> ~/.bashrc
 
 # WORKDIR <path> — sets the working directory for the remaining build
 # instructions and, importantly, the directory a container starts in when

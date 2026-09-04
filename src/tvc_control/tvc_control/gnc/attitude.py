@@ -1,7 +1,15 @@
 """
 Three-axis attitude cascade: attitude error -> body rate -> moment -> actuators.
 ================================================================================
-Moved verbatim from physics.py.
+    quaternion error  --(P)---->  body-rate setpoint
+    rate error        --(PID)-->  angular acceleration demand
+                      x inertia   body moment
+                      allocate    gimbal angles + motor commands
+
+The rate loop outputs ANGULAR ACCELERATION, not torque, and inertia is applied
+in exactly one place (desired_moment, below). See the note there for why that
+apparently cosmetic choice is what made two historical gain sets comparable at
+all. docs/2-THEORY.md, section 3.
 """
 
 from .params import VehicleParams, ControlGains
@@ -17,17 +25,21 @@ class AttitudeController:
         rate error     -> desired moment     (inner, PID)
         desired moment -> actuator commands  (allocation, §4b)
 
-    All three axes are closed here. The LATERAL pair (body x, y) is driven by
-    the gimbal; the ROLL channel (body z) is driven by tau_P, the differential
-    prop reaction torque. See the axis-naming note in the module docstring:
-    pitch_des/yaw_des are the lateral setpoints, roll_des is the one the
-    controller-design note calls pitch.
+    All three axes are closed here. The LATERAL pair -- pitch (body x) and yaw
+    (body y) -- is driven by the gimbal; the ROLL channel (body z, the thrust
+    axis) is driven by tau_P, the differential prop reaction torque. Axis names
+    follow the rocket convention throughout: docs/3-CONVENTIONS.md.
 
-    The roll channel used to be left at zero here on the grounds that the
-    gimbal cannot produce M_z. That premise is right and the conclusion was
-    wrong: the gimbal cannot, but the props can, and on this airframe they
-    can do it hard -- Iz is 11.6x smaller than Ix, so 0.11 N*m of tau_P buys
-    56 rad/s^2 about z against 15 rad/s^2 about x at full lateral authority.
+    The roll channel was once left at zero here, on the grounds that the gimbal
+    cannot produce M_z. The premise is right and the conclusion was wrong: the
+    gimbal cannot, but the props can, and on this airframe they can do it hard.
+    Izz is 11.6x smaller than Ixx, so the 0.0888 N*m available at hover buys
+    45 rad/s^2 about z against 14 rad/s^2 about x at full lateral authority.
+
+    Authority is not the whole story. The lateral axes act through a 30 ms servo
+    deadtime and the roll channel through a ~100 ms motor response, so roll is
+    authority-rich and bandwidth-poor -- the opposite of what the inertia ratio
+    alone suggests.
     """
 
     def __init__(self, params: VehicleParams, gains: ControlGains):
@@ -78,11 +90,12 @@ class AttitudeController:
         # The rate loop outputs ANGULAR ACCELERATION, not torque; inertia is
         # applied here and nowhere else. Two reasons this matters:
         #
-        #   Gains become comparable. sim/hover.py computed tau = I*KP_RATE*err
-        #   and physics.py computed tau = kp_rate*err, so the two "rate gains"
-        #   differed by a factor of I and looked 25x apart when they were not
-        #   describing the same quantity at all. In these units they can be put
-        #   side by side, which is what makes adopting the flown set possible.
+        #   Gains become comparable. The Gazebo hover demo computed
+        #   tau = I*KP_RATE*err while the analytic simulator computed
+        #   tau = kp_rate*err, so the two "rate gains" differed by a factor of I
+        #   and looked 25x apart while not describing the same quantity at all.
+        #   In these units they can be put side by side, which is what made
+        #   adopting the flown set possible.
         #
         #   The roll gain stops rotting. kp_rate_roll was a hand-scaled copy
         #   of kp_rate carrying an Iz/Ix factor baked in, so re-measuring Iz

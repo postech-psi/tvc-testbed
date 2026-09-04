@@ -1,10 +1,6 @@
 """
-tvc_gnc -- FLIGHT CODE. This is what runs on the vehicle.
+gnc -- FLIGHT CODE. This is what runs on the vehicle.
 ================================================================================
-(The restructure plan calls this package `tvc_gnc`; inside the ROS package
-`tvc_control` it is `gnc`, so imports read `tvc_control.gnc` rather than the
-stuttering `tvc_control.tvc_gnc`.)
-
 WHAT BELONGS HERE
     The controller, the control allocation, the actuator effectiveness models,
     and the parameter struct they read. Anything that must execute on the
@@ -24,9 +20,35 @@ WHY THE SEPARATION IS PHYSICAL AND NOT JUST TIDINESS
     else, and it means a test that exercises this directory is testing flight
     behaviour rather than a simulation-flavoured cousin of it.
 
-PORTING DISCIPLINE (enforced by tests/test_gnc_purity.py, arriving with the
-purity conversion): no numpy/scipy/yaml/ROS imports, no dynamic allocation in
-the control path, no exceptions as control flow, no clock reads -- every
-function takes dt -- and every numerical iteration carries a fixed upper bound
-so worst-case execution time is stated rather than hoped for.
+PORTING DISCIPLINE, enforced by tests/test_gnc_purity.py, which parses this
+directory rather than running it -- so a violation on a rarely-taken branch is
+caught too:
+
+    imports          math, dataclasses and typing ONLY. No numpy, no scipy, no
+                     yaml, no ROS. An ndarray has no fixed-size C++ counterpart,
+                     so every array in the control path would become a design
+                     decision during the port instead of a mechanical
+                     translation; a scipy call is an algorithm someone would
+                     have to reimplement under time pressure without the tests
+                     that covered the original.
+    no file I/O      parameters are injected once at startup, never looked up.
+                     That is the shape PX4's parameter system already has, and
+                     it makes a control step's worst case independent of a
+                     filesystem. The loader is tvc_control/config.py, outside
+                     this package, on purpose.
+    no global state  a module-level list is a shared buffer waiting to be found
+                     by the second controller instance.
+    no `while`       every iteration count comes from a `range`, so worst-case
+                     execution time is a number someone can write down. The two
+                     numerical iterations here -- the allocation's Newton
+                     refinement and the surface inverse -- carry their bound at
+                     the call site.
+    dt is an argument  nothing here reads a clock. That is what makes a run
+                     reproducible, and reproducibility is what makes comparing
+                     two plants mean anything.
+
+Read in this order: params -> mathx -> pid -> allocation -> attitude ->
+altitude -> position -> controller. types.py is the two seams; effectiveness.py
+is the measured hardware model everything else asks about feasibility.
+docs/2-THEORY.md derives every equation in here.
 """

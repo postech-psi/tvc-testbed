@@ -62,10 +62,10 @@ def euler_to_quat(pitch, yaw, roll):
 def thrust_axis(delta):
     """Unit vector n_hat along the gimballed thrust axis, in the body frame.
 
-    Exact (not small-angle). Sign convention matches Gazebo / sim/hover.py --
-    n_hat = R_x(d2) R_y(d1) [0,0,1] -- so gimbal signs and gains are portable
-    between the two sims. d1 deflects in the yaw plane (about body y),
-    d2 in the pitch plane (about body x).
+    Exact (not small-angle). n_hat = R_x(d2) R_y(d1) [0,0,1], matching the SDF
+    joint chain, so the analytic plant and Gazebo tilt the thrust vector the
+    same way. d1 is the INNER ring, deflecting in the yaw plane (about body y);
+    d2 is the OUTER ring, deflecting in the pitch plane (about body x).
     """
     d1, d2 = delta[0], delta[1]
     return (math.sin(d1),

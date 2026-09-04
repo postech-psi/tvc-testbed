@@ -1,25 +1,39 @@
 """
-gazebo.launch.py -- the software-in-the-loop stack: gz-sim plant + flight code.
+The full software-in-the-loop stack: gz-sim plant + ROS 2 + the flight code.
 
-Four things this launch file used to get wrong, each of which would have made
-the first run look like a control bug:
+    ros2 launch tvc_control gazebo.launch.py            # with the Gazebo window
+    ros2 launch tvc_control gazebo.launch.py gui:=false # headless (Windows/macOS)
 
-  IT STARTED UNPAUSED. `gz sim -r` begins integrating immediately, and the
-  vehicle spawns airborne at 2 m in tvc_flight.sdf. It free-falls in ~0.6 s,
-  which is less time than ROS 2 node discovery takes, so a controller that
-  connected afterwards would find the vehicle already on the ground.
-  sim/run_hover.sh documents this and starts paused; so does this file now.
+Five processes:
+    gz sim                world + vehicle SDF, the physics
+    ros_gz_bridge         gz topics <-> ROS topics, including /clock
+    gazebo_bridge_node    ActuatorCommand -> the three gz plugin topics
+    controller_node       odometry -> TvcController -> ActuatorCommand
+    (a timer)             unpauses the world once the nodes have discovered
+                          each other
 
-  IT NEVER BRIDGED /clock. Without it, ROS time is wall-clock while Gazebo runs
-  on sim time, so every measured dt is wrong by whatever the real-time factor
-  happens to be -- and varies with machine load.
+FOUR THINGS THAT LOOK LIKE CONTROL BUGS AND ARE NOT, EACH HANDLED HERE
 
-  IT DECLARED A `gui` ARGUMENT AND IGNORED IT. sim/README.md told people to pass
-  gui:=false for headless; nothing read it.
+  STARTING UNPAUSED. `gz sim -r` integrates immediately and the vehicle spawns
+  airborne at 2 m, so it free-falls in ~0.6 s -- less time than ROS 2 node
+  discovery takes. A controller connecting afterwards finds it on the ground.
+  This starts paused and unpauses on a TimerAction.
 
-  IT INLINED THE GAINS. Eight gain parameters were duplicated here, a third copy
-  after physics.py's defaults and hover.py's constants. Gains now come from
-  control_gains.yaml by profile name.
+  NOT BRIDGING /clock. Without it ROS time is wall-clock while Gazebo runs on
+  simulated time, so every measured dt is wrong by whatever the real-time factor
+  happens to be -- and that varies with machine load.
+
+  A `gui` ARGUMENT THAT NOTHING READS. Headless is mandatory on Windows and
+  macOS hosts, where the container has no display.
+
+  GAINS INLINED HERE. They were an independent third copy. Gains come from
+  control_gains.yaml by profile name and from nowhere else.
+
+Arguments:
+    world           SDF to load (default: gazebo/worlds/tvc_flight.sdf)
+    gui             false runs the server only
+    gain_profile    profile from control_gains.yaml (empty = the file default)
+    altitude_hold / position_hold / z_des
 """
 import os
 
@@ -34,10 +48,12 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     share = get_package_share_directory('tvc_control')
-    # install/tvc_control/share/tvc_control -> repo root
+    # install/tvc_control/share/tvc_control -> repo root. The SDF assets are not
+    # installed into the share directory because gz-sim, run_hover.sh and this
+    # file all want the same copy, and two copies of a world is one too many.
     repo_root = os.path.abspath(os.path.join(share, '..', '..', '..', '..'))
-    models = os.path.join(repo_root, 'sim', 'models')
-    default_world = os.path.join(repo_root, 'sim', 'worlds', 'tvc_flight.sdf')
+    models = os.path.join(repo_root, 'gazebo', 'models')
+    default_world = os.path.join(repo_root, 'gazebo', 'worlds', 'tvc_flight.sdf')
 
     world = LaunchConfiguration('world')
     gui = LaunchConfiguration('gui')
@@ -48,7 +64,8 @@ def generate_launch_description():
             'world', default_value=default_world,
             description='World SDF. Defaults to tvc_flight.sdf, which spawns '
                         'airborne and deliberately tilted -- an upright spawn '
-                        'on the ground tests nothing until takeoff exists.'),
+                        'sits in equilibrium with the gimbal at exactly zero '
+                        'and proves nothing.'),
         DeclareLaunchArgument(
             'gui', default_value='true',
             description='false runs gz sim headless (server only).'),

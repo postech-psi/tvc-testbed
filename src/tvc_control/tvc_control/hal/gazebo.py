@@ -39,7 +39,7 @@ WHAT THIS COSTS, STATED PLAINLY
     maxRotVelocity becomes solver headroom. Nothing may read omega as physics,
     and the raised ceiling means the plugin no longer enforces the vehicle's real
     17.79 N thrust limit -- the allocator does, and tests assert it rather than
-    assuming it. See docs/CREDIBILITY.md, Results Robustness.
+    assuming it. See docs/6-CREDIBILITY.md, Results Robustness.
 
     Feasibility drove the SDF change. At the original maxRotVelocity = 1100 the
     per-rotor ceiling is 8.893 N, and the c required to cover the envelope
@@ -60,9 +60,9 @@ def rotor_speeds(thrust_n, tau_p_nm, motor_constant, moment_constant,
     rotor_a is the CCW rotor (motorNumber 0), rotor_b the CW one, matching the
     SDF. The sign convention -- tau_P = c*(T_b - T_a) -- is the plugin's, and it
     agrees with the measured surface's (dTz/db positive, dTz/da negative) and
-    with sim/hover.py's split. That three-way agreement is currently a
-    coincidence of independent choices, so tests/test_axis_convention.py asserts
-    it rather than trusting it.
+    with the allocator's. That three-way agreement is a coincidence of
+    independent choices, so tests/test_consistency.py asserts it end to end
+    rather than trusting it.
 
     Returns speeds clamped to [0, max_rot_velocity]. A clamp here means the
     request was outside what the SOLVER can express, which is a different and
