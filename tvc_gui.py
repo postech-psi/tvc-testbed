@@ -28,6 +28,7 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "tvc_control"))
 from tvc_control.physics import VehicleParams, ControlGains, SimConfig, simulate
+from tvc_view3d import View3DWindow
 
 
 # =============================================================================
@@ -118,6 +119,9 @@ class TVCSimulatorApp(tk.Tk):
         self.gains = ControlGains()
         self.cfg = SimConfig()
 
+        self.last_result = None
+        self.view3d = None
+
         self._build_layout()
         # Run once at startup so the window isn't blank
         self.after(100, self.run_simulation)
@@ -125,15 +129,13 @@ class TVCSimulatorApp(tk.Tk):
     # ------------------------------------------------------------------
     def _build_layout(self):
         # Two-pane layout: scrollable control form on the left, plots on the right
-        main = ttk.Frame(self)
+        main = ttk.PanedWindow(self, orient="horizontal")
         main.pack(fill="both", expand=True)
 
-        left = ttk.Frame(main, width=300)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
-
-        right = ttk.Frame(main)
-        right.pack(side="right", fill="both", expand=True)
+        left = ttk.Frame(main, width=320)
+        right = ttk.Frame(main, width=600)
+        main.add(left, weight=0)
+        main.add(right, weight=1)
 
         self._build_control_panel(left)
         self._build_plot_panel(right)
@@ -146,16 +148,37 @@ class TVCSimulatorApp(tk.Tk):
         form = ttk.Frame(canvas)
 
         form.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=form, anchor="nw")
+        form_id = canvas.create_window((0, 0), window=form, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Keep the form as wide as the canvas so it tracks the pane sash
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(form_id, width=e.width))
 
-        # Mouse-wheel scrolling
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Mouse-wheel scrolling (Windows/macOS use <MouseWheel>, X11 uses Button-4/5)
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            if event.num == 4:
+                delta = -1
+            elif event.num == 5:
+                delta = 1
+            else:
+                delta = int(-event.delta / 120) or (-1 if event.delta > 0 else 1)
+            canvas.yview_scroll(delta, "units")
+
+        def _bind_wheel(_=None):
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                canvas.bind_all(seq, _on_mousewheel)
+
+        def _unbind_wheel(_=None):
+            for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                canvas.unbind_all(seq)
+
+        # Only scroll the form while the pointer is over it, so the plot pane
+        # and Matplotlib toolbar keep their own wheel behaviour.
+        canvas.bind("<Enter>", _bind_wheel)
+        canvas.bind("<Leave>", _unbind_wheel)
 
         pad = dict(fill="x", padx=8, pady=6)
 
@@ -183,6 +206,9 @@ class TVCSimulatorApp(tk.Tk):
 
         reset_button = ttk.Button(btn_frame, text="Reset Defaults", command=self.reset_defaults)
         reset_button.pack(side="left", expand=True, fill="x", padx=(4, 0))
+
+        self.view3d_button = ttk.Button(form, text="🚀  Open 3D View", command=self.open_3d_view)
+        self.view3d_button.pack(fill="x", padx=8, pady=(0, 4))
 
         # Metrics readout
         self.metrics_frame = ttk.LabelFrame(form, text="Last Run — Summary Metrics", padding=(8, 6))
@@ -252,8 +278,28 @@ class TVCSimulatorApp(tk.Tk):
             messagebox.showerror("Simulation error", f"{type(e).__name__}: {e}")
             return
 
+        self.last_result = result
         self._update_plots(result)
         self._update_metrics(result["metrics"])
+
+        # Keep an open 3D window in sync with the run that just finished.
+        if self.view3d is not None and self.view3d.winfo_exists():
+            self.view3d.set_result(result, self.vparams)
+
+    # ------------------------------------------------------------------
+    def open_3d_view(self):
+        """Open (or re-focus) the animated 3D window for the latest run."""
+        if self.last_result is None:
+            messagebox.showinfo("No run yet", "Run a simulation first.")
+            return
+
+        if self.view3d is not None and self.view3d.winfo_exists():
+            self.view3d.set_result(self.last_result, self.vparams)
+            self.view3d.lift()
+            self.view3d.focus_force()
+            return
+
+        self.view3d = View3DWindow(self, self.last_result, self.vparams, self.cfg)
 
     def run_button_disabled_call(self):
         self.run_button.configure(state="disabled")

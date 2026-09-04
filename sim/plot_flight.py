@@ -9,11 +9,19 @@ different scales, and overlaying them on two axes makes the reader guess which
 curve belongs to which axis.
 """
 import csv
+import os
 import sys
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from vehicle_params import load as _load_vehicle
+    GIMBAL_LIMIT_DEG = _load_vehicle().gimbal_max_deg
+except Exception:            # keep plotting even if the params file is absent
+    GIMBAL_LIMIT_DEG = 15.0
 
 # Categorical slots in fixed order (never cycled), from the validated palette.
 C_BLUE, C_ORANGE, C_AQUA, C_RED = "#2a78d6", "#eb6834", "#1baf7a", "#e34948"
@@ -71,17 +79,19 @@ def main():
 
     # --- gimbal -----------------------------------------------------------
     ax = axes[3]
-    for lim in (15, -15):
+    glim = GIMBAL_LIMIT_DEG
+    for lim in (glim, -glim):
         ax.axhline(lim, color=C_RED, lw=1, ls=":", zorder=1)
-    ax.annotate("+/-15 deg mechanical limit", (t[-1], 15), xytext=(-6, -12),
-                textcoords="offset points", ha="right", fontsize=8, color=C_RED)
+    ax.annotate("+/-%g deg mechanical limit" % glim, (t[-1], glim),
+                xytext=(-6, -12), textcoords="offset points", ha="right",
+                fontsize=8, color=C_RED)
     ax.plot(t, d["gimbal_roll_deg"], color=C_BLUE, lw=2, label="gimbal roll",
             zorder=3)
     ax.plot(t, d["gimbal_pitch_deg"], color=C_ORANGE, lw=2, label="gimbal pitch",
             zorder=3)
     ax.set_ylabel("deflection [deg]", color=INK)
     ax.set_xlabel("time [s]", color=INK)
-    ax.set_ylim(-18, 18)
+    ax.set_ylim(-glim * 1.2, glim * 1.2)
     ax.set_title("Gimbal deflection - this is what tilts the thrust vector",
                  fontsize=10, color=INK, loc="left")
     ax.legend(fontsize=8, frameon=False, loc="upper right", ncol=2)

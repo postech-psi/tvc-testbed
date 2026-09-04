@@ -31,14 +31,20 @@ the body frame is
 
 with the thrust point at r = (0, 0, -L) from the CG. Then tau = r x F gives
 
-    tau_x = -L*T*sin(dr)*cos(dp)
-    tau_y = -L*T*sin(dp)
-    tau_z = 0                      <- the gimbal has NO yaw authority
+    tau_x = -L*T*sin(dr)*cos(dp) + tau_P*sin(dp)
+    tau_y = -L*T*sin(dp)         - tau_P*sin(dr)*cos(dp)
+    tau_z =                        tau_P*cos(dp)*cos(dr)
 
-Inverting for the commanded deflections:
+where tau_P is the net prop reaction torque (below). The gimbal still has NO
+authority about z -- every tau_z term carries tau_P -- but tau_P is not absent
+from the lateral axes, because the props ride on the gimbal and their reaction
+torque tilts with the thrust. Inverting the lateral pair therefore needs the
+full 2x2, whose small-angle form is
 
-    dp = -asin( tau_y / (L*T) )
-    dr = -asin( tau_x / (L*T*cos(dp)) )
+    [dp, dr] = [[tau_P, -L*T], [-L*T, -tau_P]] [tau_x, tau_y] / (tau_P^2 + (L*T)^2)
+
+and which reduces to the old dp = -tau_y/(L*T), dr = -tau_x/(L*T) exactly when
+tau_P = 0 -- i.e. the previous mapping was the no-yaw-demand special case.
 
 Yaw IS controlled, and has to be. Its only authority is a differential
 between the counter-rotating rotors:
@@ -58,6 +64,7 @@ Usage (with `gz sim -s -r sim/worlds/tvc.sdf` already running):
 """
 import argparse
 import math
+import os
 import sys
 import time
 
@@ -66,16 +73,22 @@ from gz.msgs10.actuators_pb2 import Actuators
 from gz.msgs10.double_pb2 import Double
 from gz.msgs10.odometry_pb2 import Odometry
 
-# --- vehicle constants: see docs/MASS_BUDGET.md ---
-MASS_KG = 1.328
-INERTIA_XY = 0.0226          # kg*m^2, roll/pitch
-L_ARM = 0.211                # m, gimbal pivot -> CG
-G = 9.81
-WEIGHT_N = MASS_KG * G
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from vehicle_params import load as _load_vehicle
 
-MAX_ROT_VEL = 1100.0         # rad/s, matches the SDF
-THRUST_AT_MAX = 20.0         # N combined, full throttle (2026-07-20 bench)
-GIMBAL_MAX = math.radians(15.0)
+# --- vehicle constants: ALL from sim/vehicle_params.yaml (single source of
+# truth), so this controller and the model it flies can never disagree. Edit
+# that file, not these lines. See docs/MASS_BUDGET.md for the provenance. ---
+_VP = _load_vehicle()
+MASS_KG = _VP.mass
+INERTIA_XY = _VP.Ix           # kg*m^2, roll/pitch (Ix ~= Iy for this airframe)
+L_ARM = _VP.L                 # m, control lever arm (mode set in the YAML)
+G = _VP.g
+WEIGHT_N = _VP.weight_n
+
+MAX_ROT_VEL = _VP.max_rot_velocity       # rad/s, matches the SDF
+THRUST_AT_MAX = _VP.thrust_at_max_n      # N combined, full throttle (2026-07-20 bench)
+GIMBAL_MAX = math.radians(_VP.gimbal_max_deg)
 
 # --- gains ---
 # Attitude plant is I*theta_ddot = -L*T*sin(delta), a double integrator, so a
@@ -103,7 +116,13 @@ MAX_TILT = math.radians(8.0)
 # world frame than for pointing.
 KP_YAW = 2.0                 # rad/s of yaw rate demand per rad of yaw error
 KD_YAW = 0.45                # N.m per rad/s
-MOMENT_CONSTANT = 0.016      # m, matches the SDF
+# Deliberately the ANALYTIC moment_constant, not the measured thrust/torque
+# surface in sim/vehicle_params.yaml. This controller flies the Gazebo model,
+# and Gazebo's multicopter plugin computes reaction torque as
+# moment_constant * thrust -- so allocating against the measured surface here
+# would make the controller disagree with the plant it is actually flying. The
+# measured surface belongs on the analytic sim (physics.py) and on hardware.
+MOMENT_CONSTANT = _VP.raw["rotors"]["moment_constant"]   # m, from the YAML/SDF
 MAX_THRUST_SPLIT = 4.0       # N between the two rotors
 
 
@@ -188,26 +207,51 @@ class Hover:
         tau_x = INERTIA_XY * KP_RATE * (wx_des - s["wx"])
         tau_y = INERTIA_XY * KP_RATE * (wy_des - s["wy"])
 
-        # --- torque -> gimbal deflection (inverse of the mapping above) ---
-        lt = max(L_ARM * thrust, 1e-3)
-        dp = -math.asin(clamp(tau_y / lt, -0.99, 0.99))
-        dp = clamp(dp, -GIMBAL_MAX, GIMBAL_MAX)
-        dr = -math.asin(clamp(tau_x / (lt * math.cos(dp)), -0.99, 0.99))
-        dr = clamp(dr, -GIMBAL_MAX, GIMBAL_MAX)
-
         # --- yaw -> rotor thrust differential (the only yaw authority) ---
+        # This is solved BEFORE the gimbal, not after, because the gimbal
+        # solution depends on it: the props sit on the gimbal, so their
+        # reaction torque tilts with the thrust and leaks into the lateral
+        # axes. Doing yaw second means the gimbal is solved against a stale
+        # (zero) reaction torque.
         wz_des = KP_YAW * (0.0 - s["yaw"])
         tau_z = KD_YAW * (wz_des - s["wz"])
         # NEGATIVE: rotor A spins CCW so its drag reaction on the body is -z,
         # and B's is +z. A positive yaw torque therefore needs MORE thrust on
         # B, i.e. a negative split. Getting this backwards turns every yaw
         # disturbance into positive feedback (measured: 0 -> -44 rad/s in 2 s).
-        split = clamp(-tau_z / MOMENT_CONSTANT, -MAX_THRUST_SPLIT, MAX_THRUST_SPLIT)
+        # The split also has to fit the per-rotor limits: with t_a=(T+s)/2 and
+        # t_b=(T-s)/2 both inside [0, T_max/2], |s| <= min(T, T_max - T). At
+        # hover that headroom is 6.97 N, well under the old flat 4 N cap, but
+        # near full throttle it collapses to zero -- which the flat cap missed.
+        split_max = min(MAX_THRUST_SPLIT,
+                        max(min(thrust, THRUST_AT_MAX - thrust), 0.0))
+        split = clamp(-tau_z / MOMENT_CONSTANT, -split_max, split_max)
 
         # Their sum still equals the commanded thrust, so yaw authority costs
         # nothing in altitude -- only in headroom.
         t_a = clamp(0.5 * (thrust + split), 0.0, THRUST_AT_MAX)
         t_b = clamp(0.5 * (thrust - split), 0.0, THRUST_AT_MAX)
+
+        # --- torque -> gimbal deflection (inverse of the mapping above) ---
+        # Use the REALIZED reaction torque, not the demanded tau_z: after the
+        # split is clamped the two differ, and allocating against a torque the
+        # props are not actually producing just re-introduces the error the
+        # cross term was added to remove.
+        tau_p = -MOMENT_CONSTANT * split
+        lt = max(L_ARM * thrust, 1e-3)
+
+        # Small-angle inverse of
+        #     tau_x = -lt*sin(dr)*cos(dp) + tau_p*sin(dp)
+        #     tau_y = -lt*sin(dp)         - tau_p*sin(dr)*cos(dp)
+        # i.e. [tau_x, tau_y] = [[tau_p, -lt], [-lt, -tau_p]] [dp, dr]. That
+        # matrix squares to (tau_p^2 + lt^2)*I, so its inverse is itself over
+        # that determinant -- no solve needed, and it is never singular.
+        # Dropping the tau_p terms (what this did before) aims the gimbal
+        # atan(tau_p/lt) off the intended torque axis; small at low yaw demand,
+        # but that angle is measured against only GIMBAL_MAX of travel.
+        det = tau_p * tau_p + lt * lt
+        dp = clamp((tau_p * tau_x - lt * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
+        dr = clamp((-lt * tau_x - tau_p * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
 
         # --- thrust -> rotor speed (per rotor: thrust = k*omega^2) ---
         half_max = THRUST_AT_MAX / 2.0

@@ -1,68 +1,43 @@
 <?xml version="1.0"?>
 <!--
-  Coaxial TVC VTVL vehicle for Gazebo Harmonic (gz-sim 8).
+  GENERATED FILE. Do not edit by hand.
+  Regenerate with:  python tools/gen_model_sdf.py
+  Source of truth:  sim/vehicle_params.yaml
 
-  Geometry follows TVC Ver3.step: gimbal pivot near the bottom, coax rotors
-  just above it, body/battery stack extending up, three legs below. Body +z
-  is the thrust axis and points "up" through the airframe, matching the
-  convention in tvc_control/physics.py (thrust acts at the gimbal, a distance
-  L BELOW the CG, so a gimbal deflection produces a pitch/roll torque).
+  Coaxial TVC VTVL vehicle for Gazebo Harmonic (gz-sim 8). base_link carries the
+  WHOLE-vehicle mass properties solved so the composite of all links reproduces
+  the mass tool's (mass, CG, inertia) exactly: mass 1.3280 kg, CG z=211.1 mm,
+  Ix=0.022616. The gimbal/rotor links are small nominal tokens (see
+  tools/gen_model_sdf.py TOKEN_LINKS) subtracted from base_link, so this model no
+  longer silently drifts from the controller's assumptions.
 
-  Masses/inertias are deliberately approximate (see sim/README.md). What
-  matters for control behaviour is the ratio of thrust authority to inertia
-  and the sign/geometry of the gimbal, all of which are right here.
-
-  Rotor sign convention: rotor_a spins CCW (+z), rotor_b CW (-z). Their
-  reaction torques oppose, so a differential between them is the ONLY yaw
-  authority (the 2-axis gimbal has none about z), exactly the coupling the
-  bench thrust/torque map measures.
+  Body +z is the thrust axis. rotor_a spins CCW, rotor_b CW: their reaction
+  torques oppose, so a differential between them is the ONLY yaw authority (the
+  2-axis gimbal has none about z).
 -->
 <sdf version="1.9">
   <model name="tvc_vehicle">
     <pose>0 0 0 0 0 0</pose>
 
-    <!-- ================= body ================= -->
+    <!-- ================= body (whole-vehicle mass properties) ============= -->
     <link name="base_link">
-      <!--
-        CG sits above the gimbal pivot (the model origin), at z = 0.211 m.
-        Mass and inertia are the finalized whole-vehicle values from
-        tools/mass_properties.py: CAD solids with real mesh-derived inertia,
-        plus electronics as located point masses, plus a remainder to the
-        1328 g design total. The rotors/gimbal links below carry their own
-        mass, so this link holds the balance (body + electronics), not the
-        full 1328 g: legs 0.070 + gimbals 0.043/0.136 + rotors 0.030x2
-        = 0.309 kg live on the other links, so this one carries 1.019 kg.
-        Regenerate with:
-            python tools/mass_properties.py tools/components.yaml
-      -->
-      <pose>0 0 0.211 0 0 0</pose>
+      <pose>0 0 0.2236 0 0 0</pose>
       <inertial>
-        <mass>1.019</mass>
+        <mass>1.2580</mass>
         <inertia>
-          <ixx>0.022616</ixx>
-          <iyy>0.022581</iyy>
-          <izz>0.001957</izz>
-          <ixy>-0.000022</ixy><ixz>-0.000301</ixz><iyz>-0.000535</iyz>
+          <ixx>1.842816e-02</ixx><iyy>1.839302e-02</iyy><izz>1.393713e-03</izz>
+          <ixy>-2.187438e-05</ixy><ixz>-3.291339e-04</ixz><iyz>-5.515493e-04</iyz>
         </inertia>
       </inertial>
 
       <collision name="body_collision">
+        <pose>0 0 -0.2236 0 0 0</pose>
         <geometry>
           <cylinder><radius>0.045</radius><length>0.50</length></cylinder>
         </geometry>
       </collision>
-      <!--
-        The real CAD geometry (TVC Ver3.stl). Two conversions matter:
-          - STL is in MILLIMETERS, SDF is in meters  -> scale 0.001
-          - the mesh is in the STEP assembly frame (origin at the gimbal
-            pivot) while this link's own origin sits at the CG, z=0.211 m,
-            so the visual is pushed back down by that amount to line up.
-        Visual only. Collision stays a primitive: a 103k-triangle collision
-        mesh would cost solver time on every contact for no benefit, since
-        only the legs ever touch anything.
-      -->
       <visual name="body_visual">
-        <pose>0 0 -0.211 0 0 0</pose>
+        <pose>0 0 -0.2236 0 0 0</pose>
         <geometry>
           <mesh>
             <uri>model://tvc_vehicle/meshes/tvc_vehicle.stl</uri>
@@ -76,9 +51,6 @@
         </material>
       </visual>
 
-      <!-- IMU lives on the body link (SDF requires a link parent), so
-           controller_node consumes the same sensor_msgs/Imu it already
-           subscribes to in Phase 4. -->
       <sensor name="imu_sensor" type="imu">
         <always_on>1</always_on>
         <update_rate>250</update_rate>
@@ -86,16 +58,13 @@
       </sensor>
     </link>
 
-    <!-- Three legs, modeled as fixed geometry on the body rather than
-         separate links: they never move relative to it, so extra links would
-         only cost solver time. -->
+    <!-- Legs: nominal mass, real collision geometry for touchdown. -->
     <link name="legs_link">
-      <pose>0 0 -0.06 0 0 0</pose>
+      <pose>0 0 -0.0600 0 0 0</pose>
       <inertial>
-        <!-- measured: 3 carbon legs 50 g + 3 feet 20 g -->
-        <mass>0.070</mass>
+        <mass>0.0300</mass>
         <inertia>
-          <ixx>0.0006</ixx><iyy>0.0006</iyy><izz>0.0010</izz>
+          <ixx>3.000000e-04</ixx><iyy>3.000000e-04</iyy><izz>5.000000e-04</izz>
           <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
         </inertia>
       </inertial>
@@ -118,13 +87,12 @@
     </joint>
 
     <!-- ================= gimbal ================= -->
-    <!-- Outer ring: rotates about body x (roll-plane deflection, delta_2). -->
     <link name="outer_gimbal">
-      <pose>0 0 0 0 0 0</pose>
+      <pose>0 0 0.0000 0 0 0</pose>
       <inertial>
-        <mass>0.043</mass>
+        <mass>0.0100</mass>
         <inertia>
-          <ixx>2.0e-5</ixx><iyy>2.0e-5</iyy><izz>3.0e-5</izz>
+          <ixx>1.000000e-05</ixx><iyy>1.000000e-05</iyy><izz>1.500000e-05</izz>
           <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
         </inertia>
       </inertial>
@@ -135,32 +103,21 @@
       <axis>
         <xyz>1 0 0</xyz>
         <limit>
-          <!-- 15 deg mechanical limit, matches VehicleParams.gimbal_max_deg -->
-          <lower>-0.2618</lower>
-          <upper>0.2618</upper>
+          <lower>-0.1222</lower>
+          <upper>0.1222</upper>
           <effort>5.0</effort>
-          <!-- 180 deg/s servo slew, matches gimbal_rate_max_deg -->
-          <velocity>3.1416</velocity>
+          <velocity>4.1015</velocity>
         </limit>
         <dynamics><damping>0.01</damping></dynamics>
       </axis>
     </joint>
 
-    <!-- Inner ring: rotates about the (already rolled) y axis -> pitch-plane
-         deflection, delta_1. Order matters: outer then inner is the physical
-         nesting in the CAD assembly. -->
     <link name="inner_gimbal">
-      <pose>0 0 0 0 0 0</pose>
+      <pose>0 0 0.0000 0 0 0</pose>
       <inertial>
-        <!--
-          Measured inner gimbal 15.75 g, PLUS the motor stator. The
-          motor+prop assembly is 180 g total; the two rotor links below take
-          30 g each as the spinning props, leaving ~120 g of non-spinning
-          motor that belongs here, not on a joint that free-wheels.
-        -->
-        <mass>0.136</mass>
+        <mass>0.0100</mass>
         <inertia>
-          <ixx>2.4e-5</ixx><iyy>2.4e-5</iyy><izz>2.7e-5</izz>
+          <ixx>1.200000e-05</ixx><iyy>1.200000e-05</iyy><izz>1.400000e-05</izz>
           <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
         </inertia>
       </inertial>
@@ -171,24 +128,22 @@
       <axis>
         <xyz>0 1 0</xyz>
         <limit>
-          <lower>-0.2618</lower>
-          <upper>0.2618</upper>
+          <lower>-0.1222</lower>
+          <upper>0.1222</upper>
           <effort>5.0</effort>
-          <velocity>3.1416</velocity>
+          <velocity>4.1015</velocity>
         </limit>
         <dynamics><damping>0.01</damping></dynamics>
       </axis>
     </joint>
 
     <!-- ================= coax rotors ================= -->
-    <!-- Both mount on the inner gimbal, so both thrust vectors tilt together,
-         which is what makes this thrust-vectored rather than differential. -->
     <link name="rotor_a">
-      <pose>0 0 0.030 0 0 0</pose>
+      <pose>0 0 0.0300 0 0 0</pose>
       <inertial>
-        <mass>0.030</mass>
+        <mass>0.0100</mass>
         <inertia>
-          <ixx>9.0e-6</ixx><iyy>9.0e-6</iyy><izz>1.7e-5</izz>
+          <ixx>9.000000e-06</ixx><iyy>9.000000e-06</iyy><izz>1.700000e-05</izz>
           <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
         </inertia>
       </inertial>
@@ -208,11 +163,11 @@
     </joint>
 
     <link name="rotor_b">
-      <pose>0 0 0.060 0 0 0</pose>
+      <pose>0 0 0.0600 0 0 0</pose>
       <inertial>
-        <mass>0.030</mass>
+        <mass>0.0100</mass>
         <inertia>
-          <ixx>9.0e-6</ixx><iyy>9.0e-6</iyy><izz>1.7e-5</izz>
+          <ixx>9.000000e-06</ixx><iyy>9.000000e-06</iyy><izz>1.700000e-05</izz>
           <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
         </inertia>
       </inertial>
@@ -231,40 +186,7 @@
       </axis>
     </joint>
 
-    <!-- ================= plugins ================= -->
-    <!--
-      motorConstant / momentConstant are calibrated against the BENCH DATA in
-      tvc-data, not guessed.
-
-      Max thrust comes from the 2026-07-20 runs, the ONLY ones that reach full
-      throttle (PWM 2000); every later session stops at 1850 us. On those the
-      STM32 drove both rotors from one signal, i.e. the BALANCED case, which is
-      the right basis: unequal rotors make net yaw torque, and yaw is the one
-      axis the gimbal cannot trim, so thrust bought with A!=B is not usable in
-      steady hover.
-
-        full throttle, 3 runs   18.07 / 19.34 / 20.23 N combined
-        adopted                 20.0 N  (optimistic end of that spread)
-        vehicle weight          ~13.03 N  ->  T/W ~ 1.54
-
-      Independently corroborated: the 2026-07-24 coax data, voltage-normalized
-      to a fresh pack and extrapolated to PWM 2000, predicts 17.8 N, against
-      18.07 N actually measured on the cleanest 07-20 staircase (n=717).
-
-      Per rotor 20.0 N / 2 = 10.0 N at maxRotVelocity 1100 rad/s:
-        motorConstant = 10.0 / 1100^2 = 8.26e-6 N/(rad/s)^2
-
-      Caveats: the 07-20 runs have NO voltage record, so pack state is
-      unknown; and they predate the Pi/Pixhawk, so it is assumed (not proven)
-      that they used the same rotors as the later coax sessions.
-
-      momentConstant (drag torque / thrust) comes from the measured coax
-      torque: Tz spans roughly -0.03..+0.15 Nm while thrust runs to ~14.7 N,
-      and Tz is the DIFFERENCE of the two rotors' drag torques, so a
-      per-rotor ratio near 0.016 m reproduces the measured crossing. This is
-      the one number worth re-deriving once the off-diagonal (A,B) cells are
-      filled in (see tvctools interp).
-    -->
+    <!-- ================= plugins (constants from vehicle_params.yaml) ===== -->
     <plugin filename="gz-sim-multicopter-motor-model-system"
             name="gz::sim::systems::MulticopterMotorModel">
       <robotNamespace>tvc_vehicle</robotNamespace>
@@ -274,12 +196,12 @@
       <timeConstantUp>0.0125</timeConstantUp>
       <timeConstantDown>0.025</timeConstantDown>
       <maxRotVelocity>1100.0</maxRotVelocity>
-      <motorConstant>8.26e-06</motorConstant>
+      <motorConstant>7.350e-06</motorConstant>
       <momentConstant>0.016</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>0</motorNumber>
-      <rotorDragCoefficient>8.06e-05</rotorDragCoefficient>
-      <rollingMomentCoefficient>1.0e-06</rollingMomentCoefficient>
+      <rotorDragCoefficient>8.060e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1.000e-06</rollingMomentCoefficient>
       <motorType>velocity</motorType>
     </plugin>
 
@@ -292,16 +214,15 @@
       <timeConstantUp>0.0125</timeConstantUp>
       <timeConstantDown>0.025</timeConstantDown>
       <maxRotVelocity>1100.0</maxRotVelocity>
-      <motorConstant>8.26e-06</motorConstant>
+      <motorConstant>7.350e-06</motorConstant>
       <momentConstant>0.016</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>1</motorNumber>
-      <rotorDragCoefficient>8.06e-05</rotorDragCoefficient>
-      <rollingMomentCoefficient>1.0e-06</rollingMomentCoefficient>
+      <rotorDragCoefficient>8.060e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1.000e-06</rollingMomentCoefficient>
       <motorType>velocity</motorType>
     </plugin>
 
-    <!-- Gimbal servos: position-controlled, one per axis. -->
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>gimbal_pitch_joint</joint_name>
@@ -309,14 +230,7 @@
       <p_gain>3.0</p_gain>
       <i_gain>0.02</i_gain>
       <d_gain>0.15</d_gain>
-      <!--
-        A PTK 8515 MG-D stalls around 15 kg.cm ~ 1.5 N.m, so the old 5 N.m
-        limit modelled a servo that does not exist. It also mattered
-        dynamically: with the roll axis deflected by dr, the pitch joint's
-        axis is no longer perpendicular to body z, so its reaction torque
-        leaks tau*sin(dr) into YAW, and yaw has no gimbal authority to
-        remove it. At 5 N.m that leak alone span the vehicle to ~3 rad/s.
-      -->
+      <!-- PTK 8515 MG-D stalls ~1.5 N.m; cmd limit models that real servo. -->
       <cmd_max>1.2</cmd_max>
       <cmd_min>-1.2</cmd_min>
     </plugin>
@@ -327,14 +241,7 @@
       <p_gain>3.0</p_gain>
       <i_gain>0.02</i_gain>
       <d_gain>0.15</d_gain>
-      <!--
-        A PTK 8515 MG-D stalls around 15 kg.cm ~ 1.5 N.m, so the old 5 N.m
-        limit modelled a servo that does not exist. It also mattered
-        dynamically: with the roll axis deflected by dr, the pitch joint's
-        axis is no longer perpendicular to body z, so its reaction torque
-        leaks tau*sin(dr) into YAW, and yaw has no gimbal authority to
-        remove it. At 5 N.m that leak alone span the vehicle to ~3 rad/s.
-      -->
+      <!-- PTK 8515 MG-D stalls ~1.5 N.m; cmd limit models that real servo. -->
       <cmd_max>1.2</cmd_max>
       <cmd_min>-1.2</cmd_min>
     </plugin>
@@ -344,11 +251,8 @@
       <odom_frame>world</odom_frame>
       <robot_base_frame>base_link</robot_base_frame>
       <odom_publish_frequency>250</odom_publish_frequency>
-      <!--
-        MUST be 3: this plugin defaults to 2D planar odometry, which silently
-        omits z and vz from the message entirely. An altitude controller fed
-        that reads z = 0 forever and commands full thrust into the ground.
-      -->
+      <!-- MUST be 3: the default 2D mode drops z/vz and the altitude loop then
+           reads z=0 forever and commands full thrust into the ground. -->
       <dimensions>3</dimensions>
     </plugin>
   </model>

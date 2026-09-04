@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 730" width="1200" height="730" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555555"/>
+    </marker>
+    <marker id="arD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333333"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="730" fill="#ffffff"/>
+
+  <!-- ================= controller ================= -->
+  <rect x="330" y="40" width="540" height="92" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="600" y="95" text-anchor="middle" font-size="26" font-weight="700" fill="#111111">ROS 2 controller node</text>
+
+  <!-- command path -->
+  <path d="M430,132 L430,258" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <text x="418" y="180" text-anchor="end" font-size="18" font-weight="600" fill="#111111">δ₁, δ₂, T</text>
+  <text x="418" y="204" text-anchor="end" font-size="16" fill="#666666">/ctrl/gimbal_cmd</text>
+
+  <!-- feedback path -->
+  <path d="M770,258 L770,132" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <text x="782" y="180" font-size="18" font-weight="600" fill="#111111">q, ω, z</text>
+  <text x="782" y="204" font-size="16" fill="#666666">/sim/vehicle_attitude</text>
+
+  <!-- ================= actuators / sensors ================= -->
+  <rect x="300" y="260" width="260" height="86" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="430" y="312" text-anchor="middle" font-size="24" font-weight="700" fill="#111111">Actuators</text>
+
+  <rect x="640" y="260" width="260" height="86" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="770" y="312" text-anchor="middle" font-size="24" font-weight="700" fill="#111111">Sensors</text>
+
+  <path d="M430,346 L430,412" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <path d="M770,412 L770,346" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <!-- ================= plant ================= -->
+  <rect x="300" y="414" width="600" height="96" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="600" y="472" text-anchor="middle" font-size="26" font-weight="700" fill="#111111">Gazebo Harmonic — 6-DOF plant</text>
+
+  <!-- ================= parameter injection ================= -->
+  <!-- left: into actuators, routed outside the plant box -->
+  <path d="M360,624 L200,624 L200,303 L292,303" stroke="#333333" stroke-width="2.5" fill="none" marker-end="url(#arD)"/>
+  <text x="188" y="362" text-anchor="end" font-size="18" font-weight="600" fill="#111111">thrust curve,</text>
+  <text x="188" y="386" text-anchor="end" font-size="18" font-weight="600" fill="#111111">slew rate,</text>
+  <text x="188" y="410" text-anchor="end" font-size="18" font-weight="600" fill="#111111">servo lag</text>
+
+  <!-- centre: into plant -->
+  <path d="M600,614 L600,518" stroke="#333333" stroke-width="2.5" fill="none" marker-end="url(#arD)"/>
+  <text x="614" y="574" font-size="18" font-weight="600" fill="#111111">mass, CG, inertia</text>
+
+  <!-- right: noise + disturbance into sensors -->
+  <path d="M840,624 L1000,624 L1000,303 L908,303" stroke="#333333" stroke-width="2.5" fill="none" marker-end="url(#arD)"/>
+  <text x="1012" y="362" font-size="18" font-weight="600" fill="#111111">sensor noise,</text>
+  <text x="1012" y="386" font-size="18" font-weight="600" fill="#111111">disturbance</text>
+
+  <!-- ================= parameter bar ================= -->
+  <rect x="300" y="614" width="600" height="82" rx="6" fill="#333333"/>
+  <text x="600" y="664" text-anchor="middle" font-size="25" font-weight="700" fill="#ffffff">Bench characterization</text>
+</svg>

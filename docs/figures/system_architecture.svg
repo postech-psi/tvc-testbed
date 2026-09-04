@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 960" width="1400" height="960" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555555"/>
+    </marker>
+    <marker id="arD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333333"/>
+    </marker>
+    <marker id="arL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#999999"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="960" fill="#ffffff"/>
+
+  <!-- ================= title ================= -->
+  <text x="700" y="66" text-anchor="middle" font-size="40" font-weight="800" fill="#111111">System Architecture</text>
+  <text x="700" y="98" text-anchor="middle" font-size="17" fill="#666666">one controller, three interchangeable plants — all parameterized from a single vehicle definition</text>
+
+  <!-- ================= column headers ================= -->
+  <rect x="50" y="130" width="300" height="44" rx="6" fill="#333333"/>
+  <text x="200" y="160" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Vehicle definition</text>
+
+  <rect x="400" y="130" width="340" height="44" rx="6" fill="#333333"/>
+  <text x="570" y="160" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Control</text>
+
+  <rect x="790" y="130" width="560" height="44" rx="6" fill="#333333"/>
+  <text x="1070" y="160" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Plant — choose one</text>
+
+  <!-- ================= column A: vehicle definition chain ================= -->
+  <rect x="50" y="196" width="300" height="58" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="200" y="222" text-anchor="middle" font-size="19" font-weight="700" fill="#111111">tools/cad_parts.csv</text>
+  <text x="200" y="242" text-anchor="middle" font-size="14" fill="#666666">per-part mass &amp; position</text>
+
+  <path d="M200,254 L200,282" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="50" y="284" width="300" height="58" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="200" y="310" text-anchor="middle" font-size="19" font-weight="700" fill="#111111">tools/mass_properties.py</text>
+  <text x="200" y="330" text-anchor="middle" font-size="14" fill="#666666">composite mass, CG, inertia</text>
+
+  <path d="M200,342 L200,370" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="50" y="372" width="300" height="76" rx="6" fill="#eef2f8" stroke="#111111" stroke-width="3.5"/>
+  <text x="200" y="404" text-anchor="middle" font-size="20" font-weight="700" fill="#111111">sim/vehicle_params.yaml</text>
+  <text x="200" y="428" text-anchor="middle" font-size="14" font-weight="700" fill="#333333">SINGLE SOURCE OF TRUTH</text>
+
+  <path d="M200,448 L200,476" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="50" y="478" width="300" height="58" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="200" y="504" text-anchor="middle" font-size="19" font-weight="700" fill="#111111">tools/gen_model_sdf.py</text>
+  <text x="200" y="524" text-anchor="middle" font-size="14" fill="#666666">solves base_link so composite == target</text>
+
+  <path d="M200,536 L200,564" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="50" y="566" width="300" height="76" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="200" y="596" text-anchor="middle" font-size="19" font-weight="700" fill="#111111">model.sdf</text>
+  <text x="200" y="620" text-anchor="middle" font-size="14" fill="#666666">+ meshes/tvc_vehicle.stl</text>
+
+  <!-- ================= column B: control ================= -->
+  <rect x="400" y="196" width="340" height="110" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="570" y="226" text-anchor="middle" font-size="20" font-weight="700" fill="#111111">Desktop tools — no ROS 2</text>
+  <text x="570" y="252" text-anchor="middle" font-size="14" fill="#666666">tvc_gui.py — gains, params, response plots</text>
+  <text x="570" y="274" text-anchor="middle" font-size="14" fill="#666666">tvc_view3d.py — 3D playback of the run,</text>
+  <text x="570" y="294" text-anchor="middle" font-size="14" fill="#666666">rendering the model.sdf mesh</text>
+
+  <path d="M570,306 L570,353" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <text x="582" y="334" font-size="14" fill="#666666">import</text>
+
+  <rect x="400" y="355" width="340" height="110" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="570" y="387" text-anchor="middle" font-size="22" font-weight="700" fill="#111111">physics.py</text>
+  <text x="570" y="412" text-anchor="middle" font-size="14" fill="#666666">6-DOF quaternion dynamics</text>
+  <text x="570" y="432" text-anchor="middle" font-size="14" fill="#666666">cascaded PID + control allocation</text>
+  <text x="570" y="452" text-anchor="middle" font-size="14" fill="#666666">rate-limited gimbal servo model</text>
+
+  <!-- vehicle_params.yaml feeds physics.py directly -->
+  <path d="M350,410 L398,410" stroke="#333333" stroke-width="2.5" fill="none" marker-end="url(#arD)"/>
+
+  <path d="M570,465 L570,503" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="400" y="505" width="340" height="76" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="570" y="537" text-anchor="middle" font-size="22" font-weight="700" fill="#111111">controller_node</text>
+  <text x="570" y="561" text-anchor="middle" font-size="14" fill="#666666">ROS 2 — same AttitudeController</text>
+
+  <!-- ================= command / feedback bus ================= -->
+  <path d="M740,543 L766,543" stroke="#555555" stroke-width="2.5" fill="none"/>
+  <path d="M766,399 L766,734" stroke="#555555" stroke-width="2.5" fill="none"/>
+  <path d="M766,399 L788,399" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <path d="M766,544 L788,544" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+  <path d="M766,734 L788,734" stroke="#555555" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+
+  <!-- ================= column C: the three plants ================= -->
+  <rect x="790" y="355" width="560" height="88" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="1070" y="387" text-anchor="middle" font-size="21" font-weight="700" fill="#111111">simulator_node — analytic plant</text>
+  <text x="1070" y="412" text-anchor="middle" font-size="14" fill="#666666">integrates physics.py headless, no renderer</text>
+  <text x="1070" y="432" text-anchor="middle" font-size="14" fill="#666666">launch: phase4.launch.py</text>
+
+  <rect x="790" y="474" width="560" height="140" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="1070" y="504" text-anchor="middle" font-size="21" font-weight="700" fill="#111111">Gazebo Harmonic — 6-DOF plant</text>
+  <text x="1070" y="530" text-anchor="middle" font-size="14" fill="#666666">launch: gazebo.launch.py</text>
+  <rect x="812" y="546" width="240" height="50" rx="5" fill="#ffffff" stroke="#666666" stroke-width="2"/>
+  <text x="932" y="568" text-anchor="middle" font-size="15" font-weight="700" fill="#111111">gazebo_bridge_node</text>
+  <text x="932" y="587" text-anchor="middle" font-size="13" fill="#666666">GimbalCommand → joints</text>
+  <path d="M1052,571 L1082,571" stroke="#555555" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <rect x="1088" y="546" width="240" height="50" rx="5" fill="#ffffff" stroke="#666666" stroke-width="2"/>
+  <text x="1208" y="568" text-anchor="middle" font-size="15" font-weight="700" fill="#111111">ros_gz_bridge</text>
+  <text x="1208" y="587" text-anchor="middle" font-size="13" fill="#666666">IMU remapped to controller</text>
+
+  <rect x="790" y="690" width="560" height="88" rx="6" fill="#ffffff" stroke="#999999" stroke-width="2.5" stroke-dasharray="9 7"/>
+  <text x="1070" y="722" text-anchor="middle" font-size="21" font-weight="700" fill="#666666">Pixhawk 4 / PX4 — hardware</text>
+  <text x="1070" y="747" text-anchor="middle" font-size="14" fill="#999999">uXRCE-DDS offboard · airframe sim/px4/4600_tvc_coax</text>
+  <text x="1070" y="767" text-anchor="middle" font-size="14" font-weight="700" fill="#999999">PLANNED — same seam, no controller changes</text>
+
+  <!-- model.sdf feeds Gazebo; hop over the bus rather than crossing it -->
+  <path d="M350,604 L364,604 L364,650 L756,650 A10,10 0 0 1 776,650 L1070,650 L1070,618"
+        stroke="#333333" stroke-width="2.5" fill="none" marker-end="url(#arD)"/>
+  <text x="560" y="672" text-anchor="middle" font-size="15" font-weight="600" fill="#111111">exact mass · CG · inertia · gimbal geometry</text>
+
+  <!-- ================= interface seam ================= -->
+  <rect x="50" y="800" width="1300" height="124" rx="6" fill="#f4f5f7" stroke="#333333" stroke-width="2.5"/>
+  <text x="76" y="832" font-size="20" font-weight="700" fill="#111111">ROS 2 interface seam</text>
+  <text x="330" y="832" font-size="15" fill="#666666">— everything left of it is portable into a custom PX4 build later</text>
+
+  <text x="76" y="866" font-size="16" font-weight="700" fill="#111111">/ctrl/gimbal_cmd</text>
+  <text x="290" y="866" font-size="15" fill="#666666">tvc_msgs/GimbalCommand (δ₁, δ₂)</text>
+  <text x="700" y="866" font-size="15" fill="#666666">controller_node → plant</text>
+  <text x="960" y="866" font-size="14" fill="#999999">thrust T still fixed at hover — altitude loop pending</text>
+
+  <text x="76" y="898" font-size="16" font-weight="700" fill="#111111">/sim/vehicle_attitude</text>
+  <text x="290" y="898" font-size="15" fill="#666666">sensor_msgs/Imu (q, ω)</text>
+  <text x="700" y="898" font-size="15" fill="#666666">plant → controller_node</text>
+  <text x="960" y="898" font-size="14" fill="#999999">Gazebo IMU is remapped onto this name</text>
+</svg>

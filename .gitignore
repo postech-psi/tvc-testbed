@@ -23,3 +23,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# tvc_view3d decimated-mesh caches (regenerated from tvc_vehicle.stl on demand)
+.tvc_vehicle_*mm.npz

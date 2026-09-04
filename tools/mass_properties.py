@@ -203,14 +203,70 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
     print("      </inertia>")
 
 
+def emit_params_yaml(path, total_mass, cg, I):
+    """Rewrite ONLY the mass_properties block (between the EMIT sentinel
+    markers) of the single-source-of-truth sim/vehicle_params.yaml, preserving
+    every other line and comment. This keeps physics.py / hover.py / the SDF
+    generator all reading one authoritative set of numbers -- see that file's
+    header for the full contract."""
+    start = "# <<<EMIT:mass_properties"
+    end = "# >>>EMIT:mass_properties"
+
+    block = (
+        "%s\n"
+        "mass_properties:\n"
+        "  mass_kg: %.4f\n"
+        "  cg_mm: [%.1f, %.1f, %.1f]\n"
+        "  inertia_kg_m2:\n"
+        "    ixx: %.6f\n"
+        "    iyy: %.6f\n"
+        "    izz: %.6f\n"
+        "    ixy: %.6f\n"
+        "    ixz: %.6f\n"
+        "    iyz: %.6f\n"
+        "%s"
+    ) % (start, total_mass,
+         cg[0] * 1000, cg[1] * 1000, cg[2] * 1000,
+         I[0, 0], I[1, 1], I[2, 2], I[0, 1], I[0, 2], I[1, 2], end)
+
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    if start not in text or end not in text:
+        print("ERROR: %s has no EMIT:mass_properties markers to write into.\n"
+              "Add the sentinel comments around the mass_properties block first."
+              % path)
+        return False
+    head, _, rest = text.partition(start)
+    _, _, tail = rest.partition(end)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(head + block + tail)
+    print("\nWrote mass_properties block to %s" % path)
+    return True
+
+
 def main(argv=None):
     argv = argv if argv is not None else sys.argv[1:]
-    if not argv:
-        print("usage: python tools/mass_properties.py components.yaml [cad_parts.csv]")
+
+    # Pull out the optional `--emit PATH` flag; the rest are positional.
+    emit_path = None
+    positional = []
+    it = iter(argv)
+    for a in it:
+        if a == "--emit":
+            emit_path = next(it, None)
+            if emit_path is None:
+                print("--emit needs a path, e.g. --emit sim/vehicle_params.yaml")
+                return 1
+        else:
+            positional.append(a)
+
+    if not positional:
+        print("usage: python tools/mass_properties.py components.yaml "
+              "[cad_parts.csv] [--emit sim/vehicle_params.yaml]")
         return 1
 
-    doc = load_yaml(argv[0])
-    cad_csv = argv[1] if len(argv) > 1 else os.path.join(
+    doc = load_yaml(positional[0])
+    cad_csv = positional[1] if len(positional) > 1 else os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "cad_parts.csv")
 
     if os.path.exists(cad_csv):
@@ -223,6 +279,10 @@ def main(argv=None):
     total_mass, cg, cg_source, I = combine(
         items, doc.get("center_of_mass_override_mm"))
     report(items, unresolved, group_density, total_mass, cg, cg_source, I)
+
+    if emit_path:
+        if not emit_params_yaml(emit_path, total_mass, cg, I):
+            return 1
     return 0
 
 

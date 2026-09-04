@@ -18,6 +18,9 @@ torque, the one axis the gimbal cannot trim. Three runs gave 18.07 / 19.34 /
     omega_hover = 1100 * sqrt(13.03 / 20.0) = 888 rad/s
 i.e. ~81% of max, T/W ~ 1.54 -- a workable margin. See docs/MASS_BUDGET.md.
 """
+import os
+import sys
+
 import numpy as np
 
 import rclpy
@@ -28,9 +31,35 @@ from actuator_msgs.msg import Actuators
 from std_msgs.msg import Float64
 from tvc_msgs.msg import GimbalCommand
 
-MAX_ROT_VELOCITY = 1100.0     # rad/s, must match the SDF
-THRUST_AT_MAX_N = 20.0        # N, combined, balanced, full throttle (2026-07-20)
-WEIGHT_N = 1.328 * 9.81
+
+def _vehicle():
+    """Load the single-source-of-truth vehicle params, searching upward for the
+    sim/ tree (this node may run from an installed ROS2 path). Falls back to the
+    bench literals if that tree is not alongside."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = here
+    for _ in range(6):
+        sim_dir = os.path.join(d, "sim")
+        if os.path.isfile(os.path.join(sim_dir, "vehicle_params.py")):
+            sys.path.insert(0, sim_dir)
+            import vehicle_params as vp
+            return vp.load()
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
+_VP = _vehicle()
+if _VP is not None:
+    MAX_ROT_VELOCITY = _VP.max_rot_velocity   # rad/s, must match the SDF
+    THRUST_AT_MAX_N = _VP.thrust_at_max_n     # N, combined, balanced, full throttle
+    WEIGHT_N = _VP.weight_n
+else:                                          # sim/ tree not reachable
+    MAX_ROT_VELOCITY = 1100.0
+    THRUST_AT_MAX_N = 20.0
+    WEIGHT_N = 1.328 * 9.81
 
 
 class GazeboBridgeNode(Node):
