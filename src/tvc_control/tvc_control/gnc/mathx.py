@@ -10,58 +10,53 @@ Euler angles are READOUT ONLY -- kinematics are never propagated through them,
 which is what keeps the +/-90 deg singularity out of the state.
 """
 
-import numpy as np
+import math
 
 
 def quat_normalize(q):
     """Renormalize to unit quaternion (mandatory after every integration step;
     truncation error accumulates otherwise -- see Step 1 guide, Prop. on renorm)."""
-    return q / np.linalg.norm(q)
+    qw, qx, qy, qz = q
+    n = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    return (qw / n, qx / n, qy / n, qz / n)
 
 
 def quat_to_rotmat(q):
-    """Body -> inertial rotation matrix R(q), from unit quaternion q=(qw,qx,qy,qz)."""
+    """Body -> inertial rotation matrix R(q), from unit quaternion q=(qw,qx,qy,qz).
+
+    Returned as a tuple of rows. Callers that want to matrix-multiply wrap it in
+    np.array -- but only the plant does that, because only the plant integrates.
+    """
     qw, qx, qy, qz = q
-    return np.array([
-        [1 - 2*(qy**2 + qz**2), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
-        [2*(qx*qy + qw*qz),     1 - 2*(qx**2 + qz**2), 2*(qy*qz - qw*qx)],
-        [2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx**2 + qy**2)],
-    ])
-
-
-def quat_kinematics(q, omega):
-    """dq/dt = 0.5 * Omega(omega) @ q  -- linear, singularity-free kinematics."""
-    wx, wy, wz = omega
-    Omega = np.array([
-        [0, -wx, -wy, -wz],
-        [wx,  0,  wz, -wy],
-        [wy, -wz,  0,  wx],
-        [wz,  wy, -wx,  0],
-    ])
-    return 0.5 * Omega @ q
+    return (
+        (1 - 2*(qy**2 + qz**2), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)),
+        (2*(qx*qy + qw*qz),     1 - 2*(qx**2 + qz**2), 2*(qy*qz - qw*qx)),
+        (2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx**2 + qy**2)),
+    )
 
 
 def quat_to_euler(q):
     """ZYX (yaw-pitch-roll) Euler angles, for readout/plotting ONLY -- never
     used internally for kinematics propagation (that would reintroduce gimbal lock)."""
     qw, qx, qy, qz = q
-    roll = np.arctan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
-    pitch = np.arcsin(np.clip(2*(qw*qy - qz*qx), -1, 1))
-    yaw = np.arctan2(2*(qw*qz + qx*qy), 1 - 2*(qy**2 + qz**2))
-    return np.array([roll, pitch, yaw])
+    roll = math.atan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
+    s = 2*(qw*qy - qz*qx)
+    s = 1.0 if s > 1.0 else (-1.0 if s < -1.0 else s)
+    pitch = math.asin(s)
+    yaw = math.atan2(2*(qw*qz + qx*qy), 1 - 2*(qy**2 + qz**2))
+    return (roll, pitch, yaw)
 
 
 def euler_to_quat(roll, pitch, yaw):
     """Construct a quaternion from ZYX Euler angles (used only to set up initial
     conditions / disturbances in a human-friendly way)."""
-    cr, sr = np.cos(roll/2), np.sin(roll/2)
-    cp, sp = np.cos(pitch/2), np.sin(pitch/2)
-    cy, sy = np.cos(yaw/2), np.sin(yaw/2)
-    qw = cr*cp*cy + sr*sp*sy
-    qx = sr*cp*cy - cr*sp*sy
-    qy = cr*sp*cy + sr*cp*sy
-    qz = cr*cp*sy - sr*sp*cy
-    return np.array([qw, qx, qy, qz])
+    cr, sr = math.cos(roll/2), math.sin(roll/2)
+    cp, sp = math.cos(pitch/2), math.sin(pitch/2)
+    cy, sy = math.cos(yaw/2), math.sin(yaw/2)
+    return (cr*cp*cy + sr*sp*sy,
+            sr*cp*cy - cr*sp*sy,
+            cr*sp*cy + sr*cp*sy,
+            cr*cp*sy - sr*sp*cy)
 
 
 def thrust_axis(delta):
@@ -72,9 +67,22 @@ def thrust_axis(delta):
     between the two sims. d1 deflects in the pitch plane (about body y),
     d2 in the roll plane (about body x).
     """
-    d1, d2 = delta
-    return np.array([
-        np.sin(d1),
-        -np.sin(d2) * np.cos(d1),
-        np.cos(d1) * np.cos(d2),
-    ])
+    d1, d2 = delta[0], delta[1]
+    return (math.sin(d1),
+            -math.sin(d2) * math.cos(d1),
+            math.cos(d1) * math.cos(d2))
+
+
+def clamp(v, lo, hi):
+    """The one clamp. numpy's clip is not available in flight code."""
+    return lo if v < lo else (hi if v > hi else v)
+
+
+def isclose(a, b):
+    """numpy.isclose's default predicate, reproduced exactly.
+
+    Written out rather than approximated because it decides saturation flags,
+    and a flag that fires one step earlier or later changes anti-windup
+    behaviour. rtol=1e-5, atol=1e-8, compared against |b|.
+    """
+    return abs(a - b) <= 1e-8 + 1e-5 * abs(b)

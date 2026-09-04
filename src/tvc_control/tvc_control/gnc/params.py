@@ -14,7 +14,7 @@ which is how PX4's parameter system works and how the C++ port will read.
 import os
 import sys
 
-import numpy as np
+import math
 from dataclasses import dataclass, field
 
 # =============================================================================
@@ -132,11 +132,11 @@ class VehicleParams:
 
     @property
     def gimbal_max(self):
-        return np.deg2rad(self.gimbal_max_deg)
+        return math.radians(self.gimbal_max_deg)
 
     @property
     def gimbal_rate_max(self):
-        return np.deg2rad(self.gimbal_rate_max_deg)
+        return math.radians(self.gimbal_rate_max_deg)
 
     # --- per-axis travel ------------------------------------------------------
     # delta1 is the pitch-plane deflection, carried by the INNER ring; delta2 is
@@ -152,20 +152,20 @@ class VehicleParams:
     @property
     def delta_min(self):
         inner, outer = self._axis("inner"), self._axis("outer")
-        return np.deg2rad([inner.min_deg if inner else -self.gimbal_max_deg,
-                           outer.min_deg if outer else -self.gimbal_max_deg])
+        return (math.radians(inner.min_deg if inner else -self.gimbal_max_deg),
+                math.radians(outer.min_deg if outer else -self.gimbal_max_deg))
 
     @property
     def delta_max(self):
         inner, outer = self._axis("inner"), self._axis("outer")
-        return np.deg2rad([inner.max_deg if inner else self.gimbal_max_deg,
-                           outer.max_deg if outer else self.gimbal_max_deg])
+        return (math.radians(inner.max_deg if inner else self.gimbal_max_deg),
+                math.radians(outer.max_deg if outer else self.gimbal_max_deg))
 
     @property
     def delta_rate_max(self):
         inner, outer = self._axis("inner"), self._axis("outer")
-        return np.deg2rad([inner.rate_max_deg if inner else self.gimbal_rate_max_deg,
-                           outer.rate_max_deg if outer else self.gimbal_rate_max_deg])
+        return (math.radians(inner.rate_max_deg if inner else self.gimbal_rate_max_deg),
+                math.radians(outer.rate_max_deg if outer else self.gimbal_rate_max_deg))
 
 
 @dataclass
@@ -217,4 +217,4 @@ class ControlGains:
 
     @property
     def max_tilt(self):
-        return np.deg2rad(self.max_tilt_deg)
+        return math.radians(self.max_tilt_deg)

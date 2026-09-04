@@ -4,8 +4,6 @@ Three-axis attitude cascade: attitude error -> body rate -> moment -> actuators.
 Moved verbatim from physics.py.
 """
 
-import numpy as np
-
 from .params import VehicleParams, ControlGains
 from .mathx import quat_to_euler
 from .pid import PID
@@ -79,7 +77,7 @@ class AttitudeController:
                                            freeze=sat.gimbal_saturated)
         tau_z = self.pid_axial_rate.update(axial_rate_des - omega[2], dt,
                                            freeze=sat.axial_saturated)
-        return np.array([tau_x, tau_y, tau_z])
+        return (tau_x, tau_y, tau_z)
 
     def update(self, q, omega, roll_des, pitch_des, T_des, dt, axial_des=0.0):
         """Backward-compatible entry point: returns the gimbal command only.
@@ -91,4 +89,4 @@ class AttitudeController:
         """
         M = self.desired_moment(q, omega, roll_des, pitch_des, axial_des, dt)
         self.last_alloc = allocate(M, T_des, self.p)
-        return self.last_alloc.delta_cmd.copy()
+        return self.last_alloc.delta_cmd

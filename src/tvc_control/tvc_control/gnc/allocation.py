@@ -10,11 +10,11 @@ attitude controller -- is the standard hierarchy (Johansen & Fossen 2013) and is
 what lets the same controller drive a different effector suite later.
 """
 
-import numpy as np
+import math
 from dataclasses import dataclass, field
 
 from .params import VehicleParams
-from .mathx import thrust_axis
+from .mathx import thrust_axis, clamp, isclose
 
 
 @dataclass
@@ -26,7 +26,7 @@ class Allocation:
     saturation into a long overshoot, so the controllers freeze the relevant
     integrator whenever the matching flag is set."""
 
-    delta_cmd: np.ndarray = field(default_factory=lambda: np.zeros(2))
+    delta_cmd: tuple = field(default_factory=lambda: (0.0, 0.0))
     tau_p: float = 0.0
     T_cmd: float = 0.0
     T1: float = 0.0                 # per-rotor thrust, N (upper prop)
@@ -133,9 +133,9 @@ def motor_setpoint(T, tau_p, params: VehicleParams):
         f = share_a / (share_a + share)
         return u_a, u_b, f * T_ach, (1.0 - f) * T_ach
 
-    T = float(np.clip(T, 0.0, params.T_max))
+    T = clamp(T, 0.0, params.T_max)
     split_max = max(min(T, params.T_max - T), 0.0)
-    split = float(np.clip(tau_p / params.k_moment, -split_max, split_max))
+    split = clamp(tau_p / params.k_moment, -split_max, split_max)
     # No surface means no command coordinate to normalize against; the analytic
     # fallback speaks only in thrust. Reported as 0 rather than guessed.
     return 0.0, 0.0, 0.5 * (T - split), 0.5 * (T + split)
@@ -162,24 +162,32 @@ def _lateral_gimbal(M_xy, T, tau_p, params: VehicleParams, iters=3):
     TL = T * params.L
     D = tau_p ** 2 + TL ** 2
     Mx, My = float(M_xy[0]), float(M_xy[1])
-    d = np.array([(tau_p * Mx - TL * My) / D,
-                  (-TL * Mx - tau_p * My) / D])
+    d1 = (tau_p * Mx - TL * My) / D
+    d2 = (-TL * Mx - tau_p * My) / D
 
+    # The 2x2 is solved by Cramer's rule rather than a library call. At this
+    # size it is the same arithmetic a solver would do, minus the dependency and
+    # minus the unbounded-work worry: the iteration count is fixed, so worst-case
+    # execution time is stated rather than hoped for.
     for _ in range(iters):
-        d1, d2 = d
-        s1, c1, s2, c2 = np.sin(d1), np.cos(d1), np.sin(d2), np.cos(d2)
-        g = np.array([-TL * s2 * c1 + tau_p * s1 - Mx,
-                      -TL * s1 - tau_p * s2 * c1 - My])
-        J = np.array([[TL * s2 * s1 + tau_p * c1, -TL * c2 * c1],
-                      [-TL * c1 + tau_p * s2 * s1, -tau_p * c2 * c1]])
-        try:
-            step = np.linalg.solve(J, g)
-        except np.linalg.LinAlgError:
+        s1, c1 = math.sin(d1), math.cos(d1)
+        s2, c2 = math.sin(d2), math.cos(d2)
+        g1 = -TL * s2 * c1 + tau_p * s1 - Mx
+        g2 = -TL * s1 - tau_p * s2 * c1 - My
+        j11 = TL * s2 * s1 + tau_p * c1
+        j12 = -TL * c2 * c1
+        j21 = -TL * c1 + tau_p * s2 * s1
+        j22 = -tau_p * c2 * c1
+        det = j11 * j22 - j12 * j21
+        if det == 0.0:
             break                       # keep the small-angle seed
-        if not np.all(np.isfinite(step)):
+        step1 = (g1 * j22 - j12 * g2) / det
+        step2 = (j11 * g2 - g1 * j21) / det
+        if not (math.isfinite(step1) and math.isfinite(step2)):
             break
-        d = d - step
-    return d
+        d1 -= step1
+        d2 -= step2
+    return (d1, d2)
 
 
 def allocate(M_des, T_des, params: VehicleParams):
@@ -187,11 +195,11 @@ def allocate(M_des, T_des, params: VehicleParams):
 
     M_des is (M_x, M_y, M_z) in N*m: the first two lateral, the third axial.
     """
-    M_des = np.asarray(M_des, dtype=float)
+    Mx, My, Mz = float(M_des[0]), float(M_des[1]), float(M_des[2])
 
     # --- stage 0: thrust has priority; everything else works with what's left
-    T_cmd = float(np.clip(T_des, params.T_min, params.T_max))
-    thrust_sat = not np.isclose(T_cmd, T_des)
+    T_cmd = clamp(T_des, params.T_min, params.T_max)
+    thrust_sat = not isclose(T_cmd, T_des)
 
     # --- stages 1 & 2: axial, then lateral, iterated twice.
     # M_z can only come from tau_P, but what reaches body z is
@@ -203,15 +211,15 @@ def allocate(M_des, T_des, params: VehicleParams):
     # of the axial command -- small, but it is a systematic bias, not noise, so
     # the axial integrator would otherwise spend the whole flight paying it off.
     q_lo, q_hi = axial_limits(T_cmd, params)
-    axial_sat = M_des[2] < q_lo - 1e-12 or M_des[2] > q_hi + 1e-12
-    tau_p = float(np.clip(M_des[2], q_lo, q_hi))
-    delta = _lateral_gimbal(M_des[:2], T_cmd, tau_p, params)
+    axial_sat = Mz < q_lo - 1e-12 or Mz > q_hi + 1e-12
+    tau_p = clamp(Mz, q_lo, q_hi)
+    delta = _lateral_gimbal((Mx, My), T_cmd, tau_p, params)
     for _ in range(2):
-        loss = np.cos(delta[0]) * np.cos(delta[1])
+        loss = math.cos(delta[0]) * math.cos(delta[1])
         if loss < 1e-6:
             break
-        tau_p = float(np.clip(M_des[2] / loss, q_lo, q_hi))
-        delta = _lateral_gimbal(M_des[:2], T_cmd, tau_p, params)
+        tau_p = clamp(Mz / loss, q_lo, q_hi)
+        delta = _lateral_gimbal((Mx, My), T_cmd, tau_p, params)
 
     # Scale the PAIR down on saturation so the torque direction survives.
     # Clipping each axis independently would rotate the commanded torque vector
@@ -228,8 +236,8 @@ def allocate(M_des, T_des, params: VehicleParams):
             scale = min(scale, lo[k] / delta[k])
     gimbal_sat = scale < 1.0 - 1e-12
     if gimbal_sat:
-        delta = delta * scale
-    delta = np.clip(delta, lo, hi)
+        delta = (delta[0] * scale, delta[1] * scale)
+    delta = (clamp(delta[0], lo[0], hi[0]), clamp(delta[1], lo[1], hi[1]))
 
     u_a, u_b, T1, T2 = motor_setpoint(T_cmd, tau_p, params)
 

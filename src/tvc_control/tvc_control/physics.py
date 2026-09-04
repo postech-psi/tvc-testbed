@@ -54,7 +54,6 @@ from .gnc.params import VehicleParams, ControlGains
 from .gnc.mathx import (
     quat_normalize,
     quat_to_rotmat,
-    quat_kinematics,
     quat_to_euler,
     euler_to_quat,
     thrust_axis,
@@ -72,7 +71,7 @@ from .gnc.attitude import AttitudeController
 from .gnc.altitude import AltitudeController
 
 # --- simulation --------------------------------------------------------------
-from .plant.rigidbody import dynamics
+from .plant.rigidbody import dynamics, quat_kinematics
 from .plant.actuators import GimbalActuator
 
 # --- harness -----------------------------------------------------------------

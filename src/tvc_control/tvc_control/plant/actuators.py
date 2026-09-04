@@ -40,7 +40,8 @@ class GimbalActuator:
         # Per-axis, asymmetric stops and per-axis slew: the inner ring reaches
         # 403 deg/s and the outer only 235, so a symmetric shared limit either
         # slows the inner axis or lets the outer one move faster than it can.
-        delta_cmd = np.clip(delta_cmd, self.p.delta_min, self.p.delta_max)
+        delta_cmd = np.clip(np.asarray(delta_cmd, dtype=float),
+                            self.p.delta_min, self.p.delta_max)
 
         # Delay by round(deadtime/dt) control steps. After appending, the FIFO
         # holds the last n+1 commands, so popping the oldest yields the command
@@ -53,7 +54,8 @@ class GimbalActuator:
         else:
             target = self.delta.copy()
 
-        max_step = self.p.delta_rate_max * dt
+        # gnc hands out plain tuples now; the plant is where they become arrays.
+        max_step = np.asarray(self.p.delta_rate_max, dtype=float) * dt
         step = np.clip(target - self.delta, -max_step, max_step)
         self.delta = self.delta + step
         return self.delta.copy()

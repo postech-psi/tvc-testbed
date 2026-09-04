@@ -115,7 +115,9 @@ def capture():
         if a.gimbal_saturated or a.axial_saturated:
             continue
         n_ok += 1
-        nh = thrust_axis(a.delta_cmd)
+        # gnc returns plain tuples (flight code carries no numpy); the
+        # harness is where they become arrays.
+        nh = np.asarray(thrust_axis(a.delta_cmd), dtype=float)
         tau = np.cross([0, 0, -vp.L], T_hov * nh) + a.tau_p * nh
         worst = max(worst, float(np.max(np.abs(tau - M))))
     out["allocation_roundtrip"] = {

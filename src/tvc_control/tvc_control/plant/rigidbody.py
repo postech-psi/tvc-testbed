@@ -7,7 +7,24 @@ Moved verbatim from physics.py.
 import numpy as np
 
 from ..gnc.params import VehicleParams
-from ..gnc.mathx import quat_normalize, quat_to_rotmat, quat_kinematics, thrust_axis
+from ..gnc.mathx import quat_normalize, quat_to_rotmat, thrust_axis
+
+
+def quat_kinematics(q, omega):
+    """dq/dt = 0.5 * Omega(omega) @ q  -- linear, singularity-free kinematics.
+
+    Lives with the plant, not with the flight-code math: only an integrator
+    needs it, and keeping it here is what lets gnc/mathx.py stay free of numpy.
+    """
+    wx, wy, wz = omega
+    Omega = np.array([
+        [0, -wx, -wy, -wz],
+        [wx,  0,  wz, -wy],
+        [wy, -wz,  0,  wx],
+        [wz,  wy, -wx,  0],
+    ])
+    return 0.5 * Omega @ np.asarray(q, dtype=float)
+
 
 
 def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
@@ -23,10 +40,11 @@ def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
     q = quat_normalize(x[6:10])
     omega = x[10:13]
 
-    n_hat = thrust_axis(delta)
+    # gnc returns plain tuples; the integrator wants arrays.
+    n_hat = np.asarray(thrust_axis(delta), dtype=float)
     f_body = T * n_hat
 
-    R = quat_to_rotmat(q)
+    R = np.asarray(quat_to_rotmat(q), dtype=float)
     a_inertial = (R @ f_body) / params.m + np.array([0, 0, -params.g])
 
     # AXIAL lever arm (gimbal pivot -> CM along body z), plus optional lateral
