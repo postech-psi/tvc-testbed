@@ -22,7 +22,7 @@ Levels: **0** no evidence · **1** informal/anecdotal · **2** documented but
 unverified · **3** verified against an independent reference · **4** verified
 plus quantified uncertainty.
 
-Last updated: Phase 0 of the flight-software restructure (baseline `pre-unify`).
+Last updated: Phase 3 of the flight-software restructure.
 
 ---
 
@@ -147,8 +147,8 @@ restructure introduces them:
 | divergence | effect | status |
 |---|---|---|
 | Gazebo `momentConstant` is linear and symmetric | reproduces only ~50 % of measured axial torque at hover, and none of its sign asymmetry | fix scheduled (command-side inversion) |
-| motor lag ~100 ms measured | not modelled anywhere; the roll channel looks **more capable than it is** | fix scheduled |
-| bench record does not say whether the 100 ms is a delay or a lag | roll-channel gain margin differs materially between the two | both to be run |
+| **the 100 ms motor response is not identified as a delay or a lag** | **decides whether the roll channel is controllable at all.** Measured, both readings, same 20 deg upset: as a first-order lag the channel recovers cleanly and never saturates; as a pure transport delay it winds up to ~70 deg and saturates 94% of the run. The lateral axes are unaffected either way. | **OPEN — one bench run resolves it. Highest-value measurement outstanding.** |
+| motor lag now modelled (`plant/actuators.py::MotorLag`) | default is the optimistic reading | modelled; `sim/validate_control.py` prints the pessimistic number every run |
 | rigid-body inertia treated as diagonal | `Iyz/Izz = 27.3 %`, `Ixz/Izz = 15.4 %` — dominates the roll-axis residual | fix scheduled |
 | servo resonance (+11 dB inner, +5 dB outer) | a rate limit cannot represent it; closed-loop margin near that peak is unmodelled | deferred |
 | gimbal hysteresis | unmodelled | deferred |

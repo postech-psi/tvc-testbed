@@ -115,11 +115,50 @@ def scenario_tilted_hover(vp, gains, verbose):
     return ok, detail, on
 
 
+def scenario_motor_lag_model(vp, gains, verbose):
+    """The roll channel under both readings of the measured 100 ms motor lag.
+
+    THE OPEN QUESTION THIS GUARDS. The bench recorded "command -> thrust
+    response delay ~0.10 s" and did not say whether that is a transport delay or
+    a first-order time constant. It decides whether the thrust-axis channel is
+    controllable at the flight-validated gains:
+
+        as a LAG    the roll channel recovers cleanly and never saturates
+        as a DELAY  it winds up to ~70 deg and saturates ~94% of the run
+
+    The lateral axes are unaffected either way -- this is entirely a roll-channel
+    result, which follows from Izz being 11.6x smaller than Ixx while carrying
+    the stiffest normalized gain.
+
+    The check asserts only the optimistic reading (the current default), because
+    asserting the pessimistic one would make the suite red over a measurement
+    nobody has taken yet. What it does instead is print the pessimistic number
+    every run, so the risk cannot quietly stop being mentioned.
+    """
+    base = dict(t_final=6.0, roll_des_deg=0.0, pitch_des_deg=0.0,
+                init_roll_deg=0.0, init_pitch_deg=0.0, init_axial_deg=20.0)
+    lag = simulate(vp, gains, SimConfig(motor_model="first_order",
+                                        motor_tau_s=0.10, motor_deadtime_s=0.0,
+                                        **base))
+    dly = simulate(vp, gains, SimConfig(motor_model="delay",
+                                        motor_tau_s=0.0, motor_deadtime_s=0.10,
+                                        **base))
+    lag_final = abs(lag["metrics"]["final_axial_deg"])
+    dly_peak = float(np.max(np.abs(dly["euler_deg"][:, 2])))
+    ok = lag_final < 2.0
+    detail = ("as a LAG: final roll %.3f deg (stable). AS A DELAY: peak roll "
+              "%.1f deg, %.0f%% saturated -- UNRESOLVED, needs one bench run"
+              % (lag_final, dly_peak,
+                 100 * float(np.mean(dly["saturated"][:, 1]))))
+    return ok, detail, lag
+
+
 SCENARIOS = [
     ("lateral upset recovery", scenario_lateral),
     ("axial upset recovery", scenario_axial),
     ("climb and hold", scenario_climb),
     ("tilted hover (1/cos compensation)", scenario_tilted_hover),
+    ("motor lag model (roll channel)", scenario_motor_lag_model),
 ]
 
 

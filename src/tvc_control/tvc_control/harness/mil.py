@@ -13,7 +13,7 @@ from ..gnc.mathx import quat_normalize, quat_to_euler, euler_to_quat
 from ..gnc.types import ControlMode, Setpoint
 from ..gnc.controller import TvcController
 from ..plant.rigidbody import dynamics
-from ..plant.actuators import GimbalActuator
+from ..plant.actuators import ActuatorChain
 from ..plant.sensors import PerfectEstimator
 
 
@@ -53,6 +53,14 @@ class SimConfig:
     x_des: float = 0.0              # m, inertial
     y_des: float = 0.0
 
+    # Motor lag model. Defaults mirror vehicle_params.yaml's motor_dynamics; the
+    # bench record does not say whether the measured 100 ms is a delay or a time
+    # constant, so both are runnable and the choice is explicit at the call site
+    # rather than buried. See plant/actuators.py::MotorLag.
+    motor_model: str = "first_order"
+    motor_tau_s: float = 0.10
+    motor_deadtime_s: float = 0.0
+
 
 def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     """
@@ -65,7 +73,10 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     Returns a dict of numpy arrays: t, euler_deg, delta_deg, omega_deg, quat,
     pos, thrust_N, tau_p_Nm, motor_N, plus scalar metrics under 'metrics'.
     """
-    gimbal = GimbalActuator(vparams)
+    chain = ActuatorChain(vparams,
+                          motor_model=cfg.motor_model,
+                          motor_tau_s=cfg.motor_tau_s,
+                          motor_deadtime_s=cfg.motor_deadtime_s)
     estimator = PerfectEstimator()
     controller = TvcController(vparams, gains, ControlMode(
         altitude_hold=cfg.altitude_hold,
@@ -121,10 +132,14 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         cmd = controller.update(est, setpoint, cfg.dt_ctrl, gimbal_rad=delta)
         alloc = controller.attitude.last_alloc
         delta_cmd = np.array([cmd.gimbal_delta1_rad, cmd.gimbal_delta2_rad])
-        delta = gimbal.update(delta_cmd, cfg.dt_ctrl)
+        # Both actuator lags in one call: the gimbal's 30 ms transport delay and
+        # slew, and the motors' ~100 ms thrust response. What reaches the rigid
+        # body is what the actuators ACHIEVED, not what was commanded.
+        delta, T_ach, tau_p_ach = chain.update(
+            delta_cmd, alloc.T_cmd, alloc.tau_p, cfg.dt_ctrl)
 
         sol = solve_ivp(dynamics, [t, t + cfg.dt_ctrl], x,
-                         args=(alloc.T_cmd, delta, vparams, alloc.tau_p),
+                         args=(T_ach, delta, vparams, tau_p_ach),
                          method='RK45', max_step=cfg.dt_ctrl / 4)
         x = sol.y[:, -1]
         x[6:10] = quat_normalize(x[6:10])
@@ -138,8 +153,8 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         omega_arr[k] = np.rad2deg(x[10:13])
         quat_arr[k] = x[6:10]
         pos_arr[k] = x[0:3]
-        thrust_arr[k] = alloc.T_cmd
-        tau_p_arr[k] = alloc.tau_p
+        thrust_arr[k] = T_ach
+        tau_p_arr[k] = tau_p_ach
         motor_arr[k] = (alloc.T1, alloc.T2)
         sat_arr[k] = (cmd.sat_gimbal, cmd.sat_axial, cmd.sat_thrust)
 

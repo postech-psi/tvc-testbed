@@ -191,7 +191,36 @@ thrust_torque_surface:
 #                      12.0 N (-13%). The surface above is a fresh-pack fit; a
 #                      long flight loses authority against it.
 motor_dynamics:
-  response_delay_s: 0.10
+  # HOW the 100 ms is modelled, and the honest reason there is a switch.
+  #
+  # The bench record says "command -> thrust response delay ~0.10 s, averaged
+  # over 105 step transitions" and -- unlike the gimbal block, which separates
+  # onset / delay / rise10-90 / settle -- it does not say whether that is a
+  # transport DELAY or a first-order TIME CONSTANT. The difference is not
+  # cosmetic: a pure delay eats phase at every frequency and cannot be
+  # lead-compensated, so the usable roll-channel gain differs materially
+  # between the two readings.
+  #
+  #   first_order    T, tau_P follow their commands with time constant tau_s
+  #   delay          they follow exactly, deadtime_s late
+  #   delay_plus_lag both
+  #
+  # Default is the optimistic reading. Run the pessimistic one before trusting
+  # any roll-channel stability margin; sim/validate_control.py can be pointed at
+  # either. Resolving this needs one bench run, not a modelling decision.
+  model: first_order
+  tau_s: 0.10
+  deadtime_s: 0.0
+
+  # What Gazebo's MulticopterMotorModel should use. Near-zero on purpose: the
+  # lag is owned by the plant model above, in ONE place, so the two plants agree.
+  # It cannot live in the plugin anyway -- the plugin filters the rotor VELOCITY
+  # reference, and since T ~ omega^2 a first-order lag in omega is not a
+  # first-order lag in thrust; it is faster near hover and asymmetric between
+  # spin-up and spin-down.
+  gazebo_time_constant_s: 0.001
+
+  response_delay_s: 0.10       # as measured, kept for provenance
   peak_current_a: 34.7
   efficiency_g_per_w: 4.9
   thrust_sensitivity_n_per_v: 1.46     # r = 0.981 over 11.2-12.5 V
