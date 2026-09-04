@@ -42,7 +42,7 @@ The file's own header documents both paths, including what a custom
 `ActuatorEffectivenessTVC` firmware module would involve if PX4's internal
 attitude loop is ever needed. It also opens with the axis-convention warning,
 because PX4 speaks FRD and calls rotation about the thrust axis "yaw" while we
-call it "roll" — see [../docs/3-CONVENTIONS.md §4](../docs/3-CONVENTIONS.md).
+call it "roll" — see [../docs/4-CONVENTIONS.md §4](../docs/4-CONVENTIONS.md).
 
 To use it, copy into a PX4 source tree and rebuild SITL:
 

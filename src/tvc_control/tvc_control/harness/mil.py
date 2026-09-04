@@ -34,7 +34,7 @@ class SimConfig:
 
     att_pitch_des_deg and att_yaw_des_deg are the LATERAL setpoints -- rotations
     about body x and body y, the two the gimbal drives. att_roll_des_deg is the
-    thrust-axis channel, driven by tau_P alone. docs/3-CONVENTIONS.md.
+    thrust-axis channel, driven by tau_P alone. docs/4-CONVENTIONS.md.
     """
 
     t_final: float = 5.0

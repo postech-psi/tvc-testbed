@@ -33,6 +33,9 @@ from tvc_control.gnc.mathx import clamp
 
 
 class GazeboBridgeNode(Node):
+    """Fans one ActuatorCommand out to the three gz-sim plugin topics. The
+    conversion itself lives in hal/gazebo.py; this node is transport only.
+    """
 
     def __init__(self):
         super().__init__('gazebo_bridge_node')
@@ -60,10 +63,11 @@ class GazeboBridgeNode(Node):
                self.lo[1] * 57.2957795, self.hi[1] * 57.2957795))
 
     def on_cmd(self, msg: ActuatorCommand):
+        """Clamp per ring, then publish the two joint commands and the rotor speeds."""
         if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_ROCKET_V2:
             raise SystemExit(
                 'axis convention mismatch: controller sent %d, this bridge '
-                'speaks %d. See docs/3-CONVENTIONS.md.'
+                'speaks %d. See docs/4-CONVENTIONS.md.'
                 % (msg.axis_convention,
                    ActuatorCommand.AXIS_CONVENTION_ROCKET_V2))
 
@@ -84,6 +88,7 @@ class GazeboBridgeNode(Node):
 
 
 def main(args=None):
+    """ROS 2 entry point for `ros2 run tvc_control gazebo_bridge_node`."""
     rclpy.init(args=args)
     node = GazeboBridgeNode()
     rclpy.spin(node)

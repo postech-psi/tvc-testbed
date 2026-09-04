@@ -39,7 +39,7 @@ WHAT THIS COSTS, STATED PLAINLY
     maxRotVelocity becomes solver headroom. Nothing may read omega as physics,
     and the raised ceiling means the plugin no longer enforces the vehicle's real
     17.79 N thrust limit -- the allocator does, and tests assert it rather than
-    assuming it. See docs/6-CREDIBILITY.md, Results Robustness.
+    assuming it. See docs/7-CREDIBILITY.md, Results Robustness.
 
     Feasibility drove the SDF change. At the original maxRotVelocity = 1100 the
     per-rotor ceiling is 8.893 N, and the c required to cover the envelope
@@ -75,14 +75,6 @@ def rotor_speeds(thrust_n, tau_p_nm, motor_constant, moment_constant,
     wa = math.sqrt(max(t_a, 0.0) / motor_constant)
     wb = math.sqrt(max(t_b, 0.0) / motor_constant)
     return (min(wa, max_rot_velocity), min(wb, max_rot_velocity))
-
-
-def rotor_speeds_from(setpoint, vehicle):
-    """Convenience wrapper: ActuatorSetpoint + the loaded Vehicle -> omega pair."""
-    rot = vehicle.raw["rotors"]
-    return rotor_speeds(setpoint.thrust_n, setpoint.tau_p_nm,
-                        rot["motor_constant"], rot["moment_constant"],
-                        rot["max_rot_velocity"])
 
 
 def plugin_forward(omega_a, omega_b, motor_constant, moment_constant):

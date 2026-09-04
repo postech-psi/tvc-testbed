@@ -11,6 +11,7 @@ python tvc.py --help
 | command | what it does | needs |
 |---|---|---|
 | `validate` | the five closed-loop scenarios | Python |
+| `trace` | every computation in one control step, with the numbers | Python |
 | `golden` | capture or `--check` the frozen numerical baseline | Python |
 | `params` | every vehicle number with its provenance | Python |
 | `plot <csv>` | render a Gazebo flight log | + matplotlib |
@@ -82,7 +83,7 @@ control authority at hover (T = 13.03 N, 73% of the 17.79 N ceiling):
 - **`peak |tau_P| = X of Y available`** at 100% means the roll channel is asking
   for everything it has.
 - **`AS A DELAY: peak roll 72.5 deg, 97% saturated`** — the open question. See
-  [2-THEORY.md §7](2-THEORY.md).
+  [3-THEORY.md §7](3-THEORY.md).
 
 ---
 
@@ -153,7 +154,7 @@ ros2 launch tvc_control analytic.launch.py             # same nodes, analytic pl
 
 > ⚠ **These packages have never been built.** `colcon build` has not run against
 > them. Expect to resolve `ros-jazzy-actuator-msgs`, and expect to iterate on the
-> `ros_gz_bridge` type strings. See [6-CREDIBILITY.md](6-CREDIBILITY.md).
+> `ros_gz_bridge` type strings. See [7-CREDIBILITY.md](7-CREDIBILITY.md).
 
 Five processes:
 

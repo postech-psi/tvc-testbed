@@ -1,7 +1,7 @@
 """
 The axis convention, asserted rather than documented.
 ================================================================================
-docs/3-CONVENTIONS.md states the frames, axis names and signs. This file is what
+docs/4-CONVENTIONS.md states the frames, axis names and signs. This file is what
 makes that statement load-bearing, because every way of getting the convention
 wrong fails SILENTLY.
 
@@ -24,7 +24,7 @@ import re
 
 import pytest
 
-# body axis -> unit vector, per docs/3-CONVENTIONS.md
+# body axis -> unit vector, per docs/4-CONVENTIONS.md
 X = (1.0, 0.0, 0.0)
 Y = (0.0, 1.0, 0.0)
 Z = (0.0, 0.0, 1.0)
@@ -118,7 +118,7 @@ def test_sdf_joints_exist_and_carry_the_expected_axes(repo):
     The joints are named after the RING, not the axis, deliberately: a ring is a
     mechanical fact invariant under any naming convention, so a future revision
     of the convention does not touch model.sdf. What must be checked is that the
-    mapping in docs/3-CONVENTIONS.md matches the geometry.
+    mapping in docs/4-CONVENTIONS.md matches the geometry.
     """
     sdf = _sdf(repo)
     assert _joint_axis(sdf, OUTER_JOINT) == (1.0, 0.0, 0.0), \

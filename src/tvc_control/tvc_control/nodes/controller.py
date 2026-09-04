@@ -14,7 +14,7 @@ Three things this node used to get wrong, all fixed here:
   command, tau_P, the per-rotor split and the saturation flags. There was no
   motor topic at all, so the ROS2 path had no altitude loop and, since the
   bridge held both rotors at one speed, exactly zero roll authority
-  (roll being rotation about the thrust axis -- see docs/3-CONVENTIONS.md).
+  (roll being rotation about the thrust axis -- see docs/4-CONVENTIONS.md).
 
   IT LISTENED TO THE WRONG SENSOR. It subscribed to the IMU, which carries no
   position and no velocity, so altitude and position control were not merely
@@ -42,13 +42,16 @@ from tvc_control.hal.gazebo import rotor_speeds
 # Retired parameter names. Each one either changed meaning or stopped doing
 # anything, and a parameter that looks live while being ignored is worse than
 # one that is gone -- it makes a launch file document a control decision that
-# is not happening. See docs/3-CONVENTIONS.md.
+# is not happening. See docs/4-CONVENTIONS.md.
 RETIRED_PARAMS = ('gimbal_rate_max_deg',
                   'roll_des_deg', 'pitch_des_deg', 'axial_des_deg',
                   'init_roll_deg', 'init_pitch_deg', 'init_axial_deg')
 
 
 class ControllerNode(Node):
+    """Subscribes to odometry, runs TvcController on a timer, publishes one
+    ActuatorCommand. Owns no control math.
+    """
 
     def __init__(self):
         super().__init__('controller_node')
@@ -57,7 +60,7 @@ class ControllerNode(Node):
             self.declare_parameter(name, rclpy.Parameter.Type.NOT_SET)
             if self.get_parameter(name).type_ != rclpy.Parameter.Type.NOT_SET:
                 raise SystemExit(
-                    "parameter '%s' was retired -- see docs/3-CONVENTIONS.md" % name)
+                    "parameter '%s' was retired -- see docs/4-CONVENTIONS.md" % name)
 
         self.declare_parameter('rate_hz', 250.0)
         self.declare_parameter('gain_profile', '')
@@ -120,6 +123,7 @@ class ControllerNode(Node):
             stamp_s=stamp)
 
     def control_step(self):
+        """The timer callback: one control step, at the configured rate."""
         if self._state is None:
             return
 
@@ -158,6 +162,7 @@ class ControllerNode(Node):
 
 
 def main(args=None):
+    """ROS 2 entry point for `ros2 run tvc_control controller_node`."""
     rclpy.init(args=args)
     node = ControllerNode()
     rclpy.spin(node)

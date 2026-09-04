@@ -9,7 +9,7 @@ there is only one function.
 
   gazebo.py   normalized commands -> gz.msgs.Actuators rotor speeds
   (later) px4.py     -> ActuatorMotors / ActuatorServos, plus the FRD frame
-                        conversion (docs/3-CONVENTIONS.md). That conversion lives
+                        conversion (docs/4-CONVENTIONS.md). That conversion lives
                         here and nowhere else; FRD never appears inside gnc/.
   (later) bench.py   -> raw PWM for the ESCs and servos
 """

@@ -25,7 +25,7 @@ WHAT MAKES THIS ONE INTERESTING
     reaches body z. Both couplings are handled by the two-pass solve in
     allocate().
 
-Derivation: docs/2-THEORY.md, section 4.
+Derivation: docs/3-THEORY.md, section 4.
 """
 
 import math
@@ -106,24 +106,6 @@ def roll_limits(T, params: VehicleParams):
     return lo, hi
 
 
-def mix_motors(T, tau_p, params: VehicleParams):
-    """(total thrust, roll torque) -> (T1, T2) per-rotor thrusts [N].
-
-    tau_P = k_moment * (T2 - T1): equal and opposite prop drag torques cancel,
-    and what survives is proportional to the imbalance.
-
-    This is the ANALYTIC path. The real vehicle needs the measured two-input
-    surfaces T = f_T(u1, u2), tau_P = f_Q(u1, u2), because the lower prop runs
-    inside the upper prop's wake and the two commands are therefore coupled --
-    a separable per-motor model does not hold. That surface EXISTS and is loaded by default (vehicle_params.yaml,
-    thrust_torque_surface), so this branch runs only when a caller deliberately
-    builds a VehicleParams without one. Nothing above this function had to
-    change when the surface arrived, because everything above speaks in
-    (T, tau_P) and not in commands.
-    """
-    return motor_setpoint(T, tau_p, params)[2:]
-
-
 def motor_setpoint(T, tau_p, params: VehicleParams):
     """(T, tau_P) -> (u_a, u_b, T1, T2).
 
@@ -131,9 +113,9 @@ def motor_setpoint(T, tau_p, params: VehicleParams):
     output, and the coordinate the bench surface is defined on. T1/T2 are the
     per-prop thrust split derived from them.
 
-    mix_motors() returns only the thrusts and exists because callers predate
-    this split; new code should ask for the commands, because throwing them away
-    and re-deriving them later is what forces a second inverse solve.
+    Callers want the COMMANDS. T1/T2 are derived from them and are used only
+    for logging and for Gazebo's two-rotor plugin; nothing in the moment model
+    depends on the individual values, because the load cell measured the pair.
     """
     if params.surface is not None:
         # Measured path: solve the real surface for the two PWM commands, then

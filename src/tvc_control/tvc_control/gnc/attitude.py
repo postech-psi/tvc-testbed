@@ -9,7 +9,7 @@ Three-axis attitude cascade: attitude error -> body rate -> moment -> actuators.
 The rate loop outputs ANGULAR ACCELERATION, not torque, and inertia is applied
 in exactly one place (desired_moment, below). See the note there for why that
 apparently cosmetic choice is what made two historical gain sets comparable at
-all. docs/2-THEORY.md, section 3.
+all. docs/3-THEORY.md, section 3.
 """
 
 from .params import VehicleParams, ControlGains
@@ -28,7 +28,7 @@ class AttitudeController:
     All three axes are closed here. The LATERAL pair -- pitch (body x) and yaw
     (body y) -- is driven by the gimbal; the ROLL channel (body z, the thrust
     axis) is driven by tau_P, the differential prop reaction torque. Axis names
-    follow the rocket convention throughout: docs/3-CONVENTIONS.md.
+    follow the rocket convention throughout: docs/4-CONVENTIONS.md.
 
     The roll channel was once left at zero here, on the grounds that the gimbal
     cannot produce M_z. The premise is right and the conclusion was wrong: the
@@ -58,6 +58,7 @@ class AttitudeController:
         self.last_alloc = Allocation()
 
     def reset(self):
+        """Clear all six PIDs and the cached allocation."""
         for pid in (self.pid_pitch_angle, self.pid_yaw_angle, self.pid_roll_angle,
                     self.pid_pitch_rate, self.pid_yaw_rate, self.pid_roll_rate):
             pid.reset()

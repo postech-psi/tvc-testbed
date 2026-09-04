@@ -82,6 +82,7 @@ def _round(x):
 
 
 def capture():
+    """Run everything the baseline covers and return it as one nested dict."""
     vp, gains = load_vehicle_params(), load_gains()
     out = {}
 
@@ -162,6 +163,7 @@ def capture():
 
 
 def main(argv=None):
+    """Write the baseline, or with --check compare and report every drifted field."""
     ap = argparse.ArgumentParser(
         prog="tvc.py golden",
         description="Capture or check the frozen numerical baseline.")

@@ -21,6 +21,9 @@ from .mathx import clamp
 
 
 class PID:
+    """Parallel-form PID with conditional anti-windup. `dt` is an argument, never
+    a clock read, which is what makes every loop reproducible.
+    """
     def __init__(self, kp, ki, kd, i_limit=1e9):
         self.kp, self.ki, self.kd = kp, ki, kd
         self.i_limit = i_limit
@@ -28,6 +31,7 @@ class PID:
         self.prev_err = 0.0
 
     def reset(self):
+        """Clear the integrator and the previous error. Call between runs."""
         self.integral = 0.0
         self.prev_err = 0.0
 

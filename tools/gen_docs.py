@@ -15,6 +15,14 @@ WHY
     number that must be GENERATED from the YAML. This tool does that, and the
     CI job runs --check.
 
+WHAT IS GENERATED
+    docs/1-CODE-MAP.md     the index of every module, class and public function,
+                           each described by its own docstring
+    docs/2-WALKTHROUGH.md  a real control-path trace, produced by running
+                           `tvc.py trace`
+    docs/5-PARAMETERS.md   the parameter tables and the control-authority budget
+    docs/7-CREDIBILITY.md  what the test suite covers, counted from the suite
+
 HOW
     Generated regions are delimited by sentinel comments, the same mechanism
     tools/mass_properties.py --emit already uses on vehicle_params.yaml:
@@ -127,6 +135,117 @@ def _test_coverage():
     return "\n".join(rows)
 
 
+# Layer order below is the DEPENDENCY order, which is also the reading order.
+_LAYERS = [
+    ("gnc", "FLIGHT CODE -- runs on the vehicle. Pure Python by enforced rule."),
+    ("plant", "SIMULATION ONLY -- none of this ever flies."),
+    ("hal", "Transport adapters: one ActuatorSetpoint into one transport's "
+            "units. No control."),
+    ("harness", "Owns the clock and the I/O. Picks a plant, wires it to gnc/."),
+    ("nodes", "ROS 2 wrappers. Thin by rule: no control math here."),
+    ("apps", "Desktop tools. They read the simulator; they are not part of it."),
+    ("verify", "Verification: the scenarios, the frozen baseline, the tracer."),
+    ("", "Top level: the parameter loader and the CLI."),
+]
+
+
+def _first_line(doc):
+    """The opening sentence of a docstring, collapsed onto one line.
+
+    The first line is the summary by convention, but several here wrap, so this
+    joins until the first blank line and then cuts at the first sentence end.
+    That way no docstring has to be written for this table.
+    """
+    if not doc:
+        return ""
+    head = []
+    for line in doc.strip().split(chr(10)):
+        if not line.strip():
+            break
+        head.append(line.strip())
+    text = " ".join(head).split("=====")[0].strip()
+    m = re.search(r"\.(\s|$)", text)
+    if m and m.start() > 25:
+        text = text[:m.start() + 1]
+    return text.replace("|", "\\|").strip()
+
+
+def _signature(node):
+    """`(a, b, c=)` -- argument names, with `=` marking the ones that default."""
+    a = node.args
+    defaults = [None] * (len(a.args) - len(a.defaults)) + list(a.defaults)
+    args = [arg.arg + ("" if d is None else "=")
+            for arg, d in zip(a.args, defaults) if arg.arg not in ("self", "cls")]
+    if a.vararg:
+        args.append("*" + a.vararg.arg)
+    if a.kwarg:
+        args.append("**" + a.kwarg.arg)
+    return "(" + ", ".join(args) + ")"
+
+
+def _code_index():
+    """Every module, class and public function in the package, one line each.
+
+    Parsed from the source, with each description taken from the thing's own
+    docstring. A hand-written index of a hundred functions is a promise nobody
+    keeps past the second refactor; this one cannot disagree with the code,
+    because it IS the code.
+    """
+    import ast
+
+    base = os.path.join(REPO, "src", "tvc_control", "tvc_control")
+    out = []
+    for layer, blurb in _LAYERS:
+        d = os.path.join(base, layer) if layer else base
+        names = sorted(n for n in os.listdir(d)
+                       if n.endswith(".py") and n != "__init__.py"
+                       and os.path.isfile(os.path.join(d, n)))
+        if not names:
+            continue
+        title = ("`%s/`" % layer) if layer else "`tvc_control/` — top level"
+        out += ["", "### %s" % title, "", blurb]
+        for n in names:
+            tree = ast.parse(io.open(os.path.join(d, n), encoding="utf-8").read())
+            out += ["", "**`%s`** — %s" % (n, _first_line(ast.get_docstring(tree)))]
+            rows = []
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    rows.append(("class `%s`" % node.name,
+                                 _first_line(ast.get_docstring(node))))
+                    for sub in node.body:
+                        if (isinstance(sub, ast.FunctionDef)
+                                and not sub.name.startswith("_")):
+                            rows.append(
+                                ("&nbsp;&nbsp;&nbsp;`.%s%s`"
+                                 % (sub.name, _signature(sub)),
+                                 _first_line(ast.get_docstring(sub))))
+                elif (isinstance(node, ast.FunctionDef)
+                      and not node.name.startswith("_")):
+                    rows.append(("`%s%s`" % (node.name, _signature(node)),
+                                 _first_line(ast.get_docstring(node))))
+            if rows:
+                out += ["", "| | |", "|---|---|"]
+                out += ["| %s | %s |" % (a, b) for a, b in rows]
+    return chr(10).join(out).strip()
+
+
+def _trace_output():
+    """A real control-path trace, produced by running the tracer.
+
+    Not a transcription. `tvc.py trace` recomputes each stage with the same
+    functions the controller calls and then checks itself against
+    TvcController.update(), so what appears in the document either matches the
+    real control path or says MISMATCH.
+    """
+    import subprocess
+    r = subprocess.run([sys.executable, os.path.join(REPO, "tvc.py"), "trace"],
+                       cwd=REPO, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit("tvc.py trace failed:" + chr(10) + r.stdout + r.stderr)
+    body = r.stdout.replace(chr(13) + chr(10), chr(10)).rstrip()
+    return "```" + chr(10) + body + chr(10) + "```"
+
+
 def _provenance_summary():
     """How many of the model's numbers are measured, and how many are guesses."""
     rows = parameter_rows()
@@ -144,12 +263,18 @@ def _provenance_summary():
 
 # document path -> {marker name: generator}
 SECTIONS = {
-    os.path.join(REPO, "docs", "4-PARAMETERS.md"): {
+    os.path.join(REPO, "docs", "1-CODE-MAP.md"): {
+        "index": _code_index,
+    },
+    os.path.join(REPO, "docs", "2-WALKTHROUGH.md"): {
+        "trace": _trace_output,
+    },
+    os.path.join(REPO, "docs", "5-PARAMETERS.md"): {
         "parameters": lambda: format_parameter_table(markdown=True),
         "authority": _authority_table,
         "provenance": _provenance_summary,
     },
-    os.path.join(REPO, "docs", "6-CREDIBILITY.md"): {
+    os.path.join(REPO, "docs", "7-CREDIBILITY.md"): {
         "tests": _test_coverage,
     },
 }

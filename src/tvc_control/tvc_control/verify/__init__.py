@@ -3,7 +3,7 @@ verify -- does the simulator do what we think it does?
 ================================================================================
 This is VERIFICATION, not validation: it checks internal consistency, never
 agreement with the real vehicle. Nothing in this project has been compared
-against flight data -- see docs/6-CREDIBILITY.md.
+against flight data -- see docs/7-CREDIBILITY.md.
 
     scenarios.py  Five closed-loop runs, each asserting a threshold chosen to
                   catch one specific structural mistake.

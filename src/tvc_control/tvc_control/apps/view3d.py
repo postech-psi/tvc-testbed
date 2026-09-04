@@ -343,6 +343,7 @@ class View3DWindow(tk.Toplevel):
 
     # ------------------------------------------------------------------
     def show_frame(self, k):
+        """Pose the mesh at sample k and redraw."""
         k = int(np.clip(k, 0, self.n - 1))
         self.frame = k
 
@@ -376,6 +377,7 @@ class View3DWindow(tk.Toplevel):
         self.show_frame(self.frame_var.get())
 
     def toggle_play(self):
+        """Start or pause playback."""
         self.playing = not self.playing
         self.play_button.configure(text="⏸ Pause" if self.playing else "▶ Play")
         if self.playing:
@@ -389,6 +391,7 @@ class View3DWindow(tk.Toplevel):
             self._job = None
 
     def restart(self):
+        """Jump back to the first sample."""
         self.frame = 0
         self.frame_var.set(0)
         self._wall_start = time.monotonic()
@@ -442,7 +445,7 @@ class View3DWindow(tk.Toplevel):
 
 
 def main(argv=None):
-    """Standalone: run the default case and animate it.
+    """Run the default scenario and animate it in a standalone window.
 
     Gains come from control_gains.yaml like every other pipeline. Constructing
     a bare ControlGains() here would silently animate the `analytic_legacy`

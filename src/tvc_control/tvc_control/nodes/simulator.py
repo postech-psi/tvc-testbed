@@ -35,6 +35,9 @@ RETIRED_PARAMS = ('gimbal_rate_max_deg',)
 
 
 class SimulatorNode(Node):
+    """The analytic plant as a ROS 2 node. Publishes Odometry on the same topic
+    Gazebo uses, which is what makes the two plants interchangeable.
+    """
 
     def __init__(self):
         super().__init__('simulator_node')
@@ -46,7 +49,7 @@ class SimulatorNode(Node):
                     "parameter '%s' was retired: the gimbal has two rings with "
                     "different measured slew rates (403 and 235 deg/s). Edit "
                     "gimbal.axes.*.rate_max_deg in vehicle_params.yaml. "
-                    "See docs/3-CONVENTIONS.md." % name)
+                    "See docs/4-CONVENTIONS.md." % name)
 
         self.declare_parameter('dt', 0.004)
         self.declare_parameter('init_att_pitch_deg', 3.0)
@@ -86,15 +89,17 @@ class SimulatorNode(Node):
         self.get_logger().info('simulator_node: dt=%.4f s, z0=%.2f m' % (self.dt, z0))
 
     def on_cmd(self, msg: ActuatorCommand):
+        """Cache the latest actuator command, rejecting a foreign axis convention."""
         if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_ROCKET_V2:
             raise SystemExit(
                 'axis convention mismatch: controller sent %d, this plant speaks '
-                '%d. See docs/3-CONVENTIONS.md.'
+                '%d. See docs/4-CONVENTIONS.md.'
                 % (msg.axis_convention,
                    ActuatorCommand.AXIS_CONVENTION_ROCKET_V2))
         self.cmd = msg
 
     def tick(self):
+        """One plant step: actuator chain, then integrate, then publish."""
         if self.cmd is None:
             delta_cmd, T_cmd, tau_p_cmd = np.zeros(2), self.T_hover, 0.0
         else:
@@ -115,6 +120,7 @@ class SimulatorNode(Node):
         self.publish_odometry()
 
     def publish_odometry(self):
+        """Publish the plant state as nav_msgs/Odometry, reordering the quaternion."""
         msg = Odometry()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'world'
@@ -132,6 +138,7 @@ class SimulatorNode(Node):
 
 
 def main(args=None):
+    """ROS 2 entry point for `ros2 run tvc_control simulator_node`."""
     rclpy.init(args=args)
     node = SimulatorNode()
     rclpy.spin(node)

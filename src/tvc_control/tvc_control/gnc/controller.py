@@ -46,6 +46,7 @@ class TvcController:
         self._delta_cmd = (0.0, 0.0)
 
     def reset(self):
+        """Return every loop to its start-of-run state."""
         self.attitude.reset()
         self.altitude.reset()
         self._delta_cmd = (0.0, 0.0)

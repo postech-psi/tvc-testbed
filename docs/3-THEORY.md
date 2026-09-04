@@ -1,8 +1,8 @@
 # 2 — Theory
 
 Every equation the simulator implements, where it comes from, and which file
-contains it. Axis names and signs follow [3-CONVENTIONS.md](3-CONVENTIONS.md)
-throughout; numbers are from [4-PARAMETERS.md](4-PARAMETERS.md).
+contains it. Axis names and signs follow [4-CONVENTIONS.md](4-CONVENTIONS.md)
+throughout; numbers are from [5-PARAMETERS.md](5-PARAMETERS.md).
 
 **The one-paragraph version.** The vehicle is a rigid body with a single
 gimballed thrust vector applied below its centre of mass. Tilting that vector
@@ -39,7 +39,7 @@ response lag.
 effect, no wind); battery voltage sag and the −13% thrust derate it causes over
 a flight; servo resonance (+11 dB inner, +5 dB outer); gimbal hysteresis (up to
 0.65°); sensor noise, bias and latency; ground contact. Each is listed with its
-consequence in [6-CREDIBILITY.md](6-CREDIBILITY.md).
+consequence in [7-CREDIBILITY.md](7-CREDIBILITY.md).
 
 ---
 
@@ -502,7 +502,7 @@ the reason is stated at the point of difference.
 - **T. A. Johansen & T. I. Fossen**, *Control allocation — a survey*,
   Automatica 49(5):1087–1103, 2013 — the allocation hierarchy of §4
 - **NASA-STD-7009**, *Standard for Models and Simulations* — the credibility
-  framework of [6-CREDIBILITY.md](6-CREDIBILITY.md)
+  framework of [7-CREDIBILITY.md](7-CREDIBILITY.md)
 - **R. G. Sargent**, *Verification and validation of simulation models*, WSC 2010
 - **ROS REP-103** — frame and unit conventions
 - **PX4**, [Simulation](https://docs.px4.io/main/en/simulation/) and

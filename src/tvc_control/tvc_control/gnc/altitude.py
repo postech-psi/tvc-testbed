@@ -8,7 +8,7 @@ Two nested loops and one feedforward term:
     vertical accel   -------->   thrust,  T = m(g + a_z) / cos(theta)
 
 The division by cos(theta) is the part worth understanding; see the class
-docstring below. docs/2-THEORY.md, section 5.
+docstring below. docs/3-THEORY.md, section 5.
 """
 
 from .params import VehicleParams, ControlGains
@@ -50,6 +50,7 @@ class AltitudeController:
         self.thrust_saturated = False
 
     def reset(self):
+        """Clear the climb-rate integrator and the saturation flag."""
         self.pid_vz.reset()
         self.thrust_saturated = False
 

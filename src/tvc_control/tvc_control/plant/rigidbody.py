@@ -6,7 +6,7 @@ centre of mass, plus the propellers' reaction torque about that same tilted axis
 13 states: position, velocity (both inertial), attitude quaternion, body rates.
 
 The full moment derivation, and the three things that follow from it, are in
-docs/2-THEORY.md section 3. The short version: the gimbal has NO authority about
+docs/3-THEORY.md section 3. The short version: the gimbal has NO authority about
 the thrust axis, tau_P is NOT absent from the lateral axes, and lateral authority
 is proportional to T*L so it falls during descent.
 

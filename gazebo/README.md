@@ -34,7 +34,7 @@ GZ_SIM_RESOURCE_PATH=$PWD/gazebo/models gz sim -r gazebo/worlds/tvc.sdf
 ```
 
 The full ROS 2 stack: `ros2 launch tvc_control gazebo.launch.py` — see
-[../docs/5-RUNNING.md](../docs/5-RUNNING.md).
+[../docs/6-RUNNING.md](../docs/6-RUNNING.md).
 
 **Start paused, attach, then unpause.** Not cosmetic: the vehicle free-falls from
 its 2 m spawn in about 0.6 s, so a controller connecting after an unpaused start
@@ -73,7 +73,7 @@ ratio and the gimbal geometry, and both are now exact.
 
 **Calibrated from bench data** (the `tvc-data` repository): the gimbal joint
 limits, the mass properties, and — indirectly — the thrust and torque the vehicle
-produces. Full provenance: [../docs/4-PARAMETERS.md](../docs/4-PARAMETERS.md).
+produces. Full provenance: [../docs/5-PARAMETERS.md](../docs/5-PARAMETERS.md).
 
 **Geometry** is from `TVC Ver3.step`: gimbal pivot at the origin, rotors just
 above, body stack to +652 mm, three legs at −78 mm. Collision shapes are
@@ -96,7 +96,7 @@ meshes cost solver time and only matter on touchdown.
 > ceiling means the plugin no longer enforces the real 17.79 N thrust limit — the
 > allocator does, and a test asserts it.
 >
-> [../docs/2-THEORY.md §8](../docs/2-THEORY.md) has the derivation;
+> [../docs/3-THEORY.md §8](../docs/3-THEORY.md) has the derivation;
 > `tvc_control/hal/gazebo.py` has the code.
 
 **The SDF servos are deliberately weak.** Gazebo's own `JointPositionController`
@@ -129,7 +129,7 @@ Every scenario is deliberately airborne until then.
 ## Things that cost real debugging time
 
 Each looked like a control problem and was not. The full list is in
-[../docs/5-RUNNING.md](../docs/5-RUNNING.md); the two worst:
+[../docs/6-RUNNING.md](../docs/6-RUNNING.md); the two worst:
 
 - **`OdometryPublisher` defaults to 2D.** Without `<dimensions>3</dimensions>`
   the message silently carries no `z` and no `vz`, so the altitude controller

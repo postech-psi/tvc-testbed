@@ -5,8 +5,8 @@ to trust it. **This is the provenance document for the `mass_properties` block
 of `vehicle_params.yaml`**, which `tools/mass_properties.py --emit` writes and
 from which the Gazebo model's inertia is then generated.
 
-Axis names follow [3-CONVENTIONS.md](3-CONVENTIONS.md); the current values are
-in [4-PARAMETERS.md](4-PARAMETERS.md). This file explains where they came from,
+Axis names follow [4-CONVENTIONS.md](4-CONVENTIONS.md); the current values are
+in [5-PARAMETERS.md](5-PARAMETERS.md). This file explains where they came from,
 not what they are.
 
 ## Coordinate system
@@ -145,7 +145,7 @@ replace most of it with a real number.
 > the inertia tensor are therefore **design intent, not metrology**, and the
 > lever arm `L` that sets all lateral authority inherits that. Nothing here has
 > been weighed or balanced on the built vehicle. See
-> [6-CREDIBILITY.md](6-CREDIBILITY.md) — this is what holds Input Pedigree at 3.
+> [7-CREDIBILITY.md](7-CREDIBILITY.md) — this is what holds Input Pedigree at 3.
 
 ## Finalized mass properties
 

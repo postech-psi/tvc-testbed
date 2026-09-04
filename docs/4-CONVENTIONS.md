@@ -4,7 +4,7 @@
 units.** Every other document links here and states no axis fact of its own. If
 something contradicts this file, this file is right and the other thing is a bug.
 
-Vehicle *numbers* live in [4-PARAMETERS.md](4-PARAMETERS.md), which is generated
+Vehicle *numbers* live in [5-PARAMETERS.md](5-PARAMETERS.md), which is generated
 from the YAML. Do not copy either into a third place.
 
 ---
@@ -76,8 +76,8 @@ meaning.
 > loop".
 
 Thrust direction and the moments it produces are in
-[2-THEORY.md §3](2-THEORY.md). Measured travel is asymmetric and differs per
-ring; the numbers are in [4-PARAMETERS.md](4-PARAMETERS.md).
+[3-THEORY.md §3](3-THEORY.md). Measured travel is asymmetric and differs per
+ring; the numbers are in [5-PARAMETERS.md](5-PARAMETERS.md).
 
 ---
 
@@ -107,7 +107,7 @@ disables its own control allocator and the external controller supplies
 `ActuatorMotors` / `ActuatorServos` directly — normalized, FRD. This is the same
 uORB interface a future in-tree PX4 module would publish, which is why the flight
 code's actuator boundary is shaped like it
-([1-ARCHITECTURE.md §2](1-ARCHITECTURE.md)).
+([1-CODE-MAP.md §2](1-CODE-MAP.md)).
 
 ---
 

@@ -50,5 +50,5 @@ caught too:
 Read in this order: params -> mathx -> pid -> allocation -> attitude ->
 altitude -> position -> controller. types.py is the two seams; effectiveness.py
 is the measured hardware model everything else asks about feasibility.
-docs/2-THEORY.md derives every equation in here.
+docs/3-THEORY.md derives every equation in here.
 """

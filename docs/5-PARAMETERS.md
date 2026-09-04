@@ -199,7 +199,7 @@ default.
 torque; inertia is applied once, inside `AttitudeController`. This is what makes
 the two sets comparable at all — they were previously written in different units
 and appeared 24.9× apart while describing nearly the same loop. See
-[2-THEORY.md §6](2-THEORY.md).
+[3-THEORY.md §6](3-THEORY.md).
 
 **A prediction that did not come true, recorded because it was made.** The worry
 when adopting `flight_validated` was that 30 ms of modelled gimbal deadtime —
@@ -218,7 +218,7 @@ something to paper over by inventing an integral gain that has never flown.
 These numbers live in `vehicle_params.yaml` so that enabling them later is a code
 change and not a re-measurement. Each one is a known divergence between this
 simulator and the vehicle; see
-[6-CREDIBILITY.md](6-CREDIBILITY.md#results-robustness) for the consequences.
+[7-CREDIBILITY.md](7-CREDIBILITY.md#results-robustness) for the consequences.
 
 | measured | value | why it is not modelled |
 |---|---|---|
@@ -244,4 +244,4 @@ would.
 bench did not say whether it is a transport delay or a first-order time constant.
 `motor_dynamics.model` selects between them, defaulting to the optimistic
 reading. This is the single highest-value measurement outstanding — see
-[2-THEORY.md §7](2-THEORY.md).
+[3-THEORY.md §7](3-THEORY.md).

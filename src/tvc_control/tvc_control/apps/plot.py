@@ -11,7 +11,7 @@ on two axes makes the reader guess which curve belongs to which axis.
 The log carries an axis-convention token in its first line and this refuses to
 plot one it does not recognise. A pre-rename log has the same column NAMES with
 different meanings, so plotting it would produce a picture that is wrong in a
-way nothing about it looks wrong. See docs/3-CONVENTIONS.md.
+way nothing about it looks wrong. See docs/4-CONVENTIONS.md.
 """
 import argparse
 import csv
@@ -43,19 +43,20 @@ def read_log(path):
                 raise SystemExit(
                     "%s was written in axis convention %r, which this build does "
                     "not speak (%s). The column names are the same and the "
-                    "meanings are not -- see docs/3-CONVENTIONS.md."
+                    "meanings are not -- see docs/4-CONVENTIONS.md."
                     % (path, token, ", ".join(SUPPORTED_AXIS_CONVENTIONS)))
         else:
             raise SystemExit(
                 "%s carries no axis-convention header, so it predates the rocket "
                 "convention. Its roll/pitch/yaw columns mean different axes than "
                 "they do now; re-fly it rather than plotting it. "
-                "See docs/3-CONVENTIONS.md." % path)
+                "See docs/4-CONVENTIONS.md." % path)
         rows = list(csv.DictReader(f))
     return {k: [float(r[k]) for r in rows] for k in rows[0]}
 
 
 def main(argv=None):
+    """Read a flight log and write the four-panel PNG."""
     ap = argparse.ArgumentParser(
         prog="tvc.py plot", description="Plot a Gazebo flight log CSV.")
     ap.add_argument("log", help="CSV written by `tvc.py hover --log`")

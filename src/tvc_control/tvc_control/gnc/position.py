@@ -33,7 +33,7 @@ class PositionController:
     """Horizontal position + velocity error -> commanded tilt, in radians.
 
     Returns (pitch_des, yaw_des) in radians -- pitch about body x, yaw about
-    body y, per docs/3-CONVENTIONS.md. Both are clamped to gains.max_tilt.
+    body y, per docs/4-CONVENTIONS.md. Both are clamped to gains.max_tilt.
     """
 
     def __init__(self, gains):

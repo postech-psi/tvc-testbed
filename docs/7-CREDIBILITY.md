@@ -61,12 +61,12 @@ uncertainty.
 | `test_allocation.py` | 6 | Control allocation: does it realize the moment it was asked for? |
 | `test_attitude_error.py` | 5 | The quaternion attitude error, and why it replaced the Euler difference. |
 | `test_axis_convention.py` | 11 | The axis convention, asserted rather than documented. |
-| `test_consistency.py` | 10 | The numbers that live in two places must agree. |
+| `test_consistency.py` | 13 | The numbers that live in two places must agree. |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gnc_purity.py` | 6 | Enforce the porting discipline on the flight code. |
 | `test_scenarios.py` | 2 | The five closed-loop scenarios, run as tests. |
-| | **55** | |
+| | **58** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -115,7 +115,7 @@ name is historical; `verify/scenarios.py` says so in its first paragraph.
 
 ### Input Pedigree — where the numbers come from · level 3
 
-Full table with per-number provenance: [4-PARAMETERS.md](4-PARAMETERS.md).
+Full table with per-number provenance: [5-PARAMETERS.md](5-PARAMETERS.md).
 Roughly **46% measured, 29% derived, 5% estimated** — but the share is less
 informative than which numbers fall where.
 
@@ -231,7 +231,7 @@ inertia when `Iyz/Izz = 27.3%` (fixed by carrying the full tensor).
   baseline. A generated file that has been hand-edited fails.
 - Mass properties are regenerated from `components.yaml` through a
   sentinel-delimited splice that preserves the hand-written comments around them.
-- Conventions are centralized in [3-CONVENTIONS.md](3-CONVENTIONS.md) and
+- Conventions are centralized in [4-CONVENTIONS.md](4-CONVENTIONS.md) and
   asserted by test, not merely documented.
 - Under version control with a tagged restore point and a frozen baseline.
 - The historical weakness — stale constants duplicated across files, the 20 N

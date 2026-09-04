@@ -46,7 +46,7 @@ jobs:
       - name: The Gazebo model matches the parameters
         run: python tools/gen_model_sdf.py --check
 
-      # Same rule for the numbers in docs/4-PARAMETERS.md. A documented number
+      # Same rule for the numbers in docs/5-PARAMETERS.md. A documented number
       # that can drift from the source of truth is a number that will.
       - name: The documented numbers match the parameters
         run: python tools/gen_docs.py --check
@@ -76,4 +76,4 @@ jobs:
           echo "  colcon build --packages-select tvc_msgs"
           echo "  colcon build --packages-select tvc_control"
           echo "  ros2 launch tvc_control gazebo.launch.py gui:=false"
-          echo "See docs/6-CREDIBILITY.md -- the ROS2 path has never been built."
+          echo "See docs/7-CREDIBILITY.md -- the ROS2 path has never been built."

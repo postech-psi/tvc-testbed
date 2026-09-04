@@ -23,7 +23,7 @@ when someone changes a gain teaches people to ignore it.
 Note the name. `validate` in the command line is the historical spelling; what
 happens here is verification -- internal consistency, never agreement with the
 real vehicle. Nothing in this project has been compared against flight data.
-See docs/6-CREDIBILITY.md.
+See docs/7-CREDIBILITY.md.
 
 Every number comes from vehicle_params.yaml, so re-running after a
 mass-properties change re-verifies against the new airframe.
@@ -164,6 +164,7 @@ SCENARIOS = [
 
 
 def main(argv=None):
+    """Run all five scenarios. Returns 1 if any failed, which is the CI gate."""
     ap = argparse.ArgumentParser(
         prog="tvc.py validate",
         description="Run the five closed-loop verification scenarios.")

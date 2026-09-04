@@ -26,14 +26,14 @@
 # WHO READS IT
 #   tvc_control/config.py     the only loader; everything else goes through it
 #   tools/gen_model_sdf.py    generates gazebo/models/tvc_vehicle/model.sdf
-#   tools/gen_docs.py         generates the tables in docs/4-PARAMETERS.md
+#   tools/gen_docs.py         generates the tables in docs/5-PARAMETERS.md
 #   Both generators have a --check mode, and CI runs both.
 #
-# Provenance of each number, with its uncertainty: docs/4-PARAMETERS.md.
+# Provenance of each number, with its uncertainty: docs/5-PARAMETERS.md.
 # =============================================================================
 
 # --- axis convention ---------------------------------------------------------
-# Which naming this file's numbers are written in. See docs/3-CONVENTIONS.md.
+# Which naming this file's numbers are written in. See docs/4-CONVENTIONS.md.
 #
 #   rocket_v2   roll = body z (the thrust axis), pitch = body x, yaw = body y
 #

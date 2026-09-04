@@ -43,7 +43,7 @@ _DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "vehicle_params.yaml")
 
 # The axis convention the YAML (and therefore every consumer) is written in.
-# See docs/3-CONVENTIONS.md. Loading a file that predates or postdates the rename
+# See docs/4-CONVENTIONS.md. Loading a file that predates or postdates the rename
 # must fail loudly rather than reinterpret its numbers under the wrong names.
 SUPPORTED_AXIS_CONVENTIONS = ("rocket_v2",)
 
@@ -82,6 +82,7 @@ class Vehicle:
 
     @property
     def weight_n(self):
+        """Vehicle weight in newtons, mass * gravity."""
         return self.mass * self.g
 
 
@@ -100,7 +101,7 @@ def load(path=None):
     conv = d.get("axis_convention", "rocket_v2")
     if conv not in SUPPORTED_AXIS_CONVENTIONS:
         raise ValueError(
-            "unknown axis_convention %r in %s -- see docs/3-CONVENTIONS.md"
+            "unknown axis_convention %r in %s -- see docs/4-CONVENTIONS.md"
             % (conv, path))
 
     mp = d["mass_properties"]
@@ -239,7 +240,7 @@ def load_gains(profile=None, path=None):
 # The parameter report: every number, its value, and where it came from.
 # =============================================================================
 # ONE generator, two consumers: `python tvc.py params` prints it, and
-# tools/gen_docs.py splices it into docs/4-PARAMETERS.md between EMIT markers.
+# tools/gen_docs.py splices it into docs/5-PARAMETERS.md between EMIT markers.
 # A documented number that can drift from the YAML is a number that will, so the
 # document is generated and CI fails when it is stale.
 #

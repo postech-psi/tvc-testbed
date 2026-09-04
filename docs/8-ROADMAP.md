@@ -37,7 +37,7 @@ measurement; mixing predictions into it destroys its only advantage.
 - **Bench characterisation.** A 121-point coax thrust/torque surface with stated
   fit error, per-ring gimbal maps with travel, slew, bandwidth, hysteresis and
   deadtime, and a measured voltage-sag law. See
-  [4-PARAMETERS.md](4-PARAMETERS.md).
+  [5-PARAMETERS.md](5-PARAMETERS.md).
 - **Mass properties from CAD.** 1.328 kg, CG at z = 211 mm, full inertia tensor
   computed from the real mesh by tetrahedron decomposition. See
   [MASS-BUDGET.md](MASS-BUDGET.md).
@@ -121,7 +121,7 @@ input.
     rotors, and the two rotors are nearly co-located — which is why offboard is
     the plan rather than a firmware fork.
 
-    This is where [3-CONVENTIONS.md §4](3-CONVENTIONS.md), the FRD translation
+    This is where [4-CONVENTIONS.md §4](4-CONVENTIONS.md), the FRD translation
     table, becomes load-bearing. Without it, two axes out of three silently
     invert.
 12. **HITL.** Real Pixhawk, simulated vehicle. Catches the timing, latency and

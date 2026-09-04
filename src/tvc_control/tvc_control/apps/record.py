@@ -18,6 +18,7 @@ _last = [0.0]
 
 
 def make_cb(every):
+    """Build the image callback that keeps one frame every `every` seconds."""
     def cb(msg):
         now = time.time()
         if now - _last[0] < every:
@@ -28,6 +29,7 @@ def make_cb(every):
 
 
 def main(argv=None):
+    """Record the chase camera for --duration seconds and write the GIF."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--duration", type=float, default=20.0)
     ap.add_argument("--out", default="hover.gif")

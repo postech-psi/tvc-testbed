@@ -33,7 +33,7 @@ class VehicleParams:
     Angles are stored in DEGREES for the GUI's convenience and converted to
     radians via properties where the dynamics need them.
 
-    AXIS NAMING follows the rocket convention (docs/3-CONVENTIONS.md): body x
+    AXIS NAMING follows the rocket convention (docs/4-CONVENTIONS.md): body x
     and y are the LATERAL axes, the two the gimbal tilts thrust about, carrying
     pitch and yaw; body z is the thrust axis, carrying ROLL. The inertia fields
     are named after the AXIS (Ix = about body x), not after the rotation, so
@@ -84,10 +84,12 @@ class VehicleParams:
 
     @property
     def gimbal_max(self):
+        """Nominal symmetric gimbal limit, in radians."""
         return math.radians(self.gimbal_max_deg)
 
     @property
     def gimbal_rate_max(self):
+        """Nominal servo slew rate (the SLOWER ring), in rad/s."""
         return math.radians(self.gimbal_rate_max_deg)
 
     # --- per-ring travel -----------------------------------------------------
@@ -103,18 +105,21 @@ class VehicleParams:
 
     @property
     def delta_min(self):
+        """Most negative travel per ring, (inner, outer), in radians."""
         inner, outer = self._axis("inner"), self._axis("outer")
         return (math.radians(inner.min_deg if inner else -self.gimbal_max_deg),
                 math.radians(outer.min_deg if outer else -self.gimbal_max_deg))
 
     @property
     def delta_max(self):
+        """Most positive travel per ring, (inner, outer), in radians."""
         inner, outer = self._axis("inner"), self._axis("outer")
         return (math.radians(inner.max_deg if inner else self.gimbal_max_deg),
                 math.radians(outer.max_deg if outer else self.gimbal_max_deg))
 
     @property
     def delta_rate_max(self):
+        """Slew limit per ring, (inner, outer), in rad/s."""
         inner, outer = self._axis("inner"), self._axis("outer")
         return (math.radians(inner.rate_max_deg if inner else self.gimbal_rate_max_deg),
                 math.radians(outer.rate_max_deg if outer else self.gimbal_rate_max_deg))
@@ -184,4 +189,5 @@ class ControlGains:
 
     @property
     def max_tilt(self):
+        """Largest tilt the position loop may command, in radians."""
         return math.radians(self.max_tilt_deg)

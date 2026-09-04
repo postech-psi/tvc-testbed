@@ -22,5 +22,5 @@ Everything runnable is reachable from one entry point:
 
     python tvc.py --help
 
-See docs/1-ARCHITECTURE.md for the file-by-file map and the two seams.
+See docs/1-CODE-MAP.md for the file-by-file map and the two seams.
 """

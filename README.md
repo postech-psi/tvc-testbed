@@ -18,6 +18,7 @@ the reverse.
 ```bash
 python tvc.py --help          # every runnable thing in this repository
 python tvc.py validate        # 5 closed-loop scenarios, ~20 s, no dependencies
+python tvc.py trace           # every computation in one control step, with numbers
 python tvc.py params          # every vehicle number, with its provenance
 ```
 
@@ -28,13 +29,14 @@ Then read, in order:
 
 | | |
 |---|---|
-| [docs/1-ARCHITECTURE.md](docs/1-ARCHITECTURE.md) | the six layers, the two seams, and a file-by-file map |
-| [docs/2-THEORY.md](docs/2-THEORY.md) | every equation the simulator implements, derived, with references |
-| [docs/3-CONVENTIONS.md](docs/3-CONVENTIONS.md) | frames, axis names, signs, units — the single source |
-| [docs/4-PARAMETERS.md](docs/4-PARAMETERS.md) | every number, where it came from, how much to trust it |
-| [docs/5-RUNNING.md](docs/5-RUNNING.md) | the four pipelines, what each one is for, what its output means |
-| [docs/6-CREDIBILITY.md](docs/6-CREDIBILITY.md) | **read before believing any result.** Validation is level 0 |
-| [docs/7-ROADMAP.md](docs/7-ROADMAP.md) | what is next, what is deferred, what is genuinely unknown |
+| [docs/1-CODE-MAP.md](docs/1-CODE-MAP.md) | **what every directory, file and function is** — the index is generated from the source |
+| [docs/2-WALKTHROUGH.md](docs/2-WALKTHROUGH.md) | **what actually happens when it runs**, stage by stage, with the real numbers |
+| [docs/3-THEORY.md](docs/3-THEORY.md) | every equation the simulator implements, derived, with references |
+| [docs/4-CONVENTIONS.md](docs/4-CONVENTIONS.md) | frames, axis names, signs, units — the single source |
+| [docs/5-PARAMETERS.md](docs/5-PARAMETERS.md) | every number, where it came from, how much to trust it |
+| [docs/6-RUNNING.md](docs/6-RUNNING.md) | the four pipelines, what each is for, what its output means |
+| [docs/7-CREDIBILITY.md](docs/7-CREDIBILITY.md) | **read before believing any result.** Validation is level 0 |
+| [docs/8-ROADMAP.md](docs/8-ROADMAP.md) | what is next, what is deferred, what is genuinely unknown |
 
 Supporting: [docs/MASS-BUDGET.md](docs/MASS-BUDGET.md) (where the mass and
 inertia come from) and [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) (the Docker
@@ -60,7 +62,7 @@ against the analytic plant. It differs from the line above it only in which
 plant process starts, which is how a failure gets attributed to the control code
 or to the physics engine.
 
-Full detail, including what each output means: [docs/5-RUNNING.md](docs/5-RUNNING.md).
+Full detail, including what each output means: [docs/6-RUNNING.md](docs/6-RUNNING.md).
 
 ---
 
@@ -100,7 +102,7 @@ a colcon package directory contains a Python package of the same name.
    makes the eventual PX4 C++ module a port rather than a rewrite, and
    `tests/test_gnc_purity.py` parses the source to enforce it.
 2. **Numbers live in one place.** `vehicle_params.yaml` is the source of truth;
-   `model.sdf` and `docs/4-PARAMETERS.md` are generated from it and CI fails if
+   `model.sdf` and `docs/5-PARAMETERS.md` are generated from it and CI fails if
    either has drifted. There is no fallback constant anywhere — a missing YAML
    is an error, because defaults that can disagree with a measurement eventually
    do. (A superseded 20 N max thrust once survived in three files after the
@@ -126,7 +128,7 @@ python tools/gen_docs.py --check        # the documented numbers match the YAML
 
 ## The honest status
 
-Read [docs/6-CREDIBILITY.md](docs/6-CREDIBILITY.md) before trusting output. The
+Read [docs/7-CREDIBILITY.md](docs/7-CREDIBILITY.md) before trusting output. The
 headline, repeated wherever results are shown:
 
 > **This simulator has never been compared against flight data.** It reproduces
@@ -136,7 +138,7 @@ headline, repeated wherever results are shown:
 Two specific things to know:
 
 - **The ROS 2 packages have never been built.** `colcon build` has not run
-  against them. See [docs/5-RUNNING.md](docs/5-RUNNING.md) for the first-build
+  against them. See [docs/6-RUNNING.md](docs/6-RUNNING.md) for the first-build
   procedure and what to expect.
 - **The highest-value measurement outstanding** is whether the bench's 100 ms
   motor response is a transport delay or a first-order lag. Modelled both ways:

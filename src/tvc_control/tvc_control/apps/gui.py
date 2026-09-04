@@ -238,6 +238,7 @@ class TVCSimulatorApp(tk.Tk):
 
     # ------------------------------------------------------------------
     def reset_defaults(self):
+        """Reload every field from the YAML, discarding edits."""
         self.vparams = load_vehicle_params()
         self.gains = load_gains()
         self.cfg = SimConfig()
@@ -256,6 +257,7 @@ class TVCSimulatorApp(tk.Tk):
 
     # ------------------------------------------------------------------
     def run_simulation(self):
+        """Read the form, run the analytic harness, redraw the plots and metrics."""
         try:
             self.vehicle_group.apply_to_instance()
             self.actuator_group.apply_to_instance()
@@ -306,6 +308,7 @@ class TVCSimulatorApp(tk.Tk):
         self.view3d = View3DWindow(self, self.last_result, self.vparams, self.cfg)
 
     def run_button_disabled_call(self):
+        """Grey the Run button while a simulation is in flight."""
         self.run_button.configure(state="disabled")
         self.update_idletasks()
         try:
@@ -386,6 +389,7 @@ class TVCSimulatorApp(tk.Tk):
 
 
 def main(argv=None):
+    """Open the GUI window."""
     app = TVCSimulatorApp()
     app.mainloop()
 

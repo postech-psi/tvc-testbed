@@ -26,7 +26,7 @@ WHAT CHANGED, AND WHY IT MATTERS
     instead of the small-angle inverse alone.
 
     Not yet re-flown -- gz-transport exists only in the devcontainer. See
-    docs/6-CREDIBILITY.md.
+    docs/7-CREDIBILITY.md.
 
 LOCKSTEP
     The loop steps on ODOMETRY ARRIVAL, not on a wall clock. Gazebo publishes
@@ -128,6 +128,7 @@ class GazeboHarness:
 
     # --- one control step -----------------------------------------------------
     def step(self):
+        """One control step: state -> TvcController -> HAL -> the three gz topics."""
         if self.state is None:
             return
 
@@ -172,12 +173,13 @@ class GazeboHarness:
                       flush=True)
 
     def write_log(self):
+        """Write the flight log CSV, with its axis-convention header line."""
         if not (self.log_path and self.log):
             return
         with open(self.log_path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             # The convention token travels with the data: plot.py refuses a log
-            # whose axis names it cannot trust. See docs/3-CONVENTIONS.md.
+            # whose axis names it cannot trust. See docs/4-CONVENTIONS.md.
             w.writerow(["# axis_convention: %s"
                         % self.vehicle.raw["axis_convention"]])
             w.writerow(CSV_HEADER)
@@ -195,6 +197,7 @@ DRIFT_MAX_M = 1.00
 
 
 def main(argv=None):
+    """Run the hover demo. Returns 0 on a stable hover, 2 otherwise."""
     ap = argparse.ArgumentParser(
         prog="tvc.py hover",
         description="Hover the Gazebo vehicle under the shared flight code.")

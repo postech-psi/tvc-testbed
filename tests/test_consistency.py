@@ -43,7 +43,7 @@ def test_the_gazebo_model_is_what_the_generator_produces(repo):
 
 
 def test_the_parameter_document_is_in_sync(repo):
-    """docs/4-PARAMETERS.md is generated from the YAML. A documented number that
+    """docs/5-PARAMETERS.md is generated from the YAML. A documented number that
     can drift from the source of truth is a number that will."""
     r = subprocess.run([sys.executable,
                         os.path.join(repo, "tools", "gen_docs.py"), "--check"],
@@ -188,3 +188,92 @@ def test_the_plotter_reads_columns_the_harness_actually_writes(repo):
     assert not missing, (
         "apps/plot.py reads columns the flight log does not contain: %s"
         % missing)
+
+
+def test_the_trace_matches_the_real_control_path(capsys, vp, gains):
+    """docs/2-WALKTHROUGH.md is a real trace, so the tracer must not drift.
+
+    verify/trace.py recomputes each stage with the same functions the controller
+    calls, then compares its own numbers against TvcController.update(). If they
+    ever disagree it prints MISMATCH -- which would mean the document explains a
+    control path that is not the one running. This makes that a build failure
+    rather than something a reader has to notice.
+    """
+    from tvc_control.verify import trace
+
+    for case in sorted(trace.CASES):
+        trace.main(["--case", case, "--steps", "2"])
+        out = capsys.readouterr().out
+        assert "MISMATCH" not in out, "trace of case %r diverged:\n%s" % (case, out)
+        assert out.count("[checked:") == 2, \
+            "case %r did not reach the self-check on both steps" % case
+
+
+def test_every_public_symbol_is_documented(repo):
+    """The generated code index is only worth having with no blanks in it.
+
+    A public function whose purpose cannot be stated in one line usually does
+    not have one, so this is a design check as much as a documentation check.
+    """
+    import ast
+
+    base = os.path.join(repo, "src", "tvc_control", "tvc_control")
+    missing = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for name in sorted(filenames):
+            if not name.endswith(".py"):
+                continue
+            tree = ast.parse(open(os.path.join(dirpath, name),
+                                  encoding="utf-8").read())
+            rel = os.path.relpath(os.path.join(dirpath, name), base)
+            if not ast.get_docstring(tree):
+                missing.append("%s (module)" % rel)
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    if not ast.get_docstring(node):
+                        missing.append("%s: class %s" % (rel, node.name))
+                    for sub in node.body:
+                        if (isinstance(sub, ast.FunctionDef)
+                                and not sub.name.startswith("_")
+                                and not ast.get_docstring(sub)):
+                            missing.append("%s: %s.%s" % (rel, node.name, sub.name))
+                elif (isinstance(node, ast.FunctionDef)
+                      and not node.name.startswith("_")
+                      and not ast.get_docstring(node)):
+                    missing.append("%s: %s" % (rel, node.name))
+    assert not missing, ("undocumented public symbols:\n  " + "\n  ".join(missing))
+
+
+def test_the_two_worlds_agree_on_physics_and_plugins(repo):
+    """tvc.sdf and tvc_flight.sdf duplicate ~50 lines of preamble.
+
+    SDF has no include mechanism for world-level settings, so the duplication is
+    forced. What is not forced is letting the two copies drift: a different
+    solver step in one world would make results from it incomparable with the
+    other, silently. The vehicle spawn and the chase camera are SUPPOSED to
+    differ -- that is what the two worlds are for -- so only the shared parts
+    are compared.
+    """
+    worlds = os.path.join(repo, "gazebo", "worlds")
+    a = open(os.path.join(worlds, "tvc.sdf"), encoding="utf-8").read()
+    b = open(os.path.join(worlds, "tvc_flight.sdf"), encoding="utf-8").read()
+
+    for tag in ("max_step_size", "real_time_factor"):
+        va = re.search(r"<%s>([^<]+)</%s>" % (tag, tag), a)
+        vb = re.search(r"<%s>([^<]+)</%s>" % (tag, tag), b)
+        assert va and vb, "neither world declares <%s>" % tag
+        assert va.group(1) == vb.group(1), \
+            "the two worlds disagree about <%s>: %s vs %s" \
+            % (tag, va.group(1), vb.group(1))
+
+    def systems(text):
+        # the chase camera is deliberately only in tvc_flight
+        return set(re.findall(r'<plugin filename="(gz-sim-[a-z-]+)"', text))
+
+    only_flight = systems(b) - systems(a)
+    only_ground = systems(a) - systems(b)
+    assert not only_ground, \
+        "tvc.sdf loads system plugins tvc_flight.sdf does not: %s" % sorted(only_ground)
+    assert only_flight <= {"gz-sim-sensors-system"}, \
+        "unexpected extra system plugins in tvc_flight.sdf: %s" % sorted(only_flight)

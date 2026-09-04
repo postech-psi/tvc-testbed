@@ -91,10 +91,6 @@ class ThrustTorqueSurface:
         """Normalized commands -> (thrust N, roll torque N*m)."""
         return self._eval(self.c_T, a, b), self._eval(self.c_Q, a, b)
 
-    def forward(self, pwm_a, pwm_b):
-        """PWM microseconds -> (thrust N, roll torque N*m)."""
-        return self.forward_norm(self._norm(pwm_a), self._norm(pwm_b))
-
     # --- feasible set --------------------------------------------------------
     def _build(self):
         """Sweep the command square once: signed headroom + a coarse seed table.
@@ -147,6 +143,7 @@ class ThrustTorqueSurface:
         self._built = True
 
     def thrust_limits(self):
+        """(min, max) total thrust the command square can reach, in newtons."""
         if not self._built:
             self._build()
         return self.thrust_min, self.thrust_max
@@ -339,12 +336,15 @@ class GimbalAxisMap:
         self.bandwidth_hz = float(bandwidth_hz)
 
     def pwm_to_deg(self, pwm):
+        """This ring's PWM in microseconds -> deflection in degrees."""
         return self.gain * (pwm - self.neutral)
 
     def deg_to_pwm(self, deg):
+        """Deflection in degrees -> PWM microseconds, clamped to this ring's travel."""
         return self.neutral + self.clamp_deg(deg) / self.gain
 
     def clamp_deg(self, deg):
+        """Clamp a deflection to this ring's own measured travel."""
         return min(max(deg, self.min_deg), self.max_deg)
 
     def normalized(self, rad):

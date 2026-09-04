@@ -13,6 +13,8 @@ Subcommands are grouped by what they need:
 
     no dependencies beyond Python
         validate   the five closed-loop scenarios (the fast inner loop)
+        trace      every computation in one control step, with the numbers
+                   (docs/2-WALKTHROUGH.md is this output, annotated)
         golden     capture or check the frozen numerical baseline
         params     print every vehicle parameter with its provenance
         plot       render a Gazebo flight log as plots
@@ -45,6 +47,8 @@ COMMANDS = [
      "tvc_control.verify.golden:main"),
     ("params", "print every vehicle parameter with its provenance",
      None),
+    ("trace", "print every computation in one control step, with numbers",
+     "tvc_control.verify.trace:main"),
     ("gui", "open the Tkinter simulator GUI (needs a display)",
      "tvc_control.apps.gui:main"),
     ("view3d", "animate a run on the CAD mesh (needs a display)",
@@ -67,7 +71,7 @@ def _resolve(spec):
 def _params(argv):
     ap = argparse.ArgumentParser(prog="tvc.py params")
     ap.add_argument("--markdown", action="store_true",
-                    help="emit the markdown table docs/4-PARAMETERS.md carries")
+                    help="emit the markdown table docs/5-PARAMETERS.md carries")
     args = ap.parse_args(argv)
     from .config import format_parameter_table, load, parameter_rows
     if args.markdown:
@@ -84,12 +88,13 @@ def _params(argv):
     print("%d parameters: %s"
           % (len(rows), ", ".join("%d %s" % (n, s) for s, n
                                   in sorted(tally.items(), key=lambda kv: -kv[1]))))
-    print("provenance and uncertainty: docs/4-PARAMETERS.md")
+    print("provenance and uncertainty: docs/5-PARAMETERS.md")
     print(format_parameter_table(rows, markdown=False))
     return 0
 
 
 def main(argv=None):
+    """Dispatch one subcommand. With no arguments, print the command list."""
     argv = list(sys.argv[1:] if argv is None else argv)
     names = [c[0] for c in COMMANDS]
 

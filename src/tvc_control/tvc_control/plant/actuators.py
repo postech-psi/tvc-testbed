@@ -15,7 +15,7 @@ Two stages, with different physics and different consequences:
                      (T, tau_P). Switchable between a delay and a lag, because
                      the bench did not say which it is and the answer decides
                      whether the roll channel is controllable. See its docstring
-                     and docs/2-THEORY.md section 7.
+                     and docs/3-THEORY.md section 7.
 
 ActuatorChain bundles them so no harness can model a different subset than
 another -- which would make every cross-plant comparison unattributable.
@@ -50,10 +50,12 @@ class GimbalActuator:
         self._pending = []         # command FIFO, oldest first
 
     def reset(self):
+        """Return the servo to centre and empty the command FIFO."""
         self.delta = np.zeros(2)
         self._pending = []
 
     def update(self, delta_cmd, dt):
+        """Commanded deflection -> ACHIEVED deflection after deadtime and slew."""
         # Per-axis, asymmetric stops and per-axis slew: the inner ring reaches
         # 403 deg/s and the outer only 235, so a symmetric shared limit either
         # slows the inner axis or lets the outer one move faster than it can.
@@ -102,11 +104,13 @@ class MotorLag:
         self.reset()
 
     def reset(self):
+        """Un-initialise the lag: the next command starts settled."""
         self.T = None            # None = not yet initialised; see update()
         self.tau_p = 0.0
         self._pending = []
 
     def update(self, T_cmd, tau_p_cmd, dt):
+        """Commanded (thrust, roll torque) -> what the motors actually produce."""
         # Transport delay first, as a FIFO of commands: that is what an ESC
         # queue does, and a filter would smear an effect that is actually a
         # clean shift in time.
@@ -153,6 +157,7 @@ class ActuatorChain:
         self.motor = MotorLag(motor_model, motor_tau_s, motor_deadtime_s)
 
     def reset(self):
+        """Reset both stages -- gimbal FIFO and motor lag."""
         self.gimbal.reset()
         self.motor.reset()
 

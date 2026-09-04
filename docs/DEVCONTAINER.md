@@ -55,7 +55,7 @@ bash gazebo/run_hover.sh --duration 30        # no ROS needed
 ros2 launch tvc_control gazebo.launch.py gui:=false
 ```
 
-Full detail: [5-RUNNING.md](5-RUNNING.md).
+Full detail: [6-RUNNING.md](6-RUNNING.md).
 
 ---
 

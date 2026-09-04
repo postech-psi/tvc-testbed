@@ -30,6 +30,7 @@ class PerfectEstimator:
     """
 
     def estimate(self, pos_i, vel_i, quat, omega_b, t):
+        """Plant truth -> EstimatedState. Today the identity; the type is the point."""
         return EstimatedState(
             pos_i=tuple(float(v) for v in pos_i),
             vel_i=tuple(float(v) for v in vel_i),

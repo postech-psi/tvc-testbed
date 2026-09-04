@@ -14,7 +14,7 @@
 # the same name meant two quantities differing by a factor of I, and they looked
 # 24.9x apart while describing nearly the same loop.
 #
-# Before adopting anything here, read docs/6-CREDIBILITY.md: only one of these
+# Before adopting anything here, read docs/7-CREDIBILITY.md: only one of these
 # profiles has ever been near a plant.
 
 axis_convention: rocket_v2

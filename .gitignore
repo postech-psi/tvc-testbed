@@ -19,7 +19,9 @@ log/
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor / tool-local settings. The non-local .vscode/settings.json IS shared;
+# *.local.json is per-developer by convention and should not be committed.
+.claude/settings.local.json
 *.swp
 *.swo
 *~
