@@ -59,8 +59,8 @@ class AltitudeController:
         vz_des = clamp(self.gains.kp_alt * (z_des - z),
                        -self.gains.vz_max, self.gains.vz_max)
         # Anti-windup: hold the integrator whenever the previous command was
-        # clipped by the feasible set (§4b priority: thrust first, but "first"
-        # still ends at T_max).
+        # clipped by the feasible set. Thrust has priority in the allocation,
+        # but "priority" still ends at T_max.
         az_des = self.pid_vz.update(vz_des - vz, dt, freeze=self.thrust_saturated)
 
         # Projection of the (gimballed, then rotated) thrust axis onto vertical.

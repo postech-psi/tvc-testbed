@@ -171,7 +171,7 @@ FLIGHT CODE -- runs on the vehicle. Pure Python by enforced rule.
 
 | | |
 |---|---|
-| class `AttitudeController` | Three-axis cascade: attitude error -> desired body rate  (outer, P) rate error     -> desired moment     (inner, PID) desired moment -> actuator commands  (allocation, §4b) |
+| class `AttitudeController` | Three-axis cascade: attitude error to actuator commands. |
 | &nbsp;&nbsp;&nbsp;`.reset()` | Clear all six PIDs and the cached allocation. |
 | &nbsp;&nbsp;&nbsp;`.desired_moment(q, omega, pitch_des, yaw_des, roll_des, dt)` | Attitude + rate cascade -> desired body moment (M_x, M_y, M_z) [N*m]. |
 | &nbsp;&nbsp;&nbsp;`.update(q, omega, pitch_des, yaw_des, T_des, dt, roll_des=)` | Backward-compatible entry point: returns the gimbal command only. |
@@ -241,7 +241,7 @@ FLIGHT CODE -- runs on the vehicle. Pure Python by enforced rule.
 | | |
 |---|---|
 | class `PositionController` | Horizontal position + velocity error -> commanded tilt, in radians. |
-| &nbsp;&nbsp;&nbsp;`.update(pos_i, vel_i, pos_des)` | pos_i, vel_i : inertial position [m] and velocity [m/s], (x, y, z) pos_des      : inertial target, (x, y, z); z is ignored (altitude loop) |
+| &nbsp;&nbsp;&nbsp;`.update(pos_i, vel_i, pos_des)` | Horizontal position and velocity error -> (pitch_des, yaw_des) in rad. |
 
 **`types.py`** — The two seams: what the flight code consumes, and what it produces.
 
@@ -275,7 +275,7 @@ SIMULATION ONLY -- none of this ever flies.
 | | |
 |---|---|
 | `quat_kinematics(q, omega)` | dq/dt = 0.5 * Omega(omega) @ q  -- linear, singularity-free kinematics. |
-| `dynamics(t, x, T, delta, params, tau_p=)` | x = [r(3), v(3), q(4), omega(3)]  (13 states) T:      scalar thrust magnitude [N] delta:  [delta1, delta2] gimbal deflection angles [rad] tau_p:  net propeller reaction torque about the THRUST AXIS [N*m], from the deliberate imbalance between the two counter-rotating coax props. |
+| `dynamics(t, x, T, delta, params, tau_p=)` | State derivative for the 6-DOF rigid body. |
 
 **`sensors.py`** — Sensor models -- simulation only.
 
@@ -382,7 +382,7 @@ Desktop tools. They read the simulator; they are not part of it.
 | | |
 |---|---|
 | `load_binary_stl(path)` | Read a binary STL into an (n_tri, 3, 3) array of vertices, in metres. |
-| `decimate(tris, cell)` | Vertex-clustering decimation: snap vertices onto a `cell`-sized grid, collapse each occupied cell to its member centroid, then drop the triangles that became degenerate or duplicated. |
+| `decimate(tris, cell)` | Reduce triangle count by vertex clustering, preserving the silhouette. |
 | `load_vehicle_mesh(params, detail=)` | Return the decimated vehicle mesh as (n_tri, 3, 3), expressed in the BODY frame with the origin at the CM -- the frame the dynamics integrate in. |
 | `build_fallback_geometry(params)` | Simple stand-in body, used only when the STL mesh is missing so the viewer still opens: a tube from the rotor plane up past the CM, plus a nose taper. |
 | `shade(tris_inertial)` | Lambert-shade each face from its inertial-frame normal, so the body reads as a solid object while it rotates (flat fill turns the truss into a blob). |

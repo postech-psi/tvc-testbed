@@ -38,7 +38,9 @@ def quat_kinematics(q, omega):
 
 
 def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
-    """
+    """State derivative for the 6-DOF rigid body. The right-hand side solve_ivp
+    integrates.
+
     x = [r(3), v(3), q(4), omega(3)]  (13 states)
     T:      scalar thrust magnitude [N]
     delta:  [delta1, delta2] gimbal deflection angles [rad]

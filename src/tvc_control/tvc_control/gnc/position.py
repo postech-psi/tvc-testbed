@@ -40,9 +40,11 @@ class PositionController:
         self.gains = gains
 
     def update(self, pos_i, vel_i, pos_des):
-        """
+        """Horizontal position and velocity error -> (pitch_des, yaw_des) in rad.
+
         pos_i, vel_i : inertial position [m] and velocity [m/s], (x, y, z)
-        pos_des      : inertial target, (x, y, z); z is ignored (altitude loop)
+        pos_des      : inertial target, (x, y, z); z is ignored -- the altitude
+                       loop owns it
         """
         ex = pos_i[0] - pos_des[0]
         ey = pos_i[1] - pos_des[1]

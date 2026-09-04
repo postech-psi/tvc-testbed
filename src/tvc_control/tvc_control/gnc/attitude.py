@@ -19,11 +19,12 @@ from .allocation import Allocation, allocate
 
 
 class AttitudeController:
-    """
-    Three-axis cascade:
-        attitude error -> desired body rate  (outer, P)
-        rate error     -> desired moment     (inner, PID)
-        desired moment -> actuator commands  (allocation, §4b)
+    """Three-axis cascade: attitude error to actuator commands.
+
+        attitude error -> desired body rate   attitude loop, P
+        rate error     -> angular accel       rate loop, PID
+        x inertia      -> body moment
+        body moment    -> actuator commands   allocation.allocate()
 
     All three axes are closed here. The LATERAL pair -- pitch (body x) and yaw
     (body y) -- is driven by the gimbal; the ROLL channel (body z, the thrust

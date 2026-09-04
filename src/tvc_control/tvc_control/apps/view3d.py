@@ -84,10 +84,12 @@ def load_binary_stl(path):
 
 
 def decimate(tris, cell):
-    """Vertex-clustering decimation: snap vertices onto a `cell`-sized grid,
-    collapse each occupied cell to its member centroid, then drop the triangles
-    that became degenerate or duplicated. Preserves overall silhouette and the
-    open truss structure, which uniform triangle-dropping would shred."""
+    """Reduce triangle count by vertex clustering, preserving the silhouette.
+
+    Snap vertices onto a `cell`-sized grid, collapse each occupied cell to its
+    member centroid, then drop the triangles that became degenerate or
+    duplicated. Preserves the open truss structure, which uniform
+    triangle-dropping would shred."""
     pts = tris.reshape(-1, 3)
     keys = np.floor(pts / cell).astype(np.int64)
     _, inverse = np.unique(keys, axis=0, return_inverse=True)

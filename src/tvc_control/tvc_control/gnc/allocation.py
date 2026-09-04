@@ -145,7 +145,7 @@ def motor_setpoint(T, tau_p, params: VehicleParams):
 
 
 def _lateral_gimbal(M_xy, T, tau_p, params: VehicleParams, iters=3):
-    """Solve M_x, M_y for (delta1, delta2) -- the 2x2 inverse of §5, refined.
+    """Solve M_x, M_y for (delta1, delta2): the lateral 2x2 inverse, refined.
 
     Seed: the small-angle inverse. With s1~d1, s2*c1~d2 the map is
 

@@ -30,10 +30,11 @@ asks two questions and integrates the answer forward:
                             repeat every dt
 ```
 
-Question 1 is answered by `gnc/` and takes about 50 µs. Question 2 is answered
-by `plant/` (or by Gazebo) and is a numerical integration. **The entire design
-of this repository is the wall between those two questions** — question 1's code
-flies, question 2's never does.
+Question 1 is answered by `gnc/` — measured at **22 µs** per call in CPython on
+a laptop, warm, with the position and altitude loops on. Question 2 is answered
+by `plant/` (or by Gazebo) and is a numerical integration, which costs far more.
+**The entire design of this repository is the wall between those two
+questions**: question 1's code flies, question 2's never does.
 
 Default `dt` is 10 ms (100 Hz) in the analytic harness and 4 ms (250 Hz) in the
 ROS and Gazebo paths, matching Gazebo's odometry rate.
