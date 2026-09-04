@@ -12,6 +12,12 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
+        # The single source of truth for every vehicle number. Installed so a
+        # colcon-installed node can find it without reaching back into the
+        # source tree -- the alternative was literal fallback constants, and
+        # those went stale (20.0 N thrust survived in three files after the
+        # bench measured 17.79 N).
+        ('share/' + package_name, ['tvc_control/vehicle_params.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

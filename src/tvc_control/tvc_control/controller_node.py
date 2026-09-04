@@ -20,7 +20,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Imu
 from tvc_msgs.msg import GimbalCommand
 
-from tvc_control.physics import VehicleParams, ControlGains, AttitudeController
+from tvc_control.physics import (ControlGains, AttitudeController,
+                                 load_vehicle_params)
 
 
 class ControllerNode(Node):
@@ -47,7 +48,7 @@ class ControllerNode(Node):
             kd_rate=self.get_parameter('kd_rate').value,
             i_limit=self.get_parameter('i_limit').value,
         )
-        self.params = VehicleParams()
+        self.params = load_vehicle_params()
         self.controller = AttitudeController(self.params, gains)
         self.T_hover = self.params.m * self.params.g
 

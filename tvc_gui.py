@@ -27,7 +27,8 @@ from matplotlib.figure import Figure
 import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "tvc_control"))
-from tvc_control.physics import VehicleParams, ControlGains, SimConfig, simulate
+from tvc_control.physics import (VehicleParams, ControlGains, SimConfig, simulate,
+                                 load_vehicle_params, load_gains)
 from tvc_view3d import View3DWindow
 
 
@@ -115,8 +116,8 @@ class TVCSimulatorApp(tk.Tk):
         self.minsize(1100, 640)
 
         # Backing dataclasses (kept alive across runs so edits persist)
-        self.vparams = VehicleParams()
-        self.gains = ControlGains()
+        self.vparams = load_vehicle_params()
+        self.gains = load_gains()
         self.cfg = SimConfig()
 
         self.last_result = None
@@ -234,8 +235,8 @@ class TVCSimulatorApp(tk.Tk):
 
     # ------------------------------------------------------------------
     def reset_defaults(self):
-        self.vparams = VehicleParams()
-        self.gains = ControlGains()
+        self.vparams = load_vehicle_params()
+        self.gains = load_gains()
         self.cfg = SimConfig()
 
         for group, instance in [

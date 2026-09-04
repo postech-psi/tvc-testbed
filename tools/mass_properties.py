@@ -205,7 +205,7 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
 
 def emit_params_yaml(path, total_mass, cg, I):
     """Rewrite ONLY the mass_properties block (between the EMIT sentinel
-    markers) of the single-source-of-truth sim/vehicle_params.yaml, preserving
+    markers) of the single-source-of-truth vehicle_params.yaml, preserving
     every other line and comment. This keeps physics.py / hover.py / the SDF
     generator all reading one authoritative set of numbers -- see that file's
     header for the full contract."""
@@ -255,14 +255,15 @@ def main(argv=None):
         if a == "--emit":
             emit_path = next(it, None)
             if emit_path is None:
-                print("--emit needs a path, e.g. --emit sim/vehicle_params.yaml")
+                print("--emit needs a path, e.g. --emit "
+                      "src/tvc_control/tvc_control/vehicle_params.yaml")
                 return 1
         else:
             positional.append(a)
 
     if not positional:
         print("usage: python tools/mass_properties.py components.yaml "
-              "[cad_parts.csv] [--emit sim/vehicle_params.yaml]")
+              "[cad_parts.csv] [--emit <vehicle_params.yaml>]")
         return 1
 
     doc = load_yaml(positional[0])

@@ -1,134 +1,85 @@
 """
 Vehicle and gain parameters -- the plain data the controller reads.
 ================================================================================
-Moved verbatim from physics.py during the flight-code/plant split. The math is
-untouched; only its address changed.
+Flight code. Pure Python, no file I/O, no defaults for anything measured.
 
-NOTE ON PORTING: the YAML search-and-load below runs at IMPORT time, not in the
-control path, so it does not violate the no-runtime-file-I/O rule -- but it does
-mean this module cannot be lifted into firmware as-is. The purity conversion
-replaces it with an explicit factory that the harness calls once at startup,
-which is how PX4's parameter system works and how the C++ port will read.
+WHY VehicleParams HAS NO PHYSICAL DEFAULTS
+    `VehicleParams()` used to work, filling itself from a YAML search with a
+    literal fallback dict if the file could not be found. Those literals went
+    stale: a superseded 20.0 N max thrust survived in three files after the
+    bench measured 17.79 N, and a 180 deg/s gimbal slew outlived its measurement
+    at 235/403 deg/s. Nothing failed -- the simulation just quietly described a
+    different vehicle.
+
+    So the measured fields have no defaults at all and constructing one without
+    them is a TypeError. The single supported constructor is
+    `tvc_control.config.load_vehicle_params()`, which reads the YAML once at
+    startup and raises if it is missing. Parameters are injected, never looked
+    up, which is also how they will arrive from PX4's parameter system.
+
+    Fields that keep defaults are the ones that are choices rather than
+    measurements (dx/dy disturbance terms, T_min) or genuinely optional
+    (products of inertia, the measured surface, per-axis gimbal maps).
 """
-
-import os
-import sys
 
 import math
 from dataclasses import dataclass, field
 
-# =============================================================================
-# 0. Single-source-of-truth defaults
-# =============================================================================
-# The authoritative vehicle numbers live in sim/vehicle_params.yaml (see its
-# header). Both this module and the Gazebo controller read them, so mass / CG /
-# inertia / lever arm cannot drift apart. When that file is not reachable -- an
-# installed ROS2 context without the sim/ tree alongside -- we fall back to the
-# literals below so physics.py stays importable and self-contained.
-
-def _load_vehicle_defaults():
-    """Search upward from this file for sim/vehicle_params.py and load it.
-    Returns a dict of defaults, or None if the sim tree is not present."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    d = here
-    for _ in range(6):
-        sim_dir = os.path.join(d, "sim")
-        if os.path.isfile(os.path.join(sim_dir, "vehicle_params.py")):
-            if sim_dir not in sys.path:
-                sys.path.insert(0, sim_dir)
-            try:
-                import vehicle_params as _vp
-                v = _vp.load()
-            except Exception:
-                return None
-            try:
-                import actuator_maps as _am
-                surface = _am.ThrustTorqueSurface(v.raw.get("thrust_torque_surface"))
-                if not surface.ok:
-                    surface = None
-                axes = _am.GimbalAxisMap.all_from_params() or None
-            except Exception:
-                surface, axes = None, None
-            return {
-                "m": v.mass, "Ix": v.Ix, "Iy": v.Iy, "Iz": v.Iz,
-                "L": v.L,
-                # dx/dy stay 0 by design: per this module's convention they are
-                # OPT-IN CM-misalignment disturbance terms, not the vehicle's
-                # nominal state. The real <2 mm lateral CG offset lives in the
-                # SDF (link pose + products of inertia); forcing it here as a
-                # constant bias torque only muddies the attitude smoke test.
-                "dx": 0.0, "dy": 0.0,
-                "T_max": v.thrust_at_max_n,
-                "gimbal_max_deg": v.gimbal_max_deg,
-                "gimbal_rate_max_deg": v.gimbal_rate_max_deg,
-                "gimbal_deadtime_s": v.gimbal_deadtime_s,
-                "k_moment": v.moment_constant,
-                "tau_p_max": v.tau_p_max_nm,
-                "surface": surface,
-                "gimbal_axes": axes,
-                "g": v.g,
-            }
-        parent = os.path.dirname(d)
-        if parent == d:
-            break
-        d = parent
-    return None
-
-
-# Literal fallbacks used only when sim/vehicle_params.yaml cannot be found.
-_D = _load_vehicle_defaults() or {
-    "m": 1.328, "Ix": 0.022616, "Iy": 0.022581, "Iz": 0.001957,
-    "L": 0.2111, "dx": 0.0, "dy": 0.0,
-    "T_max": 20.0, "gimbal_max_deg": 7.0, "gimbal_rate_max_deg": 180.0,
-    "gimbal_deadtime_s": 0.030, "k_moment": 0.016, "tau_p_max": None,
-    "surface": None, "gimbal_axes": None,
-    "g": 9.81,
-}
-_D.setdefault("surface", None)
-_D.setdefault("gimbal_axes", None)
-
 
 @dataclass
 class VehicleParams:
-    """Physical vehicle parameters. Angles are stored in DEGREES for the GUI's
-    convenience and converted to radians via properties where dynamics need them.
+    """Physical vehicle parameters.
 
-    Defaults come from sim/vehicle_params.yaml (the single source of truth), so
-    editing that file re-parameterizes this sim without touching code here."""
+    Angles are stored in DEGREES for the GUI's convenience and converted to
+    radians via properties where the dynamics need them.
 
-    m: float = _D["m"]              # kg, total mass
-    Ix: float = _D["Ix"]            # kg*m^2, roll inertia (body x)
-    Iy: float = _D["Iy"]            # kg*m^2, pitch inertia (body y)
-    Iz: float = _D["Iz"]            # kg*m^2, yaw/spin inertia (body z)
+    AXIS NAMING: body x and y are the LATERAL axes (the two the gimbal tilts
+    thrust about); body z is the AXIAL/thrust axis. The field names below still
+    use the old quadcopter convention (Ix = "roll" = body x); the rename to the
+    rocket convention is a later, separate commit. See docs/CONVENTIONS.md.
+    """
 
-    L: float = _D["L"]              # m, AXIAL lever arm: gimbal pivot -> CM
-    dx: float = _D["dx"]            # m, lateral CM misalignment (disturbance)
-    dy: float = _D["dy"]            # m, lateral CM misalignment (disturbance)
+    m: float                        # kg, total mass
+    Ix: float                       # kg*m^2, about body x
+    Iy: float                       # kg*m^2, about body y
+    Iz: float                       # kg*m^2, about body z (thrust axis)
 
-    T_max: float = _D["T_max"]      # N, max thrust (combined coax unit)
-    T_min: float = 5.0              # N, min thrust (idle; must stay > 0 for allocation)
+    L: float                        # m, AXIAL lever arm: gimbal pivot -> CM
+    T_max: float                    # N, max thrust (combined coax unit)
+    g: float                        # m/s^2
 
-    gimbal_max_deg: float = _D["gimbal_max_deg"]        # deg, mechanical gimbal limit (each axis)
-    gimbal_rate_max_deg: float = _D["gimbal_rate_max_deg"]  # deg/s, servo slew rate
-    gimbal_deadtime_s: float = _D["gimbal_deadtime_s"]  # s, servo transport delay
+    gimbal_max_deg: float           # deg, nominal symmetric gimbal limit
+    gimbal_rate_max_deg: float      # deg/s, nominal servo slew rate
+    gimbal_deadtime_s: float        # s, servo transport delay
+    k_moment: float                 # m, drag-torque / thrust (analytic fallback)
 
-    # Axial (thrust-axis) reaction torque authority. k_moment is the coax
-    # drag-torque / thrust ratio, so tau_P = k_moment * (T2 - T1) for a thrust
-    # split of (T2 - T1) newtons. tau_p_max is an optional MEASURED cap; when
-    # None the allocator uses only the split headroom the thrust command leaves.
-    k_moment: float = _D["k_moment"]        # m, drag-torque / thrust
-    tau_p_max: float = _D["tau_p_max"]      # N*m or None
+    # --- products of inertia -------------------------------------------------
+    # Not negligible on this airframe: Iyz/Izz = 27.3%, Ixz/Izz = 15.4%. Default
+    # 0 so a caller can deliberately request the diagonal approximation, but
+    # load_vehicle_params() always supplies the measured values.
+    Ixy: float = 0.0
+    Ixz: float = 0.0
+    Iyz: float = 0.0
+
+    # Lateral CM misalignment. OPT-IN disturbance terms, not the vehicle's
+    # nominal state -- the real sub-2 mm offset lives in the SDF link pose and
+    # the products of inertia above.
+    dx: float = 0.0
+    dy: float = 0.0
+
+    T_min: float = 5.0              # N, idle floor; must stay > 0 for allocation
+
+    # Axial (thrust-axis) reaction torque authority. tau_p_max is an optional
+    # measured hard cap; when None the allocator reads the feasible set off the
+    # measured surface instead.
+    tau_p_max: float = None
 
     # Bench-measured (PWM A, PWM B) -> (thrust, tau_P) surface, or None. When
     # present it REPLACES the k_moment model everywhere authority is computed;
     # k_moment survives only for the Gazebo plugin, which cannot take a surface.
-    surface: object = _D["surface"]
-    # Per-axis measured gimbal maps {'inner': .., 'outer': ..}, or None.
-    # default_factory because a dict default is mutable and dataclasses reject
-    # it -- the factory hands out the same shared, read-only spec object.
-    gimbal_axes: object = field(default_factory=lambda: _D["gimbal_axes"])
-
-    g: float = _D["g"]              # m/s^2
+    surface: object = None
+    # Per-ring measured gimbal maps {'inner': .., 'outer': ..}, or None.
+    gimbal_axes: object = field(default=None)
 
     @property
     def gimbal_max(self):
@@ -138,12 +89,12 @@ class VehicleParams:
     def gimbal_rate_max(self):
         return math.radians(self.gimbal_rate_max_deg)
 
-    # --- per-axis travel ------------------------------------------------------
+    # --- per-ring travel -----------------------------------------------------
     # delta1 is the pitch-plane deflection, carried by the INNER ring; delta2 is
     # the roll-plane one, carried by the OUTER ring (base_link -> roll joint ->
-    # outer ring -> pitch joint -> inner ring -> rotors). Neither axis is
-    # symmetric about its own neutral, and they differ from each other, so the
-    # limits are vectors rather than one scalar. Falls back to the symmetric
+    # outer ring -> pitch joint -> inner ring -> rotors). Neither ring is
+    # symmetric about its own neutral and they differ from each other, so the
+    # limits are per-axis rather than one scalar. Falls back to the symmetric
     # +/-gimbal_max_deg when the measured block is absent.
 
     def _axis(self, name):
@@ -170,24 +121,29 @@ class VehicleParams:
 
 @dataclass
 class ControlGains:
-    """Cascaded PID gains: outer angle loop + inner rate loop.
+    """Cascaded PID gains: attitude loop outside, rate loop inside.
 
     LATERAL (body x, y) gains are shared between the two axes -- Ix and Iy
-    differ by 0.15% on this airframe, so treating them as symmetric is exact
-    to within the mass-budget uncertainty.
+    differ by 0.15% on this airframe, so treating them as symmetric is exact to
+    within the mass-budget uncertainty.
 
-    AXIAL (body z) gains are SEPARATE and much smaller, and this is not a
-    tuning preference -- it is forced by the airframe. Iz = 0.00196 kg*m^2 is
-    11.6x smaller than Ix, so the same torque produces 11.6x the angular
-    acceleration about z. Sharing one gain set makes the axial channel
-    violently underdamped (or the lateral channel uselessly slow). Also the
-    two channels have different actuators and therefore different lags: the
-    lateral axes go through a 30 ms servo deadtime, the axial channel through
-    the motor time constant.
+    AXIAL (body z) gains are SEPARATE and much smaller, and this is not a tuning
+    preference -- it is forced by the airframe. Iz = 0.00196 kg*m^2 is 11.6x
+    smaller than Ix, so the same torque produces 11.6x the angular acceleration
+    about z. Sharing one gain set makes the axial channel violently underdamped
+    (or the lateral channel uselessly slow). The two channels also have
+    different actuators and therefore different lags: the lateral axes go
+    through a 30 ms servo deadtime, the axial channel through the motor time
+    constant (~100 ms measured), which is why axial authority being larger does
+    not mean the axial loop can be faster.
+
+    These are the analytic simulator's historical values, which have never been
+    flown. sim/hover.py's set is 24.9x stiffer in the rate loop and IS flight-
+    validated; reconciling the two is a later, deliberate commit.
     """
 
-    kp_angle: float = 4.0      # outer loop: angle error -> rate setpoint
-    kp_rate: float = 0.02      # inner loop: rate error -> torque
+    kp_angle: float = 4.0      # attitude loop: angle error -> rate setpoint
+    kp_rate: float = 0.02      # rate loop: rate error -> torque
     ki_rate: float = 0.002
     kd_rate: float = 0.004
     i_limit: float = 0.5       # integrator clamp (anti-windup)

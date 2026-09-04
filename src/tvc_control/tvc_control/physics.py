@@ -51,6 +51,7 @@ if __package__ in (None, ""):
 
 # --- flight code -------------------------------------------------------------
 from .gnc.params import VehicleParams, ControlGains
+from .config import load_vehicle_params, load_gains
 from .gnc.mathx import (
     quat_normalize,
     quat_to_rotmat,
@@ -79,6 +80,7 @@ from .harness.mil import SimConfig, simulate, _compute_metrics
 
 __all__ = [
     "VehicleParams", "ControlGains", "SimConfig",
+    "load_vehicle_params", "load_gains",
     "quat_normalize", "quat_to_rotmat", "quat_kinematics", "quat_to_euler",
     "euler_to_quat", "thrust_axis",
     "PID", "Allocation", "axial_headroom", "axial_limits", "mix_motors",
@@ -90,8 +92,8 @@ __all__ = [
 if __name__ == "__main__":
     # Headless smoke test -- verifies the physics/controller integrate cleanly
     # without requiring a display. Run: python3 src/tvc_control/tvc_control/physics.py
-    vp = VehicleParams()
-    gains = ControlGains()
+    vp = load_vehicle_params()
+    gains = load_gains()
     cfg = SimConfig()
 
     result = simulate(vp, gains, cfg)

@@ -33,7 +33,8 @@ import tkinter as tk
 from tkinter import ttk
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "tvc_control"))
-from tvc_control.physics import quat_to_rotmat, VehicleParams  # noqa: E402
+from tvc_control.physics import (quat_to_rotmat, VehicleParams,  # noqa: E402
+                                 load_vehicle_params)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STL_PATH = os.path.join(HERE, "sim", "models", "tvc_vehicle", "meshes", "tvc_vehicle.stl")
@@ -116,7 +117,7 @@ def _vehicle_cg():
         import vehicle_params as _vp
         return np.array(_vp.load().cg, dtype=float)
     except Exception:
-        return np.array([0.0, 0.0, VehicleParams().L])
+        return np.array([0.0, 0.0, load_vehicle_params().L])
 
 
 def load_vehicle_mesh(params: VehicleParams, detail=DEFAULT_DETAIL):
@@ -440,7 +441,7 @@ def main():
     """Standalone: run the default case and animate it."""
     from tvc_control.physics import ControlGains, SimConfig, simulate
 
-    vp, gains, cfg = VehicleParams(), ControlGains(), SimConfig()
+    vp, gains, cfg = load_vehicle_params(), ControlGains(), SimConfig()
     result = simulate(vp, gains, cfg)
 
     root = tk.Tk()

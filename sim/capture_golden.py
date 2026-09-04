@@ -38,8 +38,8 @@ import numpy as np
 
 import validate_control as vc
 from tvc_control.physics import (
-    VehicleParams, ControlGains, SimConfig, simulate,
-    axial_headroom, axial_limits, allocate, thrust_axis,
+    SimConfig, simulate, axial_headroom, axial_limits, allocate, thrust_axis,
+    load_vehicle_params, load_gains,
 )
 
 GOLDEN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
@@ -67,7 +67,7 @@ def _round(x):
 
 
 def capture():
-    vp, gains = VehicleParams(), ControlGains()
+    vp, gains = load_vehicle_params(), load_gains()
     out = {}
 
     # --- the vehicle the numbers below describe ------------------------------

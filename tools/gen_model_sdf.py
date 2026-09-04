@@ -1,6 +1,6 @@
 """
 gen_model_sdf.py -- regenerate sim/models/tvc_vehicle/model.sdf from the single
-source of truth (sim/vehicle_params.yaml).
+source of truth (tvc_control/vehicle_params.yaml).
 ================================================================================
 WHY THIS EXISTS
 The hand-written SDF used to split the vehicle mass across six links whose
@@ -164,7 +164,7 @@ def render(v, base_mass, base_pos, I_base_own):
 <!--
   GENERATED FILE. Do not edit by hand.
   Regenerate with:  python tools/gen_model_sdf.py
-  Source of truth:  sim/vehicle_params.yaml
+  Source of truth:  tvc_control/vehicle_params.yaml
 
   Coaxial TVC VTVL vehicle for Gazebo Harmonic (gz-sim 8). base_link carries the
   WHOLE-vehicle mass properties solved so the composite of all links reproduces

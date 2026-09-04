@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 
 from tvc_control.physics import (
-    VehicleParams, ControlGains, SimConfig, simulate, axial_headroom,
+    SimConfig, simulate, axial_headroom, load_vehicle_params, load_gains,
 )
 
 
@@ -129,8 +129,8 @@ def main():
                     help="also print the vehicle's control-authority budget")
     args = ap.parse_args()
 
-    vp = VehicleParams()
-    gains = ControlGains()
+    vp = load_vehicle_params()
+    gains = load_gains()
     T_hov = vp.m * vp.g
 
     if args.verbose:

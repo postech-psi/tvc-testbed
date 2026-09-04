@@ -22,7 +22,7 @@ from sensor_msgs.msg import Imu
 from tvc_msgs.msg import GimbalCommand
 
 from tvc_control.physics import (
-    VehicleParams,
+    load_vehicle_params,
     GimbalActuator,
     dynamics,
     quat_normalize,
@@ -37,14 +37,27 @@ class SimulatorNode(Node):
         self.declare_parameter('dt', 0.01)
         self.declare_parameter('init_roll_deg', 3.0)
         self.declare_parameter('init_pitch_deg', -4.0)
-        self.declare_parameter('gimbal_rate_max_deg', 180.0)
+        self.declare_parameter('gimbal_rate_max_deg', rclpy.Parameter.Type.DOUBLE)
 
         self.dt = self.get_parameter('dt').value
         init_roll_deg = self.get_parameter('init_roll_deg').value
         init_pitch_deg = self.get_parameter('init_pitch_deg').value
-        gimbal_rate_max_deg = self.get_parameter('gimbal_rate_max_deg').value
+        gimbal_rate_max_deg = self.get_parameter_or(
+            'gimbal_rate_max_deg', None)
+        gimbal_rate_max_deg = (gimbal_rate_max_deg.value
+                               if gimbal_rate_max_deg is not None else None)
 
-        self.params = VehicleParams(gimbal_rate_max_deg=gimbal_rate_max_deg)
+        # gimbal_rate_max_deg is RETIRED. It was a scalar summary of a
+        # per-ring fact, and since GimbalActuator started reading the measured
+        # per-ring rates it has been silently ignored -- the parameter looked
+        # live while doing nothing. Fail loudly instead of pretending.
+        if gimbal_rate_max_deg is not None:
+            raise SystemExit(
+                "parameter 'gimbal_rate_max_deg' was retired: the gimbal has "
+                "two rings with different measured slew rates (403 and 235 "
+                "deg/s). Edit gimbal.axes.*.rate_max_deg in "
+                "tvc_control/vehicle_params.yaml. See docs/CONVENTIONS.md.")
+        self.params = load_vehicle_params()
         self.gimbal = GimbalActuator(self.params)
         self.T_hover = self.params.m * self.params.g
 

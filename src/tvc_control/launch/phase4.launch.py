@@ -12,7 +12,9 @@ def generate_launch_description():
                 'dt': 0.01,
                 'init_roll_deg': 3.0,
                 'init_pitch_deg': -4.0,
-                'gimbal_rate_max_deg': 180.0,
+                # gimbal_rate_max_deg was here at 180.0, contradicting the
+                # measured per-ring rates (403 inner / 235 outer). It is retired
+                # -- simulator_node now rejects it rather than ignoring it.
             }],
         ),
         Node(
