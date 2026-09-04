@@ -49,10 +49,11 @@ tau_P = 0 -- i.e. the previous mapping was the no-yaw-demand special case.
 Yaw IS controlled, and has to be. Its only authority is a differential
 between the counter-rotating rotors:
 
-    tau_z = momentConstant * (T_a - T_b)
+    tau_z = momentConstant * (T_b - T_a)
 
-which is weak (momentConstant = 0.016 m, so 2 N of split buys 0.032 N.m) and
-trades directly against total thrust. It cannot be skipped, though: with the
+(B minus A -- the docstring had this backwards while the code below had it
+right, which is the kind of disagreement tests/test_gazebo_mapping.py now
+asserts away.) It trades directly against total thrust. It cannot be skipped, though: with the
 roll axis deflected by dr, the pitch servo's axis tilts out of the body
 horizontal plane and leaks tau*sin(dr) of its reaction torque into yaw. With
 nothing opposing it the vehicle spins up to several rad/s, and since roll and
@@ -118,12 +119,13 @@ MAX_TILT = math.radians(8.0)
 # world frame than for pointing.
 KP_YAW = 2.0                 # rad/s of yaw rate demand per rad of yaw error
 KD_YAW = 0.45                # N.m per rad/s
-# Deliberately the ANALYTIC moment_constant, not the measured thrust/torque
-# surface in sim/vehicle_params.yaml. This controller flies the Gazebo model,
-# and Gazebo's multicopter plugin computes reaction torque as
-# moment_constant * thrust -- so allocating against the measured surface here
-# would make the controller disagree with the plant it is actually flying. The
-# measured surface belongs on the analytic sim (physics.py) and on hardware.
+# The plugin's own constant, because this controller allocates directly into
+# Gazebo's model. It is no longer a physical drag-torque ratio: since the ROS
+# path inverts the plugin algebra to reproduce the measured surface, this is a
+# SOLVER SCALING constant (see tvc_control/hal/gazebo.py) and it moved 0.016 ->
+# 0.04 to make that inversion feasible across the envelope. The loop gain here
+# is unaffected -- tau_z is commanded in N.m and split = -tau_z/c inverts
+# exactly -- but the reachable torque grows 2.5x, which is the point.
 MOMENT_CONSTANT = _VP.raw["rotors"]["moment_constant"]   # m, from the YAML/SDF
 MAX_THRUST_SPLIT = 4.0       # N between the two rotors
 
@@ -152,6 +154,10 @@ class Hover:
     def __init__(self, target_alt, verbose=True, log_path=None):
         self.target_alt = target_alt
         self.verbose = verbose
+        # Set by main() once the first odometry has arrived, so the control loop
+        # runs in lockstep with the plant instead of against a wall clock.
+        self.step_on_odom = False
+        self.steps_done = 0
         self.state = None
         self.t0 = None
         self.last_print = 0.0
@@ -179,6 +185,10 @@ class Hover:
             "roll": roll, "pitch": pitch, "yaw": yaw,
             "wx": tw.angular.x, "wy": tw.angular.y, "wz": tw.angular.z,
         }
+
+        if self.step_on_odom:
+            self.steps_done += 1
+            self.step()
 
     def step(self):
         s = self.state
@@ -314,11 +324,28 @@ def main():
         return 1
 
     print("hovering to %.1f m for %.0f s\n" % (args.altitude, args.duration), flush=True)
-    dt = 1.0 / args.rate
-    end = time.time() + args.duration
-    while time.time() < end:
-        h.step()
-        time.sleep(dt)
+    # Step on ODOMETRY ARRIVAL, not on a wall clock.
+    #
+    # This loop used to be `while time.time() < end: step(); sleep(dt)`, which
+    # ties the control rate to the host rather than to simulated time. Two
+    # consequences: the run is not reproducible, so re-running it gives a
+    # different trajectory; and when the real-time factor is not 1 the effective
+    # control rate in sim-time is not the rate that was asked for. Neither is
+    # tolerable once this flight is the reference the analytic plant is compared
+    # against -- a tolerance on a non-reproducible run means nothing.
+    #
+    # Gazebo publishes odometry at 250 Hz of SIM time, so stepping in the
+    # callback puts this loop in lockstep with the plant, which is what PX4's
+    # SITL does with its simulator and for the same reason.
+    h.step_on_odom = True
+    target_steps = int(args.duration * args.rate)
+    end = time.time() + args.duration * 3.0 + 10.0   # wall-clock safety net
+    while h.steps_done < target_steps and time.time() < end:
+        time.sleep(0.05)
+    if h.steps_done < target_steps:
+        print("WARNING: only %d of %d control steps ran before the wall-clock "
+              "limit -- the simulation is running far below real time."
+              % (h.steps_done, target_steps))
 
     s = h.state
     err = abs(s["z"] - args.altitude)

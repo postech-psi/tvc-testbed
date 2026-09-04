@@ -1,91 +1,156 @@
 """
-controller_node.py
-===================
-Phase 4 controller node. Owns the cascaded PID (AttitudeController) from
-tvc_control.physics -- nothing else. Subscribes to vehicle attitude,
-computes the gimbal deflection command, publishes it.
+controller_node -- the flight code, wrapped in ROS 2 and nothing else.
+================================================================================
+Owns no control math. It subscribes to state, calls TvcController, and publishes
+what came back. Every loop -- position, altitude, attitude, allocation -- lives
+in tvc_control.gnc and is the same code the analytic harness and sim/hover.py
+run, which is what makes a result obtained in one of them evidence about the
+others.
 
-PID gains and setpoints are ROS2 parameters (declare_parameter), not
-hardcoded -- the same "explore the design space without editing code"
-capability the Phase 2 GUI already gave, just reachable from a launch
-file or `ros2 param set` instead of a form.
+Three things this node used to get wrong, all fixed here:
+
+  IT THREW AWAY MOST OF ITS OWN OUTPUT. It called AttitudeController.update(),
+  published the two gimbal angles, and discarded last_alloc -- the thrust
+  command, tau_P, the per-rotor split and the saturation flags. There was no
+  motor topic at all, so the ROS2 path had no altitude loop and, since the
+  bridge held both rotors at one speed, exactly zero roll authority.
+
+  IT LISTENED TO THE WRONG SENSOR. It subscribed to the IMU, which carries no
+  position and no velocity, so altitude and position control were not merely
+  unimplemented but impossible. Odometry is the single state source now, which
+  is what sim/hover.py -- the only thing that has ever flown here -- always used.
+
+  IT LIED ABOUT dt. It ran off IMU callbacks at 250 Hz while passing a hardcoded
+  dt = 0.01 into the PIDs, a 2.5x error in every integral and derivative term.
+  Control now runs on a timer, dt is measured from the clock, and the callback
+  only caches state.
 """
-
 import numpy as np
-
 import rclpy
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
-from sensor_msgs.msg import Imu
-from tvc_msgs.msg import GimbalCommand
+from tvc_msgs.msg import ActuatorCommand
+from tvc_control.config import load_gains, load_vehicle_params, load
+from tvc_control.gnc.controller import TvcController
+from tvc_control.gnc.types import ControlMode, EstimatedState, Setpoint
+from tvc_control.hal.gazebo import rotor_speeds
 
-from tvc_control.physics import (ControlGains, AttitudeController,
-                                 load_vehicle_params)
+# Retired parameter names. Each one either changed meaning or stopped doing
+# anything, and a parameter that looks live while being ignored is worse than
+# one that is gone -- it makes a launch file document a control decision that
+# is not happening. See docs/CONVENTIONS.md.
+RETIRED_PARAMS = ('gimbal_rate_max_deg', 'axial_des_deg')
 
 
 class ControllerNode(Node):
+
     def __init__(self):
         super().__init__('controller_node')
 
-        self.declare_parameter('dt', 0.01)
+        for name in RETIRED_PARAMS:
+            self.declare_parameter(name, rclpy.Parameter.Type.NOT_SET)
+            if self.get_parameter(name).type_ != rclpy.Parameter.Type.NOT_SET:
+                raise SystemExit(
+                    "parameter '%s' was retired -- see docs/CONVENTIONS.md" % name)
+
+        self.declare_parameter('rate_hz', 250.0)
+        self.declare_parameter('gain_profile', '')
         self.declare_parameter('roll_des_deg', 0.0)
-        self.declare_parameter('pitch_des_deg', 5.0)
-        self.declare_parameter('kp_angle', 4.0)
-        self.declare_parameter('kp_rate', 0.02)
-        self.declare_parameter('ki_rate', 0.002)
-        self.declare_parameter('kd_rate', 0.004)
-        self.declare_parameter('i_limit', 0.5)
+        self.declare_parameter('pitch_des_deg', 0.0)
+        self.declare_parameter('altitude_hold', False)
+        self.declare_parameter('position_hold', False)
+        self.declare_parameter('z_des', 2.0)
+        self.declare_parameter('x_des', 0.0)
+        self.declare_parameter('y_des', 0.0)
 
-        self.dt = self.get_parameter('dt').value
-        self.roll_des = np.deg2rad(self.get_parameter('roll_des_deg').value)
-        self.pitch_des = np.deg2rad(self.get_parameter('pitch_des_deg').value)
+        self.rate_hz = float(self.get_parameter('rate_hz').value)
+        profile = self.get_parameter('gain_profile').value or None
 
-        gains = ControlGains(
-            kp_angle=self.get_parameter('kp_angle').value,
-            kp_rate=self.get_parameter('kp_rate').value,
-            ki_rate=self.get_parameter('ki_rate').value,
-            kd_rate=self.get_parameter('kd_rate').value,
-            i_limit=self.get_parameter('i_limit').value,
-        )
         self.params = load_vehicle_params()
-        self.controller = AttitudeController(self.params, gains)
-        self.T_hover = self.params.m * self.params.g
-
-        qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1,
+        self.vehicle = load()
+        gains = load_gains(profile)
+        self.controller = TvcController(self.params, gains, ControlMode(
+            altitude_hold=bool(self.get_parameter('altitude_hold').value),
+            position_hold=bool(self.get_parameter('position_hold').value),
+        ))
+        self.setpoint = Setpoint(
+            roll_des=np.deg2rad(self.get_parameter('roll_des_deg').value),
+            pitch_des=np.deg2rad(self.get_parameter('pitch_des_deg').value),
+            z_des=float(self.get_parameter('z_des').value),
+            pos_des=(float(self.get_parameter('x_des').value),
+                     float(self.get_parameter('y_des').value), 0.0),
         )
 
-        self.attitude_sub = self.create_subscription(
-            Imu, '/sim/vehicle_attitude', self.on_attitude, qos)
-        self.gimbal_pub = self.create_publisher(
-            GimbalCommand, '/ctrl/gimbal_cmd', qos)
+        rot = self.vehicle.raw['rotors']
+        self._motor_k = rot['motor_constant']
+        self._moment_c = rot['moment_constant']
+        self._omega_max = rot['max_rot_velocity']
+
+        qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE,
+                         history=HistoryPolicy.KEEP_LAST, depth=1)
+
+        self._state = None
+        self._last_t = None
+        self.create_subscription(Odometry, '/model/tvc_vehicle/odometry',
+                                 self.on_odometry, qos)
+        self.cmd_pub = self.create_publisher(ActuatorCommand, '/ctrl/actuator_cmd', qos)
+        self.create_timer(1.0 / self.rate_hz, self.control_step)
 
         self.get_logger().info(
-            f'controller_node started: roll_des={np.rad2deg(self.roll_des):.1f}deg, '
-            f'pitch_des={np.rad2deg(self.pitch_des):.1f}deg')
+            'controller_node at %.0f Hz, gains=%s, altitude_hold=%s, position_hold=%s'
+            % (self.rate_hz, profile or '<file default>',
+               self.controller.mode.altitude_hold,
+               self.controller.mode.position_hold))
 
-    def on_attitude(self, msg: Imu):
-        # geometry_msgs/Quaternion is (x, y, z, w); physics.py uses (qw, qx, qy, qz).
-        q = np.array([
-            msg.orientation.w, msg.orientation.x,
-            msg.orientation.y, msg.orientation.z,
-        ])
-        omega = np.array([
-            msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z,
-        ])
+    def on_odometry(self, msg: Odometry):
+        """Cache only. Control runs on the timer -- see the dt note above."""
+        p, q = msg.pose.pose.position, msg.pose.pose.orientation
+        v, w = msg.twist.twist.linear, msg.twist.twist.angular
+        stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        # geometry_msgs/Quaternion is (x, y, z, w); gnc uses (qw, qx, qy, qz).
+        self._state = EstimatedState(
+            pos_i=(p.x, p.y, p.z), vel_i=(v.x, v.y, v.z),
+            quat=(q.w, q.x, q.y, q.z), omega_b=(w.x, w.y, w.z),
+            stamp_s=stamp)
 
-        delta = self.controller.update(
-            q, omega, self.roll_des, self.pitch_des, self.T_hover, self.dt)
+    def control_step(self):
+        if self._state is None:
+            return
 
-        cmd = GimbalCommand()
-        cmd.header.stamp = self.get_clock().now().to_msg()
-        cmd.header.frame_id = 'body'
-        cmd.delta1 = float(delta[0])
-        cmd.delta2 = float(delta[1])
-        self.gimbal_pub.publish(cmd)
+        now = self.get_clock().now().nanoseconds * 1e-9
+        nominal = 1.0 / self.rate_hz
+        if self._last_t is None:
+            dt = nominal
+        else:
+            # Clamped to a sane band around nominal. A stalled executor or a
+            # paused simulator can hand back a dt of seconds, and an unclamped
+            # derivative term on that is a single enormous actuator command.
+            dt = min(max(now - self._last_t, 0.2 * nominal), 5.0 * nominal)
+        self._last_t = now
+
+        cmd = self.controller.update(self._state, self.setpoint, dt)
+
+        wa, wb = rotor_speeds(cmd.thrust_n, cmd.tau_p_nm, self._motor_k,
+                             self._moment_c, self._omega_max)
+
+        msg = ActuatorCommand()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'body'
+        msg.axis_convention = ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER
+        msg.gimbal_delta1_rad = float(cmd.gimbal_delta1_rad)
+        msg.gimbal_delta2_rad = float(cmd.gimbal_delta2_rad)
+        msg.motor_a = float(cmd.motor_a)
+        msg.motor_b = float(cmd.motor_b)
+        msg.thrust_n = float(cmd.thrust_n)
+        msg.tau_p_nm = float(cmd.tau_p_nm)
+        msg.rotor_a_speed_rads = float(wa)
+        msg.rotor_b_speed_rads = float(wb)
+        msg.sat_gimbal = bool(cmd.sat_gimbal)
+        msg.sat_axial = bool(cmd.sat_axial)
+        msg.sat_thrust = bool(cmd.sat_thrust)
+        self.cmd_pub.publish(msg)
 
 
 def main(args=None):
