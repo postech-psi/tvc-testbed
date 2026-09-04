@@ -27,7 +27,7 @@ uncertainty.
 
 | category | factor | level | basis |
 |---|---|---|---|
-| M&S Development | Verification | **3** | 63 tests + 5 scenarios + a frozen baseline, all gated in CI |
+| M&S Development | Verification | **3** | a unit suite, 5 closed-loop scenarios and a frozen baseline, all gated in CI |
 | M&S Development | Validation | **0** | *nothing has been compared against the real vehicle* |
 | M&S Operations | Input Pedigree | **3** | actuators bench-measured with stated fit error; mass properties are CAD plus assumptions |
 | M&S Operations | Results Uncertainty | **0** | measurement uncertainty is recorded and never propagated |
@@ -51,18 +51,23 @@ uncertainty.
 
 **What exists.**
 
-- **63 unit tests** (`tests/`), pure Python, no ROS or Gazebo, seconds to run.
+- **The unit suite** (`tests/`): pure Python, no ROS or Gazebo, seconds to run.
+  Both the counts and the descriptions below are generated from the test files
+  themselves, so this table cannot go stale.
 
-  | file | tests | guards |
-  |---|---|---|
-  | `test_gnc_purity.py` | 6 | the porting discipline, by parsing the AST: no forbidden import, no file I/O, no module-level mutable state, no `while`, no reach into `plant/` — plus numpy blocked at the import hook, which a lazy in-function import could otherwise evade |
-  | `test_axis_convention.py` | 11 | handedness, the SDF joint axes, that every gimbal joint is actually driven by a plugin, that the SDF stops bound the measured travel, the gimbal sign convention, and the retired-parameter guards |
-  | `test_effectiveness.py` | 12 | the surface's two independent anchors, non-separability, the inverse's round-trip and feasibility, and that the promised limits are reachable |
-  | `test_allocation.py` | 6 | the moment round-trip, that saturation preserves torque *direction*, thrust priority, and the shape of the feasible set |
-  | `test_attitude_error.py` | 10 | the quaternion error's second-order agreement with the Euler difference, the short-way-round property, and that no axis is singular |
-  | `test_consistency.py` | 9 | that generated artefacts are in sync, that solver constants exceed physical limits, that both plants share one actuator chain, that only one controller exists, and the τ_P sign chain end to end |
-  | `test_gazebo_mapping.py` | 3 | the command-side inversion round-trips exactly over the measured envelope |
-  | `test_scenarios.py` | 6 | the five closed-loop scenarios, imported from `verify/` so they are defined once |
+<!-- <<<EMIT:tests -->
+| file | test functions | what it guards |
+|---|---|---|
+| `test_allocation.py` | 6 | Control allocation: does it realize the moment it was asked for? |
+| `test_attitude_error.py` | 5 | The quaternion attitude error, and why it replaced the Euler difference. |
+| `test_axis_convention.py` | 11 | The axis convention, asserted rather than documented. |
+| `test_consistency.py` | 10 | The numbers that live in two places must agree. |
+| `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
+| `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
+| `test_gnc_purity.py` | 6 | Enforce the porting discipline on the flight code. |
+| `test_scenarios.py` | 2 | The five closed-loop scenarios, run as tests. |
+| | **55** | |
+<!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
   realized moment matches the commanded moment to **4.3 × 10⁻¹³ N·m**, frozen in

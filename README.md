@@ -116,7 +116,7 @@ a colcon package directory contains a Python package of the same name.
 All three run in CI, and the first is the merge gate.
 
 ```bash
-python -m pytest tests/ -q         # 54 tests: purity, conventions, allocation, scenarios
+python -m pytest tests/ -q         # purity, conventions, allocation, scenarios
 python tvc.py golden --check       # the frozen numerical baseline
 python tools/gen_model_sdf.py --check   # the Gazebo model matches the parameters
 python tools/gen_docs.py --check        # the documented numbers match the YAML

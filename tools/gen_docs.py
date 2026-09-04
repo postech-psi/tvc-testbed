@@ -98,6 +98,35 @@ def _authority_table():
     return "\n".join(out)
 
 
+def _test_coverage():
+    """What the test suite covers, counted from the suite itself.
+
+    The count and the one-line summary both come from the test files -- the
+    count by parsing for `def test_`, the summary from the first line of each
+    module's docstring. A test-suite description maintained by hand in a
+    document is a description that goes stale the first time someone adds a
+    file, which is the failure this whole generator exists to prevent.
+    """
+    import ast
+
+    tests_dir = os.path.join(REPO, "tests")
+    rows = ["| file | test functions | what it guards |", "|---|---|---|"]
+    total = 0
+    for name in sorted(os.listdir(tests_dir)):
+        if not (name.startswith("test_") and name.endswith(".py")):
+            continue
+        tree = ast.parse(io.open(os.path.join(tests_dir, name),
+                                 encoding="utf-8").read())
+        n = sum(1 for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name.startswith("test_"))
+        doc = (ast.get_docstring(tree) or "").strip().split("\n")[0]
+        rows.append("| `%s` | %d | %s |" % (name, n, doc))
+        total += n
+    rows.append("| | **%d** | |" % total)
+    return "\n".join(rows)
+
+
 def _provenance_summary():
     """How many of the model's numbers are measured, and how many are guesses."""
     rows = parameter_rows()
@@ -119,6 +148,9 @@ SECTIONS = {
         "parameters": lambda: format_parameter_table(markdown=True),
         "authority": _authority_table,
         "provenance": _provenance_summary,
+    },
+    os.path.join(REPO, "docs", "6-CREDIBILITY.md"): {
+        "tests": _test_coverage,
     },
 }
 
