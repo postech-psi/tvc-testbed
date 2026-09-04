@@ -17,7 +17,8 @@ setup(
         # source tree -- the alternative was literal fallback constants, and
         # those went stale (20.0 N thrust survived in three files after the
         # bench measured 17.79 N).
-        ('share/' + package_name, ['tvc_control/vehicle_params.yaml']),
+        ('share/' + package_name, ['tvc_control/vehicle_params.yaml',
+                                  'tvc_control/control_gains.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

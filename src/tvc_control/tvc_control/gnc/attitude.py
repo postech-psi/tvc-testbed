@@ -75,13 +75,31 @@ class AttitudeController:
 
         # Freeze the lateral integrators when the gimbal is on its stops, and
         # the axial one when tau_P is capped -- see PID.update / Allocation.
-        tau_x = self.pid_roll_rate.update(roll_rate_des - omega[0], dt,
-                                          freeze=sat.gimbal_saturated)
-        tau_y = self.pid_pitch_rate.update(pitch_rate_des - omega[1], dt,
-                                           freeze=sat.gimbal_saturated)
-        tau_z = self.pid_axial_rate.update(axial_rate_des - omega[2], dt,
-                                           freeze=sat.axial_saturated)
-        return (tau_x, tau_y, tau_z)
+        # The rate loop outputs ANGULAR ACCELERATION, not torque; inertia is
+        # applied here and nowhere else. Two reasons this matters:
+        #
+        #   Gains become comparable. sim/hover.py computed tau = I*KP_RATE*err
+        #   and physics.py computed tau = kp_rate*err, so the two "rate gains"
+        #   differed by a factor of I and looked 25x apart when they were not
+        #   describing the same quantity at all. In these units they can be put
+        #   side by side, which is what makes adopting the flown set possible.
+        #
+        #   The axial gain stops rotting. kp_rate_axial was a hand-scaled copy
+        #   of kp_rate carrying an Iz/Ix factor baked in, so re-measuring Iz
+        #   would have silently changed the loop bandwidth. Now the scaling is
+        #   explicit and follows the measurement.
+        #
+        # The DIAGONAL inertia is used for this mapping even though the plant
+        # integrates the full tensor: this is gain scheduling, not dynamics, and
+        # a controller that inverts its own model's cross terms is claiming a
+        # model accuracy the mass budget does not support.
+        alpha_x = self.pid_roll_rate.update(roll_rate_des - omega[0], dt,
+                                            freeze=sat.gimbal_saturated)
+        alpha_y = self.pid_pitch_rate.update(pitch_rate_des - omega[1], dt,
+                                             freeze=sat.gimbal_saturated)
+        alpha_z = self.pid_axial_rate.update(axial_rate_des - omega[2], dt,
+                                             freeze=sat.axial_saturated)
+        return (self.p.Ix * alpha_x, self.p.Iy * alpha_y, self.p.Iz * alpha_z)
 
     def update(self, q, omega, roll_des, pitch_des, T_des, dt, axial_des=0.0):
         """Backward-compatible entry point: returns the gimbal command only.

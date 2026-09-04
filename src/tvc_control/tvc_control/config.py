@@ -191,17 +191,44 @@ def load_vehicle_params(path=None):
     )
 
 
-def load_gains(profile="default", path=None):
-    """Build ControlGains. Placeholder until control_gains.yaml lands.
+_GAINS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "control_gains.yaml")
 
-    Returns the dataclass defaults for now; the profile argument exists so call
-    sites are already written against the eventual signature.
+
+def load_gains(profile=None, path=None):
+    """Build ControlGains from a named profile in control_gains.yaml.
+
+    profile=None takes the file's own default_profile, so switching the whole
+    project between gain sets is a one-line edit in one file rather than a
+    search for constructor call sites.
     """
     from .gnc.params import ControlGains
-    if profile != "default":
-        raise ValueError("gain profiles are not implemented yet (asked for %r)"
-                         % profile)
-    return ControlGains()
+
+    path = path or _GAINS_PATH
+    if not os.path.isfile(path):
+        raise FileNotFoundError("control_gains.yaml not found at %s" % path)
+    with open(path, encoding="utf-8") as f:
+        d = yaml.safe_load(f)
+
+    name = profile or d.get("default_profile")
+    profiles = d.get("profiles") or {}
+    if name not in profiles:
+        raise ValueError("unknown gain profile %r; have %s"
+                         % (name, sorted(profiles)))
+    p = profiles[name]
+    att, ax = p["attitude"], p["axial"]
+    alt, pos = p["altitude"], p["position"]
+    return ControlGains(
+        kp_angle=att["kp_angle"], kp_rate=att["kp_rate"],
+        ki_rate=att["ki_rate"], kd_rate=att["kd_rate"], i_limit=att["i_limit"],
+        kp_angle_axial=ax["kp_angle"], kp_rate_axial=ax["kp_rate"],
+        ki_rate_axial=ax["ki_rate"], kd_rate_axial=ax["kd_rate"],
+        i_limit_axial=ax["i_limit"],
+        kp_alt=alt["kp_alt"], kp_vz=alt["kp_vz"], ki_vz=alt["ki_vz"],
+        kd_vz=alt["kd_vz"], i_limit_vz=alt["i_limit_vz"], vz_max=alt["vz_max"],
+        kp_pos=pos["kp_pos"], kd_pos=pos["kd_pos"],
+        max_tilt_deg=pos["max_tilt_deg"],
+    )
 
 
 if __name__ == "__main__":

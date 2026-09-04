@@ -142,18 +142,26 @@ class ControlGains:
     validated; reconciling the two is a later, deliberate commit.
     """
 
+    # UNITS: the rate loop outputs ANGULAR ACCELERATION [rad/s^2], not torque.
+    # Inertia is applied once, in AttitudeController. The values below are the
+    # historical torque-unit gains divided by their axis inertia, so behaviour
+    # is unchanged; what changes is that they can now be compared against
+    # sim/hover.py's set, which was always written this way.
     kp_angle: float = 4.0      # attitude loop: angle error -> rate setpoint
-    kp_rate: float = 0.02      # rate loop: rate error -> torque
-    ki_rate: float = 0.002
-    kd_rate: float = 0.004
-    i_limit: float = 0.5       # integrator clamp (anti-windup)
+    kp_rate: float = 0.8843296781     # rate loop: rate error -> angular accel
+    ki_rate: float = 0.0884329678
+    kd_rate: float = 0.1768659356
+    i_limit: float = 22.1082419526     # integrator clamp (anti-windup), rad/s^2
 
-    # --- axial channel (body z / tau_P), scaled by Iz/Ix ~= 1/11.6 ---
+    # --- axial channel (body z / tau_P) ---
+    # No longer carries a hand-baked Iz/Ix factor: the inertia scaling is
+    # explicit in the controller, so re-measuring Iz changes the torque these
+    # produce without silently changing the loop bandwidth.
     kp_angle_axial: float = 4.0
-    kp_rate_axial: float = 0.0018
-    ki_rate_axial: float = 0.00018
-    kd_rate_axial: float = 0.00035
-    i_limit_axial: float = 0.05
+    kp_rate_axial: float = 0.9197751661
+    ki_rate_axial: float = 0.0919775166
+    kd_rate_axial: float = 0.1788451712
+    i_limit_axial: float = 25.5493101686
 
     # --- altitude cascade: outer P (m -> m/s), inner PID (m/s -> m/s^2) ---
     kp_alt: float = 1.5        # m/s of climb demand per m of altitude error
