@@ -10,10 +10,11 @@ from dataclasses import dataclass, field
 
 from ..gnc.params import VehicleParams, ControlGains
 from ..gnc.mathx import quat_normalize, quat_to_euler, euler_to_quat
-from ..gnc.attitude import AttitudeController
-from ..gnc.altitude import AltitudeController
+from ..gnc.types import ControlMode, Setpoint
+from ..gnc.controller import TvcController
 from ..plant.rigidbody import dynamics
 from ..plant.actuators import GimbalActuator
+from ..plant.sensors import PerfectEstimator
 
 
 @dataclass
@@ -45,6 +46,13 @@ class SimConfig:
     init_z: float = 0.0             # m
     tilt_compensation: bool = True  # 1/cos(theta) feedforward on the thrust cmd
 
+    # Position hold, off by default so every pre-existing run is unchanged.
+    # Explicitly a mode rather than inferred from a non-zero target: "hold the
+    # origin" and "do not run the position loop" are different commands.
+    position_hold: bool = False
+    x_des: float = 0.0              # m, inertial
+    y_des: float = 0.0
+
 
 def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     """
@@ -58,10 +66,12 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     pos, thrust_N, tau_p_Nm, motor_N, plus scalar metrics under 'metrics'.
     """
     gimbal = GimbalActuator(vparams)
-    controller = AttitudeController(vparams, gains)
-    alt_ctl = (AltitudeController(vparams, gains,
-                                 tilt_compensation=cfg.tilt_compensation)
-               if cfg.altitude_hold else None)
+    estimator = PerfectEstimator()
+    controller = TvcController(vparams, gains, ControlMode(
+        altitude_hold=cfg.altitude_hold,
+        position_hold=cfg.position_hold,
+        tilt_compensation=cfg.tilt_compensation,
+    ))
 
     roll_des = np.deg2rad(cfg.roll_des_deg)
     pitch_des = np.deg2rad(cfg.pitch_des_deg)
@@ -89,29 +99,28 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     motor_arr = np.zeros((n_steps, 2))
     sat_arr = np.zeros((n_steps, 3), dtype=bool)   # gimbal, axial, thrust
 
+    setpoint = Setpoint(roll_des=roll_des, pitch_des=pitch_des,
+                        axial_des=axial_des, z_des=cfg.z_des,
+                        pos_des=(cfg.x_des, cfg.y_des, cfg.z_des))
+
     t = 0.0
     delta = np.zeros(2)
     for k in range(n_steps):
         q = quat_normalize(x[6:10])
         omega = x[10:13]
 
-        # Altitude first: the allocator needs T before it can size the axial
-        # headroom or the gimbal angles (§4b priority). Compensation uses the
-        # gimbal position actually reached, not the one just commanded.
-        if alt_ctl is not None:
-            T_cmd = alt_ctl.update(x[2], x[5], q, delta, cfg.z_des, cfg.dt_ctrl)
-            # The altitude loop clips to [T_min, T_max] itself, so by the time
-            # allocate() sees the command it is already in range and its own
-            # thrust_saturated flag can never fire. Carry the upstream flag
-            # forward or the logs claim the vehicle never hit its thrust limit.
-            alt_thrust_sat = alt_ctl.thrust_saturated
-        else:
-            T_cmd = T_hover
-            alt_thrust_sat = False
+        # Seam A: the controller is handed an ESTIMATE, never the plant's state,
+        # even though today's estimator is the identity. See plant/sensors.py.
+        est = estimator.estimate(x[0:3], x[3:6], q, omega, t)
 
-        delta_cmd = controller.update(q, omega, roll_des, pitch_des,
-                                      T_cmd, cfg.dt_ctrl, axial_des=axial_des)
-        alloc = controller.last_alloc
+        # gimbal_rad is the ACHIEVED deflection. A simulation knows it; the
+        # vehicle does not (the servos give no position feedback), so flight
+        # code falls back to its own last command. Passing it here keeps this
+        # harness bit-identical to its pre-facade behaviour; the difference
+        # between the two is one servo lag and is worth measuring later.
+        cmd = controller.update(est, setpoint, cfg.dt_ctrl, gimbal_rad=delta)
+        alloc = controller.attitude.last_alloc
+        delta_cmd = np.array([cmd.gimbal_delta1_rad, cmd.gimbal_delta2_rad])
         delta = gimbal.update(delta_cmd, cfg.dt_ctrl)
 
         sol = solve_ivp(dynamics, [t, t + cfg.dt_ctrl], x,
@@ -132,8 +141,7 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         thrust_arr[k] = alloc.T_cmd
         tau_p_arr[k] = alloc.tau_p
         motor_arr[k] = (alloc.T1, alloc.T2)
-        sat_arr[k] = (alloc.gimbal_saturated, alloc.axial_saturated,
-                      alloc.thrust_saturated or alt_thrust_sat)
+        sat_arr[k] = (cmd.sat_gimbal, cmd.sat_axial, cmd.sat_thrust)
 
     metrics = _compute_metrics(t_arr, euler_arr, delta_arr, cfg,
                                pos_arr=pos_arr, tau_p_arr=tau_p_arr,

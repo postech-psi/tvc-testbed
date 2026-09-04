@@ -206,3 +206,15 @@ class ControlGains:
     kd_vz: float = 0.2
     i_limit_vz: float = 4.0    # m/s^2 of integral authority
     vz_max: float = 2.0        # m/s, climb/descent rate limit
+
+    # --- position hold: horizontal error -> commanded tilt (from sim/hover.py) ---
+    # Deliberately ~10x slower than the attitude loop; see gnc/position.py for
+    # why closing that gap produces a coning limit cycle rather than a faster
+    # response.
+    kp_pos: float = 0.10       # rad of tilt per m of position error
+    kd_pos: float = 0.20       # rad per m/s
+    max_tilt_deg: float = 8.0
+
+    @property
+    def max_tilt(self):
+        return np.deg2rad(self.max_tilt_deg)

@@ -31,6 +31,12 @@ class Allocation:
     T_cmd: float = 0.0
     T1: float = 0.0                 # per-rotor thrust, N (upper prop)
     T2: float = 0.0                 # per-rotor thrust, N (lower prop)
+    # Normalized [0,1] motor commands against the measured surface's own
+    # pwm_min/pwm_max. THESE are what a HAL sends; T1/T2 are a derived split
+    # kept for logging and for Gazebo's two-rotor plugin. Zero when no surface
+    # is loaded (the analytic fallback has no command coordinate to normalize).
+    u_a: float = 0.0
+    u_b: float = 0.0
     gimbal_saturated: bool = False
     axial_saturated: bool = False
     thrust_saturated: bool = False
@@ -94,6 +100,20 @@ def mix_motors(T, tau_p, params: VehicleParams):
     (a 2-D Newton solve or a precomputed inverse lookup); nothing above it
     changes, because everything above speaks in (T, tau_P).
     """
+    return motor_setpoint(T, tau_p, params)[2:]
+
+
+def motor_setpoint(T, tau_p, params: VehicleParams):
+    """(T, tau_P) -> (u_a, u_b, T1, T2).
+
+    u_a/u_b are the NORMALIZED [0,1] motor commands -- the actual actuator
+    output, and the coordinate the bench surface is defined on. T1/T2 are the
+    per-prop thrust split derived from them.
+
+    mix_motors() returns only the thrusts and exists because callers predate
+    this split; new code should ask for the commands, because throwing them away
+    and re-deriving them later is what forces a second inverse solve.
+    """
     if params.surface is not None:
         # Measured path: solve the real surface for the two PWM commands, then
         # report what those commands actually produce per prop. The split is no
@@ -101,6 +121,9 @@ def mix_motors(T, tau_p, params: VehicleParams):
         # unequal (dQ/db = +0.087 against dQ/da = -0.0795), which is the wake
         # asymmetry, not fit noise.
         pwm_a, pwm_b, T_ach, _ = params.surface.inverse(T, tau_p)
+        span = params.surface.pwm_max - params.surface.pwm_min
+        u_a = (pwm_a - params.surface.pwm_min) / span
+        u_b = (pwm_b - params.surface.pwm_min) / span
         # Per-prop thrust is not separately measured (the load cell reads the
         # pair), so split the ACHIEVED total by the commands' share of it. This
         # is only used for logging and for Gazebo's two-rotor plugin; nothing in
@@ -108,12 +131,14 @@ def mix_motors(T, tau_p, params: VehicleParams):
         share = (pwm_b - params.surface.pwm_min) + 1e-9
         share_a = (pwm_a - params.surface.pwm_min) + 1e-9
         f = share_a / (share_a + share)
-        return f * T_ach, (1.0 - f) * T_ach
+        return u_a, u_b, f * T_ach, (1.0 - f) * T_ach
 
     T = float(np.clip(T, 0.0, params.T_max))
     split_max = max(min(T, params.T_max - T), 0.0)
     split = float(np.clip(tau_p / params.k_moment, -split_max, split_max))
-    return 0.5 * (T - split), 0.5 * (T + split)
+    # No surface means no command coordinate to normalize against; the analytic
+    # fallback speaks only in thrust. Reported as 0 rather than guessed.
+    return 0.0, 0.0, 0.5 * (T - split), 0.5 * (T + split)
 
 
 def _lateral_gimbal(M_xy, T, tau_p, params: VehicleParams, iters=3):
@@ -206,8 +231,9 @@ def allocate(M_des, T_des, params: VehicleParams):
         delta = delta * scale
     delta = np.clip(delta, lo, hi)
 
-    T1, T2 = mix_motors(T_cmd, tau_p, params)
+    u_a, u_b, T1, T2 = motor_setpoint(T_cmd, tau_p, params)
 
     return Allocation(delta_cmd=delta, tau_p=tau_p, T_cmd=T_cmd, T1=T1, T2=T2,
+                      u_a=u_a, u_b=u_b,
                       gimbal_saturated=gimbal_sat, axial_saturated=axial_sat,
                       thrust_saturated=thrust_sat)
