@@ -27,7 +27,7 @@ if __name__ == "__main__":
     vp = load_vehicle_params()
     surf = vp.surface
     print("measured surface: thrust %.2f .. %.2f N" % surf.thrust_limits())
-    print("  axial torque available vs thrust:")
+    print("  roll torque available vs thrust:")
     for frac in (0.50, 0.65, 0.75, 0.85, 0.95):
         T = surf.thrust_max * frac
         lo, hi = surf.torque_limits_at(T)

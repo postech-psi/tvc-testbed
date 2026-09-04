@@ -16,7 +16,7 @@
 # Before adopting anything here, read docs/CREDIBILITY.md: only one of these
 # profiles has ever been near a plant.
 
-axis_convention: legacy_quadcopter
+axis_convention: rocket_v2
 
 profiles:
 
@@ -36,10 +36,10 @@ profiles:
   # ---------------------------------------------------------------------------
   flight_validated:
     attitude: {kp_angle: 5.0, kp_rate: 22.0, ki_rate: 0.0, kd_rate: 0.0, i_limit: 50.0}
-    # hover.py's yaw channel: KP_YAW = 2.0 rad/s per rad, KD_YAW = 0.45 N.m per
+    # hover.py's thrust-axis channel (it called this yaw): KP_YAW = 2.0 rad/s per rad, KD_YAW = 0.45 N.m per
     # rad/s -> 229.9 rad/s^2 per rad/s once the Iz = 0.001957 kg.m^2 is taken out.
     # The large number is not aggression, it is a small inertia.
-    axial:    {kp_angle: 2.0, kp_rate: 229.9438, ki_rate: 0.0, kd_rate: 0.0, i_limit: 200.0}
+    roll:    {kp_angle: 2.0, kp_rate: 229.9438, ki_rate: 0.0, kd_rate: 0.0, i_limit: 200.0}
     altitude: {kp_alt: 4.0, kp_vz: 3.0, ki_vz: 0.0, kd_vz: 0.0, i_limit_vz: 4.0, vz_max: 2.0}
     position: {kp_pos: 0.10, kd_pos: 0.20, max_tilt_deg: 8.0}
 
@@ -54,13 +54,13 @@ profiles:
   # ---------------------------------------------------------------------------
   analytic_legacy:
     attitude: {kp_angle: 4.0, kp_rate: 0.8843296781, ki_rate: 0.0884329678, kd_rate: 0.1768659356, i_limit: 22.1082419526}
-    axial:    {kp_angle: 4.0, kp_rate: 0.9197751661, ki_rate: 0.0919775166, kd_rate: 0.1788451712, i_limit: 25.5493101686}
+    roll:    {kp_angle: 4.0, kp_rate: 0.9197751661, ki_rate: 0.0919775166, kd_rate: 0.1788451712, i_limit: 25.5493101686}
     altitude: {kp_alt: 1.5, kp_vz: 4.0, ki_vz: 1.0, kd_vz: 0.2, i_limit_vz: 4.0, vz_max: 2.0}
     position: {kp_pos: 0.10, kd_pos: 0.20, max_tilt_deg: 8.0}
 
 # MEASURED, not assumed. The worry was that 30 ms of modelled gimbal deadtime --
 # which sim/hover.py does not model -- would destabilise the flown set. It does
-# not: A/B over lateral upset, axial upset and a ground climb shows no
+# not: A/B over lateral upset, roll upset and a ground climb shows no
 # divergence and essentially no difference between 30 ms and 0 ms. It also halves
 # the climb transient the analytic set suffers (66.4 -> 36.9 deg peak).
 #

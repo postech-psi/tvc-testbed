@@ -87,7 +87,7 @@ workable VTVL margin. Hover sits at ~81% of max rotor speed
 That figure comes from the **2026-07-20** runs — the only ones reaching full
 throttle (PWM 2000); every later session stops at 1850 µs. They drove both
 rotors from one signal, i.e. the *balanced* case, which is the right basis:
-unequal rotors make net yaw torque, and yaw is the one axis the gimbal cannot
+unequal rotors make net roll torque, and roll is the one axis the gimbal cannot
 trim. Three runs gave 18.07 / 19.34 / 19.96 N; 20.0 N is the optimistic end.
 
 Corroborated independently: the 07-24 coax data, voltage-normalized to a fresh
@@ -103,7 +103,7 @@ in [../docs/MASS_BUDGET.md](../docs/MASS_BUDGET.md).
 state estimation, arming, failsafes, and logging while the attitude loop runs in
 ROS2. This is a deliberate choice, not a limitation to work around: PX4's stock
 control allocator assumes control torque comes from thrust *differences* across
-fixed-direction rotors, but this vehicle gets pitch/roll from *tilting one
+fixed-direction rotors, but this vehicle gets yaw/pitch from *tilting one
 thrust vector*, and its two rotors are nearly co-located. No combination of
 `CA_*` geometry parameters expresses that.
 
@@ -131,8 +131,8 @@ bash sim/run_hover.sh --duration 20 --record sim/hover.gif    # + video
 python3 sim/plot_flight.py sim/flight_log.csv                 # + plots
 ```
 
-Result: spawns tilted (roll +10 deg, pitch -7 deg), recovers level in ~2 s,
-then holds **2.00 m with 0.00 m drift and 0.0 deg tilt**, yaw flat.
+Result: spawns tilted (pitch +10 deg, yaw -7 deg), recovers level in ~2 s,
+then holds **2.00 m with 0.00 m drift and 0.0 deg tilt**, roll flat.
 
 `run_hover.sh` starts the simulator **paused**, attaches the controller, and
 only then unpauses. That is not cosmetic: the vehicle free-falls from its 2 m
@@ -158,8 +158,8 @@ Recorded because each looked like a control problem and was not:
 - **A perfectly upright spawn tests nothing.** The vehicle sits in equilibrium,
   the gimbal stays at exactly 0, and the plot looks flawless while proving
   nothing. The flight world is deliberately tilted.
-- **Sign errors dominate.** Both the position loop and the yaw differential
-  were inverted at first; each turned its loop into positive feedback (yaw
+- **Sign errors dominate.** Both the position loop and the roll differential
+  were inverted at first; each turned its loop into positive feedback (roll
   reached -44 rad/s). Both signs are derived in comments where they are used.
 
 ### Still open

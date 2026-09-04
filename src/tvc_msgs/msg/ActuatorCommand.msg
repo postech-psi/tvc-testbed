@@ -1,7 +1,7 @@
 # Everything the flight code decided in one control step, in one message.
 #
 # Replaces GimbalCommand, which carried only the two gimbal angles. The thrust
-# and axial-torque commands were computed and then DISCARDED by controller_node,
+# and roll-torque commands were computed and then DISCARDED by controller_node,
 # so the ROS2 path had no altitude loop and no roll authority at all -- both
 # rotors were held at the same speed by the bridge.
 #
@@ -16,16 +16,16 @@
 
 std_msgs/Header header
 
-uint8 AXIS_CONVENTION_LEGACY_QUADCOPTER = 1
+uint8 AXIS_CONVENTION_ROCKET_V2 = 1
 uint8 AXIS_CONVENTION_ROCKET_V2 = 2
 uint8 axis_convention
 
 # --- gimbal, radians ---------------------------------------------------------
-# delta1 is the inner ring (pitch plane), delta2 the outer ring (roll plane).
+# delta1 is the inner ring (yaw plane), delta2 the outer ring (pitch plane).
 # Named by index rather than by axis until the rename lands, so the field names
 # do not have to change meaning when it does.
-float64 gimbal_delta1_rad
-float64 gimbal_delta2_rad
+float64 gimbal_inner_rad
+float64 gimbal_outer_rad
 
 # --- motors, normalized [0, 1] ----------------------------------------------
 # Against the measured surface's own pwm_min/pwm_max, the coordinate the bench
@@ -49,5 +49,5 @@ float64 rotor_b_speed_rads
 
 # --- saturation, for the subscriber's own anti-windup ------------------------
 bool sat_gimbal
-bool sat_axial
+bool sat_roll
 bool sat_thrust

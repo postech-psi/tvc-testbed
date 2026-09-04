@@ -24,40 +24,40 @@ vehicles wobble.
 
 CONTROL MAPPING (derived, not guessed)
 --------------------------------------
-Joint order is roll(x) then pitch(y), rotors on the inner ring, so thrust in
+Joint order is pitch(x) then yaw(y), rotors on the inner ring, so thrust in
 the body frame is
 
-    F_body = T * [ sin(dp), -sin(dr)*cos(dp), cos(dr)*cos(dp) ]
+    F_body = T * [ sin(d_inner), -sin(d_outer)*cos(d_inner), cos(d_outer)*cos(d_inner) ]
 
 with the thrust point at r = (0, 0, -L) from the CG. Then tau = r x F gives
 
-    tau_x = -L*T*sin(dr)*cos(dp) + tau_P*sin(dp)
-    tau_y = -L*T*sin(dp)         - tau_P*sin(dr)*cos(dp)
-    tau_z =                        tau_P*cos(dp)*cos(dr)
+    tau_x = -L*T*sin(d_outer)*cos(d_inner) + tau_P*sin(d_inner)
+    tau_y = -L*T*sin(d_inner)         - tau_P*sin(d_outer)*cos(d_inner)
+    tau_roll =                        tau_P*cos(d_inner)*cos(d_outer)
 
 where tau_P is the net prop reaction torque (below). The gimbal still has NO
-authority about z -- every tau_z term carries tau_P -- but tau_P is not absent
+authority about z -- every tau_roll term carries tau_P -- but tau_P is not absent
 from the lateral axes, because the props ride on the gimbal and their reaction
 torque tilts with the thrust. Inverting the lateral pair therefore needs the
 full 2x2, whose small-angle form is
 
-    [dp, dr] = [[tau_P, -L*T], [-L*T, -tau_P]] [tau_x, tau_y] / (tau_P^2 + (L*T)^2)
+    [d_inner, d_outer] = [[tau_P, -L*T], [-L*T, -tau_P]] [tau_x, tau_y] / (tau_P^2 + (L*T)^2)
 
-and which reduces to the old dp = -tau_y/(L*T), dr = -tau_x/(L*T) exactly when
-tau_P = 0 -- i.e. the previous mapping was the no-yaw-demand special case.
+and which reduces to the old d_inner = -tau_y/(L*T), d_outer = -tau_x/(L*T) exactly when
+tau_P = 0 -- i.e. the previous mapping was the no-roll-demand special case.
 
-Yaw IS controlled, and has to be. Its only authority is a differential
+Roll IS controlled, and has to be. Its only authority is a differential
 between the counter-rotating rotors:
 
-    tau_z = momentConstant * (T_b - T_a)
+    tau_roll = momentConstant * (T_b - T_a)
 
 (B minus A -- the docstring had this backwards while the code below had it
 right, which is the kind of disagreement tests/test_gazebo_mapping.py now
 asserts away.) It trades directly against total thrust. It cannot be skipped, though: with the
-roll axis deflected by dr, the pitch servo's axis tilts out of the body
-horizontal plane and leaks tau*sin(dr) of its reaction torque into yaw. With
-nothing opposing it the vehicle spins up to several rad/s, and since roll and
-pitch are BODY-frame, a steady world-frame tilt then reads as a large
+pitch axis deflected by d_outer, the yaw servo's axis tilts out of the body
+horizontal plane and leaks tau*sin(d_outer) of its reaction torque into roll. With
+nothing opposing it the vehicle spins up to several rad/s, and since pitch and
+yaw are BODY-frame, a steady world-frame tilt then reads as a large
 oscillation that is really just the frame rotating underneath it.
 
 Usage (with `gz sim -s -r sim/worlds/tvc.sdf` already running):
@@ -83,7 +83,7 @@ from tvc_control.hal.gazebo import rotor_speeds
 # that file, not these lines. See docs/MASS_BUDGET.md for the provenance. ---
 _VP = _load_vehicle()
 MASS_KG = _VP.mass
-INERTIA_XY = _VP.Ix           # kg*m^2, roll/pitch (Ix ~= Iy for this airframe)
+INERTIA_XY = _VP.Ix           # kg*m^2, pitch/yaw (Ix ~= Iy for this airframe)
 L_ARM = _VP.L                 # m, control lever arm (mode set in the YAML)
 G = _VP.g
 WEIGHT_N = _VP.weight_n
@@ -109,41 +109,41 @@ KD_ALT = 3.0                 # N per m/s
 # Position must be MUCH slower than attitude or the two fight: at Kp=0.22 /
 # Kd=0.35 the loops were only 6.5x apart and the vehicle settled into a
 # steady +/-9 deg coning limit cycle at the attitude natural frequency
-# (roll and pitch 90 deg out of phase). 0.10/0.20 puts them ~10x apart.
+# (pitch and yaw 90 deg out of phase). 0.10/0.20 puts them ~10x apart.
 KP_POS = 0.10                # rad of tilt per m of position error
 KD_POS = 0.20                # rad per m/s
 MAX_TILT = math.radians(8.0)
 
-# Yaw: weak authority, so gains are modest and the split is capped. Holding
-# yaw near zero matters more for keeping the body frame aligned with the
+# Roll: weak authority, so gains are modest and the split is capped. Holding
+# roll near zero matters more for keeping the body frame aligned with the
 # world frame than for pointing.
-KP_YAW = 2.0                 # rad/s of yaw rate demand per rad of yaw error
+KP_YAW = 2.0                 # rad/s of roll rate demand per rad of roll error
 KD_YAW = 0.45                # N.m per rad/s
 # The plugin's own constant, because this controller allocates directly into
 # Gazebo's model. It is no longer a physical drag-torque ratio: since the ROS
 # path inverts the plugin algebra to reproduce the measured surface, this is a
 # SOLVER SCALING constant (see tvc_control/hal/gazebo.py) and it moved 0.016 ->
 # 0.04 to make that inversion feasible across the envelope. The loop gain here
-# is unaffected -- tau_z is commanded in N.m and split = -tau_z/c inverts
+# is unaffected -- tau_roll is commanded in N.m and split = -tau_roll/c inverts
 # exactly -- but the reachable torque grows 2.5x, which is the point.
 MOMENT_CONSTANT = _VP.raw["rotors"]["moment_constant"]   # m, from the YAML/SDF
 MAX_THRUST_SPLIT = 4.0       # N between the two rotors
 
 
 def quat_to_euler(w, x, y, z):
-    """ZYX yaw-pitch-roll. Returns (roll, pitch, yaw) in radians."""
+    """ZYX roll-yaw-pitch. Returns (pitch, yaw, roll) in radians."""
     sinr_cosp = 2 * (w * x + y * z)
     cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = math.atan2(sinr_cosp, cosr_cosp)
+    pitch = math.atan2(sinr_cosp, cosr_cosp)
 
     sinp = 2 * (w * y - z * x)
-    # asin domain guard: near +/-90 deg pitch, float error can push |sinp|>1
-    pitch = math.copysign(math.pi / 2, sinp) if abs(sinp) >= 1 else math.asin(sinp)
+    # asin domain guard: near +/-90 deg yaw, float error can push |sinp|>1
+    yaw = math.copysign(math.pi / 2, sinp) if abs(sinp) >= 1 else math.asin(sinp)
 
     siny_cosp = 2 * (w * z + x * y)
     cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = math.atan2(siny_cosp, cosy_cosp)
-    return roll, pitch, yaw
+    roll = math.atan2(siny_cosp, cosy_cosp)
+    return pitch, yaw, roll
 
 
 def clamp(v, lo, hi):
@@ -167,8 +167,8 @@ class Hover:
         self.node = Node()
         self.pub_motor = self.node.advertise(
             "/tvc_vehicle/command/motor_speed", Actuators)
-        self.pub_pitch = self.node.advertise("/tvc_vehicle/gimbal_pitch", Double)
-        self.pub_roll = self.node.advertise("/tvc_vehicle/gimbal_roll", Double)
+        self.pub_inner = self.node.advertise("/tvc_vehicle/gimbal_inner_cmd", Double)
+        self.pub_outer = self.node.advertise("/tvc_vehicle/gimbal_outer_cmd", Double)
 
         if not self.node.subscribe(Odometry, "/model/tvc_vehicle/odometry",
                                    self.on_odom):
@@ -178,11 +178,11 @@ class Hover:
         p = msg.pose.position
         q = msg.pose.orientation
         tw = msg.twist
-        roll, pitch, yaw = quat_to_euler(q.w, q.x, q.y, q.z)
+        pitch, yaw, roll = quat_to_euler(q.w, q.x, q.y, q.z)
         self.state = {
             "x": p.x, "y": p.y, "z": p.z,
             "vx": tw.linear.x, "vy": tw.linear.y, "vz": tw.linear.z,
-            "roll": roll, "pitch": pitch, "yaw": yaw,
+            "pitch": pitch, "yaw": yaw, "roll": roll,
             "wx": tw.angular.x, "wy": tw.angular.y, "wz": tw.angular.z,
         }
 
@@ -201,35 +201,35 @@ class Hover:
         thrust = clamp(thrust, 0.5, THRUST_AT_MAX)
 
         # --- position -> desired tilt ---
-        # Rotating body +z into the world: +pitch tips thrust toward +x, and
-        # +roll tips it toward -y. So to come BACK to the origin the demands
+        # Rotating body +z into the world: +yaw tips thrust toward +x, and
+        # +pitch tips it toward -y. So to come BACK to the origin the demands
         # carry opposite signs to each other:
-        #     x > 0  needs -x force -> negative pitch
-        #     y > 0  needs -y force -> positive roll
+        #     x > 0  needs -x force -> negative yaw
+        #     y > 0  needs -y force -> positive pitch
         # Getting either backwards turns this loop into positive feedback and
         # the vehicle accelerates away instead of returning.
-        pitch_des = clamp(-(KP_POS * s["x"] + KD_POS * s["vx"]),
+        yaw_des = clamp(-(KP_POS * s["x"] + KD_POS * s["vx"]),
                           -MAX_TILT, MAX_TILT)
-        roll_des = clamp(+(KP_POS * s["y"] + KD_POS * s["vy"]),
+        pitch_des = clamp(+(KP_POS * s["y"] + KD_POS * s["vy"]),
                          -MAX_TILT, MAX_TILT)
 
         # --- attitude cascade: angle -> rate -> torque ---
-        wx_des = KP_ANGLE * (roll_des - s["roll"])
-        wy_des = KP_ANGLE * (pitch_des - s["pitch"])
+        wx_des = KP_ANGLE * (pitch_des - s["pitch"])
+        wy_des = KP_ANGLE * (yaw_des - s["yaw"])
         tau_x = INERTIA_XY * KP_RATE * (wx_des - s["wx"])
         tau_y = INERTIA_XY * KP_RATE * (wy_des - s["wy"])
 
-        # --- yaw -> rotor thrust differential (the only yaw authority) ---
+        # --- roll -> rotor thrust differential (the only roll authority) ---
         # This is solved BEFORE the gimbal, not after, because the gimbal
         # solution depends on it: the props sit on the gimbal, so their
         # reaction torque tilts with the thrust and leaks into the lateral
-        # axes. Doing yaw second means the gimbal is solved against a stale
+        # axes. Doing roll second means the gimbal is solved against a stale
         # (zero) reaction torque.
-        wz_des = KP_YAW * (0.0 - s["yaw"])
-        tau_z = KD_YAW * (wz_des - s["wz"])
+        wz_des = KP_YAW * (0.0 - s["roll"])
+        tau_roll = KD_YAW * (wz_des - s["wz"])
         # NEGATIVE: rotor A spins CCW so its drag reaction on the body is -z,
-        # and B's is +z. A positive yaw torque therefore needs MORE thrust on
-        # B, i.e. a negative split. Getting this backwards turns every yaw
+        # and B's is +z. A positive roll torque therefore needs MORE thrust on
+        # B, i.e. a negative split. Getting this backwards turns every roll
         # disturbance into positive feedback (measured: 0 -> -44 rad/s in 2 s).
         # The split also has to fit the per-rotor limits: with t_a=(T+s)/2 and
         # t_b=(T-s)/2 both inside [0, T_max/2], |s| <= min(T, T_max - T). At
@@ -237,15 +237,15 @@ class Hover:
         # near full throttle it collapses to zero -- which the flat cap missed.
         split_max = min(MAX_THRUST_SPLIT,
                         max(min(thrust, THRUST_AT_MAX - thrust), 0.0))
-        split = clamp(-tau_z / MOMENT_CONSTANT, -split_max, split_max)
+        split = clamp(-tau_roll / MOMENT_CONSTANT, -split_max, split_max)
 
-        # Their sum still equals the commanded thrust, so yaw authority costs
+        # Their sum still equals the commanded thrust, so roll authority costs
         # nothing in altitude -- only in headroom.
         t_a = clamp(0.5 * (thrust + split), 0.0, THRUST_AT_MAX)
         t_b = clamp(0.5 * (thrust - split), 0.0, THRUST_AT_MAX)
 
         # --- torque -> gimbal deflection (inverse of the mapping above) ---
-        # Use the REALIZED reaction torque, not the demanded tau_z: after the
+        # Use the REALIZED reaction torque, not the demanded tau_roll: after the
         # split is clamped the two differ, and allocating against a torque the
         # props are not actually producing just re-introduces the error the
         # cross term was added to remove.
@@ -253,17 +253,17 @@ class Hover:
         lt = max(L_ARM * thrust, 1e-3)
 
         # Small-angle inverse of
-        #     tau_x = -lt*sin(dr)*cos(dp) + tau_p*sin(dp)
-        #     tau_y = -lt*sin(dp)         - tau_p*sin(dr)*cos(dp)
-        # i.e. [tau_x, tau_y] = [[tau_p, -lt], [-lt, -tau_p]] [dp, dr]. That
+        #     tau_x = -lt*sin(d_outer)*cos(d_inner) + tau_p*sin(d_inner)
+        #     tau_y = -lt*sin(d_inner)         - tau_p*sin(d_outer)*cos(d_inner)
+        # i.e. [tau_x, tau_y] = [[tau_p, -lt], [-lt, -tau_p]] [d_inner, d_outer]. That
         # matrix squares to (tau_p^2 + lt^2)*I, so its inverse is itself over
         # that determinant -- no solve needed, and it is never singular.
         # Dropping the tau_p terms (what this did before) aims the gimbal
-        # atan(tau_p/lt) off the intended torque axis; small at low yaw demand,
+        # atan(tau_p/lt) off the intended torque axis; small at low roll demand,
         # but that angle is measured against only GIMBAL_MAX of travel.
         det = tau_p * tau_p + lt * lt
-        dp = clamp((tau_p * tau_x - lt * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
-        dr = clamp((-lt * tau_x - tau_p * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
+        d_inner = clamp((tau_p * tau_x - lt * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
+        d_outer = clamp((-lt * tau_x - tau_p * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
 
         # --- thrust -> rotor speed ---
         # One converter, shared with the ROS2 bridge: tvc_control.hal.gazebo.
@@ -279,27 +279,27 @@ class Hover:
         act = Actuators()
         act.velocity.extend([omega_a, omega_b])
         self.pub_motor.publish(act)
-        self.pub_pitch.publish(Double(data=dp))
-        self.pub_roll.publish(Double(data=dr))
+        self.pub_inner.publish(Double(data=d_inner))
+        self.pub_outer.publish(Double(data=d_outer))
 
         if self.log_path is not None:
             if self.t0 is None:
                 self.t0 = time.time()
             self.log.append((time.time() - self.t0, s["z"], s["x"], s["y"],
-                             math.degrees(s["roll"]), math.degrees(s["pitch"]),
-                             math.degrees(s["yaw"]), s["wz"],
-                             math.degrees(dr), math.degrees(dp), thrust, split))
+                             math.degrees(s["pitch"]), math.degrees(s["yaw"]),
+                             math.degrees(s["roll"]), s["wz"],
+                             math.degrees(d_outer), math.degrees(d_inner), thrust, split))
 
         if self.verbose:
             now = time.time()
             if now - self.last_print > 1.0:
                 self.last_print = now
                 print("z=%5.2f  xy=(%+5.2f,%+5.2f)  rp=(%+6.1f,%+6.1f)  "
-                      "YAW=%+7.1f wz=%+5.2f  gimbal=(%+5.1f,%+5.1f)  T=%5.2f"
+                      "ROLL=%+7.1f wz=%+5.2f  gimbal=(%+5.1f,%+5.1f)  T=%5.2f"
                       % (s["z"], s["x"], s["y"],
-                         math.degrees(s["roll"]), math.degrees(s["pitch"]),
-                         math.degrees(s["yaw"]), s["wz"],
-                         math.degrees(dr), math.degrees(dp), thrust),
+                         math.degrees(s["pitch"]), math.degrees(s["yaw"]),
+                         math.degrees(s["roll"]), s["wz"],
+                         math.degrees(d_outer), math.degrees(d_inner), thrust),
                       flush=True)
 
 
@@ -349,7 +349,7 @@ def main():
 
     s = h.state
     err = abs(s["z"] - args.altitude)
-    tilt = math.degrees(math.hypot(s["roll"], s["pitch"]))
+    tilt = math.degrees(math.hypot(s["pitch"], s["yaw"]))
     drift = math.hypot(s["x"], s["y"])
     print("\nfinal: z=%.2f m (err %.2f)  tilt=%.1f deg  drift=%.2f m"
           % (s["z"], err, tilt, drift))
@@ -357,9 +357,9 @@ def main():
         import csv as _csv
         with open(h.log_path, "w", newline="") as f:
             w = _csv.writer(f)
-            w.writerow(["t_s", "z_m", "x_m", "y_m", "roll_deg", "pitch_deg",
-                        "yaw_deg", "wz_rads", "gimbal_roll_deg",
-                        "gimbal_pitch_deg", "thrust_N", "split_N"])
+            w.writerow(["t_s", "z_m", "x_m", "y_m", "pitch_deg", "yaw_deg",
+                        "roll_deg", "wz_rads", "gimbal_outer_deg",
+                        "gimbal_inner_deg", "thrust_N", "split_N"])
             w.writerows(h.log)
         print("wrote %s (%d samples)" % (h.log_path, len(h.log)))
 

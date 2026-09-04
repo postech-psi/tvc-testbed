@@ -5,18 +5,24 @@ and identifiers.** Every other document links here and states no axis fact of
 its own. If something contradicts this file, this file is right and the other
 thing is a bug.
 
-> ## Status: TARGET, not yet applied
+> ## Status: APPLIED
 >
-> The repository still uses the **old** (quadcopter) axis names: body x =
-> "roll", body y = "pitch", body z = "yaw". The rename to the convention below
-> happens in one atomic commit in Phase 6 of the restructure, deliberately last
-> — its acceptance criterion is that no number in `sim/golden/` moves, and that
-> criterion only exists once the test suite and the golden flight exist.
+> The rename landed as one atomic commit. Every axis-bearing identifier in the
+> code, the SDF, the message, the CSV and the ROS parameters now follows the
+> convention below.
 >
-> Until then: **new** identifiers (message fields, gains-YAML keys, the
-> `tvc_gnc` API) are born with the names below; **existing** identifiers keep
-> their old names and are converted in Phase 6. The old→new map in §6 is the
-> data file for that commit.
+> **It moved no numbers.** The acceptance criterion was that `sim/golden/`
+> survive the rename unchanged, and it did: 137 numeric values compared across
+> the pre- and post-rename baselines under the key relabelling, zero
+> differences. A pure rename that changes a number is not a rename, and without
+> a frozen baseline that claim is untestable -- which is why the baseline was
+> captured in Phase 0, before any of this work started.
+>
+> One real bug was caught in the attempt, by the test suite that was
+> deliberately written first: the initial map omitted `yaw -> roll`, leaving a
+> three-cycle two-thirds applied and producing
+> `euler_to_quat(pitch, yaw, yaw)`. That is a SyntaxError, so it failed loudly
+> -- but the same omission in a dict key or a topic name would not have.
 
 ---
 
@@ -180,8 +186,10 @@ will command what the vehicle cannot produce.
 
 ## 6. Identifier map
 
-Applied in one atomic commit (Phase 6). Left column = what is in the repo
-today.
+Applied in one atomic commit. The left column is what the repo used to say;
+it is kept because a reader hitting an old branch, an old log or an old plot
+needs to be able to translate it, and because §7's guards are written against
+these exact strings.
 
 ### Externally visible — rename together or not at all
 

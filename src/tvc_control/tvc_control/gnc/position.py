@@ -20,7 +20,7 @@ WHY THIS LOOP MUST BE MUCH SLOWER THAN THE ATTITUDE LOOP
     That is the loop that runs away. Letting it approach the attitude loop in
     bandwidth is what makes these vehicles wobble: at kp=0.22/kd=0.35 the two
     were only 6.5x apart and the vehicle settled into a +/-9 deg coning limit
-    cycle at the attitude natural frequency, roll and pitch 90 deg out of phase.
+    cycle at the attitude natural frequency, pitch and yaw 90 deg out of phase.
     The 0.10/0.20 defaults put them ~10x apart.
 """
 
@@ -32,8 +32,8 @@ def _clamp(v, lo, hi):
 class PositionController:
     """Horizontal position + velocity error -> commanded tilt, in radians.
 
-    Returns (roll_des, pitch_des) in the CURRENT repo convention: roll about
-    body x, pitch about body y. Renamed with everything else in a later commit
+    Returns (pitch_des, yaw_des) in the CURRENT repo convention: pitch about
+    body x, yaw about body y. Renamed with everything else in a later commit
     (docs/CONVENTIONS.md).
     """
 
@@ -53,13 +53,13 @@ class PositionController:
         # Sign derivation, preserved verbatim from sim/hover.py because both
         # signs were wrong once and the comment is what caught it:
         #
-        #   Rotating body +z into the world: +pitch tips thrust toward +x, and
-        #   +roll tips it toward -y. So to come BACK to the origin the demands
+        #   Rotating body +z into the world: +yaw tips thrust toward +x, and
+        #   +pitch tips it toward -y. So to come BACK to the origin the demands
         #   carry opposite signs to each other:
-        #       x > 0  needs -x force -> negative pitch
-        #       y > 0  needs -y force -> positive roll
+        #       x > 0  needs -x force -> negative yaw
+        #       y > 0  needs -y force -> positive pitch
         #   Getting either backwards turns this loop into positive feedback and
         #   the vehicle accelerates away instead of returning.
-        pitch_des = _clamp(-(g.kp_pos * ex + g.kd_pos * vel_i[0]), -lim, lim)
-        roll_des = _clamp(+(g.kp_pos * ey + g.kd_pos * vel_i[1]), -lim, lim)
-        return roll_des, pitch_des
+        yaw_des = _clamp(-(g.kp_pos * ex + g.kd_pos * vel_i[0]), -lim, lim)
+        pitch_des = _clamp(+(g.kp_pos * ey + g.kd_pos * vel_i[1]), -lim, lim)
+        return pitch_des, yaw_des

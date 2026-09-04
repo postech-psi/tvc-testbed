@@ -47,17 +47,17 @@ def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
     R = np.asarray(quat_to_rotmat(q), dtype=float)
     a_inertial = (R @ f_body) / params.m + np.array([0, 0, -params.g])
 
-    # AXIAL lever arm (gimbal pivot -> CM along body z), plus optional lateral
+    # ROLL lever arm (gimbal pivot -> CM along body z), plus optional lateral
     # misalignment disturbance terms dx, dy (normally ~0 for a balanced vehicle).
     d_cm = np.array([params.dx, params.dy, -params.L])
     # tau_P acts along the PROP AXIS, not along body z: the props are mounted on
     # the gimbal, so their reaction torque tilts with the thrust. That is what
-    # couples the axial channel into the lateral axes -- expanding gives
+    # couples the roll channel into the lateral axes -- expanding gives
     #     M_x = -T*L*sin(d2)cos(d1) + tau_P*sin(d1)
     #     M_y = -T*L*sin(d1)        - tau_P*sin(d2)cos(d1)
     #     M_z =                       tau_P*cos(d1)cos(d2)
     # Dropping the tau_P terms (as this module did before) is exact only while
-    # the axial channel is unused; it under-predicts lateral torque by ~6.5% of
+    # the roll channel is unused; it under-predicts lateral torque by ~6.5% of
     # full authority once tau_P is commanded.
     tau = np.cross(d_cm, f_body) + tau_p * n_hat
 

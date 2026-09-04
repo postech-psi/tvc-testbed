@@ -38,7 +38,7 @@ import numpy as np
 
 import validate_control as vc
 from tvc_control.physics import (
-    SimConfig, simulate, axial_headroom, axial_limits, allocate, thrust_axis,
+    SimConfig, simulate, roll_headroom, roll_limits, allocate, thrust_axis,
     load_vehicle_params, load_gains,
 )
 
@@ -87,14 +87,14 @@ def capture():
     })
 
     # --- control authority budget -------------------------------------------
-    q_lo, q_hi = axial_limits(T_hov, vp)
+    q_lo, q_hi = roll_limits(T_hov, vp)
     out["authority_at_hover"] = _round({
         "T_hover_N": T_hov,
-        "axial_headroom_Nm": axial_headroom(T_hov, vp),
-        "axial_limit_lo_Nm": q_lo,
-        "axial_limit_hi_Nm": q_hi,
-        "axial_limits_vs_thrust": {
-            "%.2f" % T: list(axial_limits(T, vp))
+        "roll_headroom_Nm": roll_headroom(T_hov, vp),
+        "roll_limit_lo_Nm": q_lo,
+        "roll_limit_hi_Nm": q_hi,
+        "roll_limits_vs_thrust": {
+            "%.2f" % T: list(roll_limits(T, vp))
             for T in (8.0, 10.0, 12.0, 13.028, 15.0, 17.0)
         },
     })
@@ -112,7 +112,7 @@ def capture():
                       rng.uniform(-1, 1) * lat * 0.7,
                       rng.uniform(q_lo, q_hi) * 0.95])
         a = allocate(M, T_hov, vp)
-        if a.gimbal_saturated or a.axial_saturated:
+        if a.gimbal_saturated or a.roll_saturated:
             continue
         n_ok += 1
         # gnc returns plain tuples (flight code carries no numpy); the

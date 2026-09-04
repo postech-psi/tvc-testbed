@@ -34,8 +34,8 @@ class VehicleParams:
     radians via properties where the dynamics need them.
 
     AXIS NAMING: body x and y are the LATERAL axes (the two the gimbal tilts
-    thrust about); body z is the AXIAL/thrust axis. The field names below still
-    use the old quadcopter convention (Ix = "roll" = body x); the rename to the
+    thrust about); body z is the ROLL/thrust axis. The field names below still
+    use the old quadcopter convention (Ix = "pitch" = body x); the rename to the
     rocket convention is a later, separate commit. See docs/CONVENTIONS.md.
     """
 
@@ -44,7 +44,7 @@ class VehicleParams:
     Iy: float                       # kg*m^2, about body y
     Iz: float                       # kg*m^2, about body z (thrust axis)
 
-    L: float                        # m, AXIAL lever arm: gimbal pivot -> CM
+    L: float                        # m, ROLL lever arm: gimbal pivot -> CM
     T_max: float                    # N, max thrust (combined coax unit)
     g: float                        # m/s^2
 
@@ -69,7 +69,7 @@ class VehicleParams:
 
     T_min: float = 5.0              # N, idle floor; must stay > 0 for allocation
 
-    # Axial (thrust-axis) reaction torque authority. tau_p_max is an optional
+    # Roll (thrust-axis) reaction torque authority. tau_p_max is an optional
     # measured hard cap; when None the allocator reads the feasible set off the
     # measured surface instead.
     tau_p_max: float = None
@@ -90,9 +90,9 @@ class VehicleParams:
         return math.radians(self.gimbal_rate_max_deg)
 
     # --- per-ring travel -----------------------------------------------------
-    # delta1 is the pitch-plane deflection, carried by the INNER ring; delta2 is
-    # the roll-plane one, carried by the OUTER ring (base_link -> roll joint ->
-    # outer ring -> pitch joint -> inner ring -> rotors). Neither ring is
+    # delta1 is the yaw-plane deflection, carried by the INNER ring; delta2 is
+    # the pitch-plane one, carried by the OUTER ring (base_link -> pitch joint ->
+    # outer ring -> yaw joint -> inner ring -> rotors). Neither ring is
     # symmetric about its own neutral and they differ from each other, so the
     # limits are per-axis rather than one scalar. Falls back to the symmetric
     # +/-gimbal_max_deg when the measured block is absent.
@@ -127,15 +127,15 @@ class ControlGains:
     differ by 0.15% on this airframe, so treating them as symmetric is exact to
     within the mass-budget uncertainty.
 
-    AXIAL (body z) gains are SEPARATE and much smaller, and this is not a tuning
+    ROLL (body z) gains are SEPARATE and much smaller, and this is not a tuning
     preference -- it is forced by the airframe. Iz = 0.00196 kg*m^2 is 11.6x
     smaller than Ix, so the same torque produces 11.6x the angular acceleration
-    about z. Sharing one gain set makes the axial channel violently underdamped
+    about z. Sharing one gain set makes the roll channel violently underdamped
     (or the lateral channel uselessly slow). The two channels also have
     different actuators and therefore different lags: the lateral axes go
-    through a 30 ms servo deadtime, the axial channel through the motor time
-    constant (~100 ms measured), which is why axial authority being larger does
-    not mean the axial loop can be faster.
+    through a 30 ms servo deadtime, the roll channel through the motor time
+    constant (~100 ms measured), which is why roll authority being larger does
+    not mean the roll loop can be faster.
 
     These are the analytic simulator's historical values, which have never been
     flown. sim/hover.py's set is 24.9x stiffer in the rate loop and IS flight-
@@ -153,15 +153,15 @@ class ControlGains:
     kd_rate: float = 0.1768659356
     i_limit: float = 22.1082419526     # integrator clamp (anti-windup), rad/s^2
 
-    # --- axial channel (body z / tau_P) ---
+    # --- roll channel (body z / tau_P) ---
     # No longer carries a hand-baked Iz/Ix factor: the inertia scaling is
     # explicit in the controller, so re-measuring Iz changes the torque these
     # produce without silently changing the loop bandwidth.
-    kp_angle_axial: float = 4.0
-    kp_rate_axial: float = 0.9197751661
-    ki_rate_axial: float = 0.0919775166
-    kd_rate_axial: float = 0.1788451712
-    i_limit_axial: float = 25.5493101686
+    kp_angle_roll: float = 4.0
+    kp_rate_roll: float = 0.9197751661
+    ki_rate_roll: float = 0.0919775166
+    kd_rate_roll: float = 0.1788451712
+    i_limit_roll: float = 25.5493101686
 
     # --- altitude cascade: outer P (m -> m/s), inner PID (m/s -> m/s^2) ---
     kp_alt: float = 1.5        # m/s of climb demand per m of altitude error

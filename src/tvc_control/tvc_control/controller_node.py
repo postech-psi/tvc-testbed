@@ -13,7 +13,8 @@ Three things this node used to get wrong, all fixed here:
   published the two gimbal angles, and discarded last_alloc -- the thrust
   command, tau_P, the per-rotor split and the saturation flags. There was no
   motor topic at all, so the ROS2 path had no altitude loop and, since the
-  bridge held both rotors at one speed, exactly zero roll authority.
+  bridge held both rotors at one speed, exactly zero roll authority
+  (roll being rotation about the thrust axis -- see docs/CONVENTIONS.md).
 
   IT LISTENED TO THE WRONG SENSOR. It subscribed to the IMU, which carries no
   position and no velocity, so altitude and position control were not merely
@@ -41,7 +42,9 @@ from tvc_control.hal.gazebo import rotor_speeds
 # anything, and a parameter that looks live while being ignored is worse than
 # one that is gone -- it makes a launch file document a control decision that
 # is not happening. See docs/CONVENTIONS.md.
-RETIRED_PARAMS = ('gimbal_rate_max_deg', 'axial_des_deg')
+RETIRED_PARAMS = ('gimbal_rate_max_deg',
+                  'roll_des_deg', 'pitch_des_deg', 'axial_des_deg',
+                  'init_roll_deg', 'init_pitch_deg', 'init_axial_deg')
 
 
 class ControllerNode(Node):
@@ -57,8 +60,8 @@ class ControllerNode(Node):
 
         self.declare_parameter('rate_hz', 250.0)
         self.declare_parameter('gain_profile', '')
-        self.declare_parameter('roll_des_deg', 0.0)
-        self.declare_parameter('pitch_des_deg', 0.0)
+        self.declare_parameter('att_pitch_des_deg', 0.0)
+        self.declare_parameter('att_yaw_des_deg', 0.0)
         self.declare_parameter('altitude_hold', False)
         self.declare_parameter('position_hold', False)
         self.declare_parameter('z_des', 2.0)
@@ -76,8 +79,8 @@ class ControllerNode(Node):
             position_hold=bool(self.get_parameter('position_hold').value),
         ))
         self.setpoint = Setpoint(
-            roll_des=np.deg2rad(self.get_parameter('roll_des_deg').value),
-            pitch_des=np.deg2rad(self.get_parameter('pitch_des_deg').value),
+            pitch_des=np.deg2rad(self.get_parameter('att_pitch_des_deg').value),
+            yaw_des=np.deg2rad(self.get_parameter('att_yaw_des_deg').value),
             z_des=float(self.get_parameter('z_des').value),
             pos_des=(float(self.get_parameter('x_des').value),
                      float(self.get_parameter('y_des').value), 0.0),
@@ -138,9 +141,9 @@ class ControllerNode(Node):
         msg = ActuatorCommand()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'body'
-        msg.axis_convention = ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER
-        msg.gimbal_delta1_rad = float(cmd.gimbal_delta1_rad)
-        msg.gimbal_delta2_rad = float(cmd.gimbal_delta2_rad)
+        msg.axis_convention = ActuatorCommand.AXIS_CONVENTION_ROCKET_V2
+        msg.gimbal_inner_rad = float(cmd.gimbal_inner_rad)
+        msg.gimbal_outer_rad = float(cmd.gimbal_outer_rad)
         msg.motor_a = float(cmd.motor_a)
         msg.motor_b = float(cmd.motor_b)
         msg.thrust_n = float(cmd.thrust_n)
@@ -148,7 +151,7 @@ class ControllerNode(Node):
         msg.rotor_a_speed_rads = float(wa)
         msg.rotor_b_speed_rads = float(wb)
         msg.sat_gimbal = bool(cmd.sat_gimbal)
-        msg.sat_axial = bool(cmd.sat_axial)
+        msg.sat_roll = bool(cmd.sat_roll)
         msg.sat_thrust = bool(cmd.sat_thrust)
         self.cmd_pub.publish(msg)
 

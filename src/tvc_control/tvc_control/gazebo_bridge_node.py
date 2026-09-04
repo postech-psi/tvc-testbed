@@ -45,9 +45,9 @@ class GazeboBridgeNode(Node):
                          history=HistoryPolicy.KEEP_LAST, depth=1)
 
         self.delta1_pub = self.create_publisher(
-            Float64, '/tvc_vehicle/gimbal_pitch', qos)
+            Float64, '/tvc_vehicle/gimbal_inner_cmd', qos)
         self.delta2_pub = self.create_publisher(
-            Float64, '/tvc_vehicle/gimbal_roll', qos)
+            Float64, '/tvc_vehicle/gimbal_outer_cmd', qos)
         self.motor_pub = self.create_publisher(
             Actuators, '/tvc_vehicle/command/motor_speed', qos)
 
@@ -60,19 +60,19 @@ class GazeboBridgeNode(Node):
                self.lo[1] * 57.2957795, self.hi[1] * 57.2957795))
 
     def on_cmd(self, msg: ActuatorCommand):
-        if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER:
+        if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_ROCKET_V2:
             raise SystemExit(
                 'axis convention mismatch: controller sent %d, this bridge '
                 'speaks %d. See docs/CONVENTIONS.md.'
                 % (msg.axis_convention,
-                   ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER))
+                   ActuatorCommand.AXIS_CONVENTION_ROCKET_V2))
 
         # Clamp per ring, per sign. The allocator already scales the pair to
         # preserve torque direction; this is the last line of defence against a
         # command that would otherwise be truncated by the joint stop, where the
         # truncation rotates the realized torque instead of shrinking it.
-        d1 = clamp(msg.gimbal_delta1_rad, self.lo[0], self.hi[0])
-        d2 = clamp(msg.gimbal_delta2_rad, self.lo[1], self.hi[1])
+        d1 = clamp(msg.gimbal_inner_rad, self.lo[0], self.hi[0])
+        d2 = clamp(msg.gimbal_outer_rad, self.lo[1], self.hi[1])
         self.delta1_pub.publish(Float64(data=float(d1)))
         self.delta2_pub.publish(Float64(data=float(d2)))
 

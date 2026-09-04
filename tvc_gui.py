@@ -39,10 +39,10 @@ from tvc_view3d import View3DWindow
 
 VEHICLE_FIELDS = [
     ("Mass  m  [kg]", "m"),
-    ("Roll inertia  Ix  [kg·m²]", "Ix"),
-    ("Pitch inertia  Iy  [kg·m²]", "Iy"),
-    ("Yaw inertia  Iz  [kg·m²]", "Iz"),
-    ("Axial lever arm  L  [m]", "L"),
+    ("Pitch inertia  Ix  [kg·m²]", "Ix"),
+    ("Yaw inertia  Iy  [kg·m²]", "Iy"),
+    ("Roll inertia  Iz  [kg·m²]", "Iz"),
+    ("Roll lever arm  L  [m]", "L"),
     ("Lateral misalign  dx  [m]", "dx"),
     ("Lateral misalign  dy  [m]", "dy"),
 ]
@@ -65,10 +65,10 @@ GAIN_FIELDS = [
 SIM_FIELDS = [
     ("Sim duration  [s]", "t_final"),
     ("Control period  dt  [s]", "dt_ctrl"),
-    ("Target roll  [deg]", "roll_des_deg"),
-    ("Target pitch  [deg]", "pitch_des_deg"),
-    ("Initial roll disturbance  [deg]", "init_roll_deg"),
-    ("Initial pitch disturbance  [deg]", "init_pitch_deg"),
+    ("Target pitch  [deg]", "att_pitch_des_deg"),
+    ("Target yaw  [deg]", "att_yaw_des_deg"),
+    ("Initial pitch disturbance  [deg]", "init_att_pitch_deg"),
+    ("Initial yaw disturbance  [deg]", "init_att_yaw_deg"),
 ]
 
 
@@ -267,7 +267,7 @@ class TVCSimulatorApp(tk.Tk):
             messagebox.showerror("Invalid input", "Mass and all inertias must be positive.")
             return
         if self.vparams.L <= 0:
-            messagebox.showerror("Invalid input", "Axial lever arm L must be positive.")
+            messagebox.showerror("Invalid input", "Roll lever arm L must be positive.")
             return
         if self.cfg.dt_ctrl <= 0 or self.cfg.t_final <= 0:
             messagebox.showerror("Invalid input", "Simulation duration and dt must be positive.")
@@ -322,10 +322,10 @@ class TVCSimulatorApp(tk.Tk):
             ax.clear()
 
         # Attitude
-        self.ax_att.plot(t, euler[:, 0], color="tab:blue", lw=1.6, label="roll")
-        self.ax_att.plot(t, euler[:, 1], color="tab:red", lw=1.6, label="pitch")
-        self.ax_att.axhline(self.cfg.roll_des_deg, color="tab:blue", ls="--", lw=0.8, alpha=0.6)
-        self.ax_att.axhline(self.cfg.pitch_des_deg, color="tab:red", ls="--", lw=0.8, alpha=0.6)
+        self.ax_att.plot(t, euler[:, 0], color="tab:blue", lw=1.6, label="pitch")
+        self.ax_att.plot(t, euler[:, 1], color="tab:red", lw=1.6, label="yaw")
+        self.ax_att.axhline(self.cfg.att_pitch_des_deg, color="tab:blue", ls="--", lw=0.8, alpha=0.6)
+        self.ax_att.axhline(self.cfg.att_yaw_des_deg, color="tab:red", ls="--", lw=0.8, alpha=0.6)
         self.ax_att.set_ylabel("Euler angle [deg]")
         self.ax_att.set_title("Attitude Response")
         self.ax_att.legend(loc="upper right", fontsize=8)
@@ -342,8 +342,8 @@ class TVCSimulatorApp(tk.Tk):
 
         # Gimbal commands
         glim = self.vparams.gimbal_max_deg
-        self.ax_gimbal.plot(t, delta[:, 0], color="tab:blue", lw=1.6, label="δ₁ (pitch-plane)")
-        self.ax_gimbal.plot(t, delta[:, 1], color="tab:red", lw=1.6, label="δ₂ (roll-plane)")
+        self.ax_gimbal.plot(t, delta[:, 0], color="tab:blue", lw=1.6, label="δ₁ (yaw-plane)")
+        self.ax_gimbal.plot(t, delta[:, 1], color="tab:red", lw=1.6, label="δ₂ (pitch-plane)")
         self.ax_gimbal.axhline(glim, color="gray", ls=":", lw=1.0, alpha=0.7, label=f"±{glim:g}° limit")
         self.ax_gimbal.axhline(-glim, color="gray", ls=":", lw=1.0, alpha=0.7)
         self.ax_gimbal.set_ylabel("Gimbal angle [deg]")
@@ -356,17 +356,17 @@ class TVCSimulatorApp(tk.Tk):
 
     def _update_metrics(self, m):
         glim = self.vparams.gimbal_max_deg
-        util1 = 100.0 * m["max_delta1_deg"] / glim if glim > 0 else 0.0
-        util2 = 100.0 * m["max_delta2_deg"] / glim if glim > 0 else 0.0
+        util1 = 100.0 * m["max_gimbal_inner_deg"] / glim if glim > 0 else 0.0
+        util2 = 100.0 * m["max_gimbal_outer_deg"] / glim if glim > 0 else 0.0
 
         lines = [
-            f"Final roll:   {m['final_roll_deg']:+7.3f} deg",
-            f"Final pitch:  {m['final_pitch_deg']:+7.3f} deg",
-            f"Roll error:   {m['roll_error_deg']:+7.3f} deg",
-            f"Pitch error:  {m['pitch_error_deg']:+7.3f} deg",
-            f"Settling (2%,pitch): {m['settling_time_s']:6.2f} s",
-            f"Max |δ1|: {m['max_delta1_deg']:6.2f} deg  ({util1:5.1f}% of limit)",
-            f"Max |δ2|: {m['max_delta2_deg']:6.2f} deg  ({util2:5.1f}% of limit)",
+            f"Final pitch:   {m['final_pitch_deg']:+7.3f} deg",
+            f"Final yaw:  {m['final_yaw_deg']:+7.3f} deg",
+            f"Pitch error:   {m['pitch_error_deg']:+7.3f} deg",
+            f"Yaw error:  {m['yaw_error_deg']:+7.3f} deg",
+            f"Settling (2%,yaw): {m['settling_time_s']:6.2f} s",
+            f"Max |δ1|: {m['max_gimbal_inner_deg']:6.2f} deg  ({util1:5.1f}% of limit)",
+            f"Max |δ2|: {m['max_gimbal_outer_deg']:6.2f} deg  ({util2:5.1f}% of limit)",
         ]
 
         warn = []

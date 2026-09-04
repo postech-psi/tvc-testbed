@@ -12,7 +12,7 @@
   longer silently drifts from the controller's assumptions.
 
   Body +z is the thrust axis. rotor_a spins CCW, rotor_b CW: their reaction
-  torques oppose, so a differential between them is the ONLY yaw authority (the
+  torques oppose, so a differential between them is the ONLY roll authority (the
   2-axis gimbal has none about z).
 -->
 <sdf version="1.9">
@@ -97,7 +97,7 @@
         </inertia>
       </inertial>
     </link>
-    <joint name="gimbal_roll_joint" type="revolute">
+    <joint name="gimbal_outer_joint" type="revolute">
       <parent>base_link</parent>
       <child>outer_gimbal</child>
       <axis>
@@ -122,7 +122,7 @@
         </inertia>
       </inertial>
     </link>
-    <joint name="gimbal_pitch_joint" type="revolute">
+    <joint name="gimbal_inner_joint" type="revolute">
       <parent>outer_gimbal</parent>
       <child>inner_gimbal</child>
       <axis>
@@ -237,8 +237,8 @@
 
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
-      <joint_name>gimbal_pitch_joint</joint_name>
-      <topic>/tvc_vehicle/gimbal_pitch</topic>
+      <joint_name>gimbal_inner_joint</joint_name>
+      <topic>/tvc_vehicle/gimbal_inner_cmd</topic>
       <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
            Gazebo its own gimbal lag and slew, on top of the plant model's --
            double-counting, and with a single symmetric rate where the bench
@@ -253,8 +253,8 @@
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
-      <joint_name>gimbal_roll_joint</joint_name>
-      <topic>/tvc_vehicle/gimbal_roll</topic>
+      <joint_name>gimbal_outer_joint</joint_name>
+      <topic>/tvc_vehicle/gimbal_outer_cmd</topic>
       <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
            Gazebo its own gimbal lag and slew, on top of the plant model's --
            double-counting, and with a single symmetric rate where the bench

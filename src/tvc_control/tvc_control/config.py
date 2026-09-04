@@ -41,7 +41,7 @@ _DEFAULT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # The axis convention the YAML (and therefore every consumer) is written in.
 # See docs/CONVENTIONS.md. Loading a file that predates or postdates the rename
 # must fail loudly rather than reinterpret its numbers under the wrong names.
-SUPPORTED_AXIS_CONVENTIONS = ("legacy_quadcopter", "rocket_v2")
+SUPPORTED_AXIS_CONVENTIONS = ("rocket_v2",)
 
 
 @dataclass
@@ -69,7 +69,7 @@ class Vehicle:
     motor_constant: float
     moment_constant: float
     thrust_at_max_n: float
-    tau_p_max_nm: float  # N.m, optional hard cap on axial torque, or None
+    tau_p_max_nm: float  # N.m, optional hard cap on roll torque, or None
     surface: dict        # measured (PWM A, PWM B) -> (thrust, torque) cubic fit
     gimbal_axes: dict    # per-axis measured gimbal data ('inner' / 'outer')
     motor_dynamics: dict # measured motor lag / sag / derating
@@ -93,7 +93,7 @@ def load(path=None):
     with open(path, encoding="utf-8") as f:
         d = yaml.safe_load(f)
 
-    conv = d.get("axis_convention", "legacy_quadcopter")
+    conv = d.get("axis_convention", "rocket_v2")
     if conv not in SUPPORTED_AXIS_CONVENTIONS:
         raise ValueError(
             "unknown axis_convention %r in %s -- see docs/CONVENTIONS.md"
@@ -216,14 +216,14 @@ def load_gains(profile=None, path=None):
         raise ValueError("unknown gain profile %r; have %s"
                          % (name, sorted(profiles)))
     p = profiles[name]
-    att, ax = p["attitude"], p["axial"]
+    att, ax = p["attitude"], p["roll"]
     alt, pos = p["altitude"], p["position"]
     return ControlGains(
         kp_angle=att["kp_angle"], kp_rate=att["kp_rate"],
         ki_rate=att["ki_rate"], kd_rate=att["kd_rate"], i_limit=att["i_limit"],
-        kp_angle_axial=ax["kp_angle"], kp_rate_axial=ax["kp_rate"],
-        ki_rate_axial=ax["ki_rate"], kd_rate_axial=ax["kd_rate"],
-        i_limit_axial=ax["i_limit"],
+        kp_angle_roll=ax["kp_angle"], kp_rate_roll=ax["kp_rate"],
+        ki_rate_roll=ax["ki_rate"], kd_rate_roll=ax["kd_rate"],
+        i_limit_roll=ax["i_limit"],
         kp_alt=alt["kp_alt"], kp_vz=alt["kp_vz"], ki_vz=alt["ki_vz"],
         kd_vz=alt["kd_vz"], i_limit_vz=alt["i_limit_vz"], vz_max=alt["vz_max"],
         kp_pos=pos["kp_pos"], kd_pos=pos["kd_pos"],

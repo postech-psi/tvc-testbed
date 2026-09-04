@@ -189,7 +189,7 @@ def render(v, base_mass, base_pos, I_base_own):
   longer silently drifts from the controller's assumptions.
 
   Body +z is the thrust axis. rotor_a spins CCW, rotor_b CW: their reaction
-  torques oppose, so a differential between them is the ONLY yaw authority (the
+  torques oppose, so a differential between them is the ONLY roll authority (the
   2-axis gimbal has none about z).
 -->
 <sdf version="1.9">
@@ -267,7 +267,7 @@ def render(v, base_mass, base_pos, I_base_own):
         </inertia>
       </inertial>
     </link>
-    <joint name="gimbal_roll_joint" type="revolute">
+    <joint name="gimbal_outer_joint" type="revolute">
       <parent>base_link</parent>
       <child>outer_gimbal</child>
       <axis>
@@ -292,7 +292,7 @@ def render(v, base_mass, base_pos, I_base_own):
         </inertia>
       </inertial>
     </link>
-    <joint name="gimbal_pitch_joint" type="revolute">
+    <joint name="gimbal_inner_joint" type="revolute">
       <parent>outer_gimbal</parent>
       <child>inner_gimbal</child>
       <axis>
@@ -361,8 +361,8 @@ def render(v, base_mass, base_pos, I_base_own):
 
 {motor_plugin('rotor_b_joint', 'rotor_b', 'cw', 1)}
 
-{servo_plugin('gimbal_pitch_joint', '/tvc_vehicle/gimbal_pitch')}
-{servo_plugin('gimbal_roll_joint', '/tvc_vehicle/gimbal_roll')}
+{servo_plugin('gimbal_inner_joint', '/tvc_vehicle/gimbal_inner_cmd')}
+{servo_plugin('gimbal_outer_joint', '/tvc_vehicle/gimbal_outer_cmd')}
 
     <plugin filename="gz-sim-odometry-publisher-system"
             name="gz::sim::systems::OdometryPublisher">

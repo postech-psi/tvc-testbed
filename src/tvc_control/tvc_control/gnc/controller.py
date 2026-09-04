@@ -14,7 +14,7 @@ Loop order, and why it is this order:
     3. attitude + rate cascade -> moment  (always, all three axes)
     4. allocation -> actuator commands    (always)
 
-Altitude runs before attitude because the allocator cannot size the axial
+Altitude runs before attitude because the allocator cannot size the roll
 headroom or the gimbal angles without knowing the thrust first -- the feasible
 set is a function of T. Position runs before both because it produces a
 setpoint, not an effort, and so belongs outside the attitude loop entirely.
@@ -60,11 +60,11 @@ class TvcController:
         it None (the flight case) falls back to the last command, which differs
         only by the servo's own lag.
         """
-        roll_des, pitch_des = setpoint.roll_des, setpoint.pitch_des
+        pitch_des, yaw_des = setpoint.pitch_des, setpoint.yaw_des
 
         # --- 1. position -> attitude setpoint --------------------------------
         if self.mode.position_hold:
-            roll_des, pitch_des = self.position.update(
+            pitch_des, yaw_des = self.position.update(
                 state.pos_i, state.vel_i, setpoint.pos_des)
 
         # --- 2. altitude -> thrust -------------------------------------------
@@ -80,19 +80,19 @@ class TvcController:
 
         # --- 3 & 4. attitude cascade and allocation --------------------------
         delta_cmd = self.attitude.update(state.quat, state.omega_b,
-                                         roll_des, pitch_des, T_cmd, dt,
-                                         axial_des=setpoint.axial_des)
+                                         pitch_des, yaw_des, T_cmd, dt,
+                                         roll_des=setpoint.roll_des)
         alloc = self.attitude.last_alloc
         self._delta_cmd = (float(delta_cmd[0]), float(delta_cmd[1]))
 
         return ActuatorSetpoint(
             motor_a=alloc.u_a,
             motor_b=alloc.u_b,
-            gimbal_delta1_rad=float(delta_cmd[0]),
-            gimbal_delta2_rad=float(delta_cmd[1]),
+            gimbal_inner_rad=float(delta_cmd[0]),
+            gimbal_outer_rad=float(delta_cmd[1]),
             thrust_n=alloc.T_cmd,
             tau_p_nm=alloc.tau_p,
             sat_gimbal=alloc.gimbal_saturated,
-            sat_axial=alloc.axial_saturated,
+            sat_roll=alloc.roll_saturated,
             sat_thrust=alloc.thrust_saturated or self.altitude.thrust_saturated,
         )

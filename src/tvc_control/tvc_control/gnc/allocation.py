@@ -38,16 +38,16 @@ class Allocation:
     u_a: float = 0.0
     u_b: float = 0.0
     gimbal_saturated: bool = False
-    axial_saturated: bool = False
+    roll_saturated: bool = False
     thrust_saturated: bool = False
 
 
-def axial_headroom(T, params: VehicleParams):
+def roll_headroom(T, params: VehicleParams):
     """Max |tau_P| available at total thrust T [N] -> N*m.
 
     tau_P is bought with a thrust SPLIT between the props, and the split has to
     fit inside the per-rotor limits: with T1 = (T-s)/2 and T2 = (T+s)/2 both in
-    [0, T_max/2], the split s is bounded by min(T, T_max - T). So axial
+    [0, T_max/2], the split s is bounded by min(T, T_max - T). So roll
     authority is largest at half throttle and vanishes at both idle and full
     throttle -- at hover (T = 13.03 N of 20 N) the binding side is the top one,
     leaving 6.97 N of split, i.e. 0.112 N*m.
@@ -66,10 +66,10 @@ def axial_headroom(T, params: VehicleParams):
     return tau
 
 
-def axial_limits(T, params: VehicleParams):
+def roll_limits(T, params: VehicleParams):
     """Signed (min, max) tau_P [N*m] at total thrust T -- the asymmetric truth.
 
-    axial_headroom() returns the symmetric figure guaranteed in both directions,
+    roll_headroom() returns the symmetric figure guaranteed in both directions,
     which is the right number for sizing gains and for quoting authority. This
     one returns the actual interval, which is what the allocator should clamp
     against: the coax wake makes one direction stronger than the other, and
@@ -78,7 +78,7 @@ def axial_limits(T, params: VehicleParams):
     if params.surface is not None:
         lo, hi = params.surface.torque_limits_at(T)
     else:
-        cap = axial_headroom(T, params)
+        cap = roll_headroom(T, params)
         lo, hi = -cap, cap
     if params.tau_p_max is not None:
         lo = max(lo, -params.tau_p_max)
@@ -87,7 +87,7 @@ def axial_limits(T, params: VehicleParams):
 
 
 def mix_motors(T, tau_p, params: VehicleParams):
-    """(total thrust, axial torque) -> (T1, T2) per-rotor thrusts [N].
+    """(total thrust, roll torque) -> (T1, T2) per-rotor thrusts [N].
 
     tau_P = k_moment * (T2 - T1): equal and opposite prop drag torques cancel,
     and what survives is proportional to the imbalance.
@@ -150,7 +150,7 @@ def _lateral_gimbal(M_xy, T, tau_p, params: VehicleParams, iters=3):
         [M_y] = [ -T*L   -tau_P] [d2]
 
     whose determinant is -(tau_P^2 + (T*L)^2) < 0 always, so the inverse exists
-    for any thrust and any axial command -- there is no allocation singularity
+    for any thrust and any roll command -- there is no allocation singularity
     to guard against, only actuator limits.
 
     Refine: three Newton steps on the exact trigonometric map. At 7 deg the
@@ -193,7 +193,7 @@ def _lateral_gimbal(M_xy, T, tau_p, params: VehicleParams, iters=3):
 def allocate(M_des, T_des, params: VehicleParams):
     """Desired body moment (3,) and total thrust -> Allocation.
 
-    M_des is (M_x, M_y, M_z) in N*m: the first two lateral, the third axial.
+    M_des is (M_x, M_y, M_z) in N*m: the first two lateral, the third roll.
     """
     Mx, My, Mz = float(M_des[0]), float(M_des[1]), float(M_des[2])
 
@@ -201,16 +201,16 @@ def allocate(M_des, T_des, params: VehicleParams):
     T_cmd = clamp(T_des, params.T_min, params.T_max)
     thrust_sat = not isclose(T_cmd, T_des)
 
-    # --- stages 1 & 2: axial, then lateral, iterated twice.
+    # --- stages 1 & 2: roll, then lateral, iterated twice.
     # M_z can only come from tau_P, but what reaches body z is
     # tau_P*cos(d1)*cos(d2), not tau_P -- and d1, d2 are not known until the
     # lateral stage has run, which in turn needs tau_P. One extra pass closes
     # that loop: solve the gimbal against the first tau_P guess, then divide
     # the guess by the cosine loss those angles imply and re-solve. Skipping it
     # leaves M_z short by tau_P*(1 - cos*cos), which at the 7 deg stops is 1.5%
-    # of the axial command -- small, but it is a systematic bias, not noise, so
-    # the axial integrator would otherwise spend the whole flight paying it off.
-    q_lo, q_hi = axial_limits(T_cmd, params)
+    # of the roll command -- small, but it is a systematic bias, not noise, so
+    # the roll integrator would otherwise spend the whole flight paying it off.
+    q_lo, q_hi = roll_limits(T_cmd, params)
     axial_sat = Mz < q_lo - 1e-12 or Mz > q_hi + 1e-12
     tau_p = clamp(Mz, q_lo, q_hi)
     delta = _lateral_gimbal((Mx, My), T_cmd, tau_p, params)
@@ -243,5 +243,5 @@ def allocate(M_des, T_des, params: VehicleParams):
 
     return Allocation(delta_cmd=delta, tau_p=tau_p, T_cmd=T_cmd, T1=T1, T2=T2,
                       u_a=u_a, u_b=u_b,
-                      gimbal_saturated=gimbal_sat, axial_saturated=axial_sat,
+                      gimbal_saturated=gimbal_sat, roll_saturated=axial_sat,
                       thrust_saturated=thrust_sat)

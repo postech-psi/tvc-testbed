@@ -12,7 +12,7 @@ THE PROBLEM
     hence T = k(omega_a^2 + omega_b^2) and tau_P = c(T_b - T_a). That model is
     separable, symmetric and linear in the thrust split. The measured coax
     surface is none of the three, and the gap is not small: at hover the plugin
-    with the original c = 0.016 reaches only ~50% of the measured axial torque,
+    with the original c = 0.016 reaches only ~50% of the measured roll torque,
     and being odd in the split it cannot represent the sign asymmetry at all --
     the surface gives +0.147 one way and -0.089 the other.
 
@@ -24,7 +24,7 @@ WHY NOT JUST FIT c
     the roll integrator would wind up, and the symptom would look like a tuning
     problem rather than a modelling one. Per-rotor asymmetric constants are
     worse still -- unequal k means equal omega no longer gives equal thrust, so
-    the vehicle produces a parasitic roll torque at zero roll command.
+    the vehicle produces a parasitic pitch torque at zero pitch command.
 
 THE FIX: INVERT ON THE COMMAND SIDE
     Take the (T, tau_P) the allocator chose off the measured surface, and solve

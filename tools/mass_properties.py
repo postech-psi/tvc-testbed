@@ -186,7 +186,7 @@ def report(items, unresolved, group_density, total_mass, cg, cg_source, I):
     print("    Ix: float = %.6f" % I[0, 0])
     print("    Iy: float = %.6f" % I[1, 1])
     print("    Iz: float = %.6f" % I[2, 2])
-    print("    L: float = %.4f    # axial gimbal-pivot -> CM distance" % cg[2])
+    print("    L: float = %.4f    # roll gimbal-pivot -> CM distance" % cg[2])
     if abs(cg[0]) > 1e-4 or abs(cg[1]) > 1e-4:
         print("    dx: float = %.4f   # lateral CG offset (disturbance term)" % cg[0])
         print("    dy: float = %.4f" % cg[1])

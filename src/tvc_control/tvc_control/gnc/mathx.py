@@ -36,23 +36,23 @@ def quat_to_rotmat(q):
 
 
 def quat_to_euler(q):
-    """ZYX (yaw-pitch-roll) Euler angles, for readout/plotting ONLY -- never
+    """ZYX (roll-yaw-pitch) Euler angles, for readout/plotting ONLY -- never
     used internally for kinematics propagation (that would reintroduce gimbal lock)."""
     qw, qx, qy, qz = q
-    roll = math.atan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
+    pitch = math.atan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
     s = 2*(qw*qy - qz*qx)
     s = 1.0 if s > 1.0 else (-1.0 if s < -1.0 else s)
-    pitch = math.asin(s)
-    yaw = math.atan2(2*(qw*qz + qx*qy), 1 - 2*(qy**2 + qz**2))
-    return (roll, pitch, yaw)
+    yaw = math.asin(s)
+    roll = math.atan2(2*(qw*qz + qx*qy), 1 - 2*(qy**2 + qz**2))
+    return (pitch, yaw, roll)
 
 
-def euler_to_quat(roll, pitch, yaw):
+def euler_to_quat(pitch, yaw, roll):
     """Construct a quaternion from ZYX Euler angles (used only to set up initial
     conditions / disturbances in a human-friendly way)."""
-    cr, sr = math.cos(roll/2), math.sin(roll/2)
-    cp, sp = math.cos(pitch/2), math.sin(pitch/2)
-    cy, sy = math.cos(yaw/2), math.sin(yaw/2)
+    cr, sr = math.cos(pitch/2), math.sin(pitch/2)
+    cp, sp = math.cos(yaw/2), math.sin(yaw/2)
+    cy, sy = math.cos(roll/2), math.sin(roll/2)
     return (cr*cp*cy + sr*sp*sy,
             sr*cp*cy - cr*sp*sy,
             cr*sp*cy + sr*cp*sy,
@@ -64,8 +64,8 @@ def thrust_axis(delta):
 
     Exact (not small-angle). Sign convention matches Gazebo / sim/hover.py --
     n_hat = R_x(d2) R_y(d1) [0,0,1] -- so gimbal signs and gains are portable
-    between the two sims. d1 deflects in the pitch plane (about body y),
-    d2 in the roll plane (about body x).
+    between the two sims. d1 deflects in the yaw plane (about body y),
+    d2 in the pitch plane (about body x).
     """
     d1, d2 = delta[0], delta[1]
     return (math.sin(d1),
@@ -117,7 +117,7 @@ def attitude_error(q, q_des):
     Why this replaces the Euler difference: the Euler path had an arcsin
     singularity at +/-90 deg on one specific axis, which meant the axis names
     carried a stability caveat. Under the rocket convention that axis becomes
-    "yaw", and a reader would have to know which of three similar-looking
+    "roll", and a reader would have to know which of three similar-looking
     channels was the fragile one. This form has no preferred axis at all.
     """
     qe = quat_mul(quat_conj(q), q_des)

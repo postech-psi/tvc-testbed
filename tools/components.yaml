@@ -59,11 +59,11 @@ point_masses:
   # --- servos: real CAD positions are known (PTK8515:1 / :2), so these are
   #     NOT estimates. Kept here rather than in cad_parts.csv to avoid
   #     double-counting them against the 56 g spreadsheet line.
-  - name: "PTK 8515 servo + horn (pitch)"
+  - name: "PTK 8515 servo + horn (yaw)"
     mass_g: 28
     position_mm: [-2.9, 30.3, 113.0]
     estimated: false
-  - name: "PTK 8515 servo + horn (roll)"
+  - name: "PTK 8515 servo + horn (pitch)"
     mass_g: 28
     position_mm: [-46.4, -11.2, 80.4]
     estimated: false

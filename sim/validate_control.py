@@ -1,6 +1,6 @@
 """
 validate_control.py -- the four scenarios that exercise the three-axis
-allocation, the axial (tau_P) channel, and the altitude loop.
+allocation, the roll (tau_P) channel, and the altitude loop.
 
 Run:  python sim/validate_control.py [--verbose]
 
@@ -10,7 +10,7 @@ loose enough that ordinary gain retuning does not trip them:
 
   lateral    a sign error in the gimbal allocation, or a gimbal limit so tight
              the vehicle cannot recover from a routine upset at all.
-  axial      the tau_P*n_hat term missing from the moment sum, or the axial
+  roll      the tau_P*n_hat term missing from the moment sum, or the roll
              loop not closed -- both leave body z drifting forever.
   climb      altitude cascade sign / windup errors.
   tilted     the 1/cos(theta) feedforward missing. This one is an A/B: it runs
@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 
 from tvc_control.physics import (
-    SimConfig, simulate, axial_headroom, load_vehicle_params, load_gains,
+    SimConfig, simulate, roll_headroom, load_vehicle_params, load_gains,
 )
 
 
@@ -43,47 +43,47 @@ def _fmt(ok):
 def scenario_lateral(vp, gains, verbose):
     """Lateral upset recovery: released at 8 deg on both lateral axes, hold 0."""
     cfg = SimConfig(t_final=6.0,
-                    roll_des_deg=0.0, pitch_des_deg=0.0,
-                    init_roll_deg=8.0, init_pitch_deg=-8.0)
+                    att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
+                    init_att_pitch_deg=8.0, init_att_yaw_deg=-8.0)
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
-    ok = abs(m["final_roll_deg"]) < 1.0 and abs(m["final_pitch_deg"]) < 1.0
+    ok = abs(m["final_pitch_deg"]) < 1.0 and abs(m["final_yaw_deg"]) < 1.0
     detail = ("final lateral = (%+.3f, %+.3f) deg, peak gimbal %.2f/%.2f deg "
               "of %.1f, saturated %.0f%% of the run"
-              % (m["final_roll_deg"], m["final_pitch_deg"],
-                 m["max_delta1_deg"], m["max_delta2_deg"],
+              % (m["final_pitch_deg"], m["final_yaw_deg"],
+                 m["max_gimbal_inner_deg"], m["max_gimbal_outer_deg"],
                  vp.gimbal_max_deg, 100 * m["gimbal_sat_frac"]))
     return ok, detail, r
 
 
-def scenario_axial(vp, gains, verbose):
-    """Axial (thrust-axis) upset: released at 20 deg about body z, hold 0.
+def scenario_roll(vp, gains, verbose):
+    """Roll (thrust-axis) upset: released at 20 deg about body z, hold 0.
 
     This is the scenario that did not exist before tau_P became a control
     input -- with the gimbal alone, body z is uncontrollable and this test
     can only fail.
     """
     cfg = SimConfig(t_final=6.0,
-                    roll_des_deg=0.0, pitch_des_deg=0.0,
-                    init_roll_deg=0.0, init_pitch_deg=0.0,
-                    init_axial_deg=20.0)
+                    att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
+                    init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
+                    init_att_roll_deg=20.0)
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
-    ok = abs(m["final_axial_deg"]) < 2.0
-    cap = axial_headroom(vp.m * vp.g, vp)
-    detail = ("final axial = %+.3f deg, peak |tau_P| = %.4f N.m of %.4f "
+    ok = abs(m["final_roll_deg"]) < 2.0
+    cap = roll_headroom(vp.m * vp.g, vp)
+    detail = ("final roll = %+.3f deg, peak |tau_P| = %.4f N.m of %.4f "
               "available at hover (%.0f%%), capped %.0f%% of the run"
-              % (m["final_axial_deg"], m["max_tau_p_Nm"], cap,
+              % (m["final_roll_deg"], m["max_tau_p_Nm"], cap,
                  100 * m["max_tau_p_Nm"] / cap if cap > 0 else 0,
-                 100 * m["axial_sat_frac"]))
+                 100 * m["roll_sat_frac"]))
     return ok, detail, r
 
 
 def scenario_climb(vp, gains, verbose):
     """Climb to 2 m and hold, starting from the ground, attitude level."""
     cfg = SimConfig(t_final=12.0,
-                    roll_des_deg=0.0, pitch_des_deg=0.0,
-                    init_roll_deg=0.0, init_pitch_deg=0.0,
+                    att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
+                    init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
                     altitude_hold=True, z_des=2.0, init_z=0.0)
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
@@ -99,8 +99,8 @@ def scenario_climb(vp, gains, verbose):
 def scenario_tilted_hover(vp, gains, verbose):
     """Hold 2 m while commanded to a 6 deg lateral tilt, with and without the
     1/cos(theta) feedforward. The compensated run must sag less."""
-    base = dict(t_final=12.0, roll_des_deg=0.0, pitch_des_deg=6.0,
-                init_roll_deg=0.0, init_pitch_deg=0.0,
+    base = dict(t_final=12.0, att_pitch_des_deg=0.0, att_yaw_des_deg=6.0,
+                init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
                 altitude_hold=True, z_des=2.0, init_z=2.0)
     on = simulate(vp, gains, SimConfig(tilt_compensation=True, **base))
     off = simulate(vp, gains, SimConfig(tilt_compensation=False, **base))
@@ -111,7 +111,7 @@ def scenario_tilted_hover(vp, gains, verbose):
               "(%.0f%% less); final tilt %+.2f deg"
               % (sag_on, sag_off,
                  100 * (1 - sag_on / sag_off) if sag_off > 0 else 0.0,
-                 on["metrics"]["final_pitch_deg"]))
+                 on["metrics"]["final_yaw_deg"]))
     return ok, detail, on
 
 
@@ -126,7 +126,7 @@ def scenario_motor_lag_model(vp, gains, verbose):
         as a LAG    the roll channel recovers cleanly and never saturates
         as a DELAY  it winds up to ~70 deg and saturates ~94% of the run
 
-    The lateral axes are unaffected either way -- this is entirely a roll-channel
+    The pitch/yaw pair is unaffected either way -- this is entirely a roll-channel
     result, which follows from Izz being 11.6x smaller than Ixx while carrying
     the stiffest normalized gain.
 
@@ -135,15 +135,15 @@ def scenario_motor_lag_model(vp, gains, verbose):
     nobody has taken yet. What it does instead is print the pessimistic number
     every run, so the risk cannot quietly stop being mentioned.
     """
-    base = dict(t_final=6.0, roll_des_deg=0.0, pitch_des_deg=0.0,
-                init_roll_deg=0.0, init_pitch_deg=0.0, init_axial_deg=20.0)
+    base = dict(t_final=6.0, att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
+                init_att_pitch_deg=0.0, init_att_yaw_deg=0.0, init_att_roll_deg=20.0)
     lag = simulate(vp, gains, SimConfig(motor_model="first_order",
                                         motor_tau_s=0.10, motor_deadtime_s=0.0,
                                         **base))
     dly = simulate(vp, gains, SimConfig(motor_model="delay",
                                         motor_tau_s=0.0, motor_deadtime_s=0.10,
                                         **base))
-    lag_final = abs(lag["metrics"]["final_axial_deg"])
+    lag_final = abs(lag["metrics"]["final_roll_deg"])
     dly_peak = float(np.max(np.abs(dly["euler_deg"][:, 2])))
     ok = lag_final < 2.0
     detail = ("as a LAG: final roll %.3f deg (stable). AS A DELAY: peak roll "
@@ -155,7 +155,7 @@ def scenario_motor_lag_model(vp, gains, verbose):
 
 SCENARIOS = [
     ("lateral upset recovery", scenario_lateral),
-    ("axial upset recovery", scenario_axial),
+    ("roll upset recovery", scenario_roll),
     ("climb and hold", scenario_climb),
     ("tilted hover (1/cos compensation)", scenario_tilted_hover),
     ("motor lag model (roll channel)", scenario_motor_lag_model),
@@ -173,7 +173,7 @@ def main():
     T_hov = vp.m * vp.g
 
     if args.verbose:
-        cap = axial_headroom(T_hov, vp)
+        cap = roll_headroom(T_hov, vp)
         # Worst-case travel, not the nominal +/-7: the stops are asymmetric and
         # differ per axis, and the binding one is what sets guaranteed authority.
         travel = float(np.min(np.abs(np.concatenate([vp.delta_min, vp.delta_max]))))
@@ -185,7 +185,7 @@ def main():
               % (lat, lat / vp.Ix,
                  np.degrees(vp.delta_min[0]), np.degrees(vp.delta_max[0]),
                  np.degrees(vp.delta_min[1]), np.degrees(vp.delta_max[1]), vp.L))
-        print("  axial    %.4f N.m -> %6.2f rad/s^2   Iz is %.1fx smaller than Ix"
+        print("  roll    %.4f N.m -> %6.2f rad/s^2   Iz is %.1fx smaller than Ix"
               % (cap, cap / vp.Iz, vp.Ix / vp.Iz))
         print("  cross-coupling tau_P/(T*L) = %.1f%%, allocation rotated %.2f deg "
               "(%.0f%% of the tighter axis's travel)"
@@ -193,11 +193,11 @@ def main():
                  np.degrees(np.arctan(cap / (T_hov * vp.L))),
                  100 * np.arctan(cap / (T_hov * vp.L)) / travel))
         if vp.surface is not None:
-            print("  axial headroom vs thrust (measured surface):")
+            print("  roll headroom vs thrust (measured surface):")
             for T in (10.0, 11.5, T_hov, 15.0, 17.0):
                 print("    T = %5.2f N (%3.0f%%)  ->  |tau_P| <= %.4f N.m"
-                      % (T, 100 * T / t_max, axial_headroom(T, vp)))
-            print("  NOTE authority is not the whole story: the axial channel has")
+                      % (T, 100 * T / t_max, roll_headroom(T, vp)))
+            print("  NOTE authority is not the whole story: the roll channel has")
             print("       %.1fx the angular acceleration of the lateral pair but its"
                   % ((cap / vp.Iz) / (lat / vp.Ix)))
             print("       actuator is ~3x slower (motor ~100 ms vs gimbal ~30 ms).")

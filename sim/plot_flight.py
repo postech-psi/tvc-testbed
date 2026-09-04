@@ -43,8 +43,8 @@ def main():
 
     fig, axes = plt.subplots(4, 1, figsize=(11, 10), sharex=True)
     fig.suptitle("Coaxial TVC vehicle - Gazebo hover\n"
-                 "thrust vectoring only: 2-axis gimbal for pitch/roll, "
-                 "rotor differential for yaw",
+                 "thrust vectoring only: 2-axis gimbal for yaw/pitch, "
+                 "rotor differential for roll",
                  fontsize=12, color=INK, y=0.985)
 
     # --- altitude ---------------------------------------------------------
@@ -69,12 +69,12 @@ def main():
     # --- attitude ---------------------------------------------------------
     ax = axes[2]
     ax.axhline(0, color=GRID, lw=1, zorder=1)
-    ax.plot(t, d["roll_deg"], color=C_BLUE, lw=2, label="roll", zorder=3)
-    ax.plot(t, d["pitch_deg"], color=C_ORANGE, lw=2, label="pitch", zorder=3)
-    ax.plot(t, d["yaw_deg"], color=C_AQUA, lw=2, label="yaw", zorder=3)
+    ax.plot(t, d["pitch_deg"], color=C_BLUE, lw=2, label="pitch", zorder=3)
+    ax.plot(t, d["yaw_deg"], color=C_ORANGE, lw=2, label="yaw", zorder=3)
+    ax.plot(t, d["roll_deg"], color=C_AQUA, lw=2, label="roll", zorder=3)
     ax.set_ylabel("attitude [deg]", color=INK)
-    ax.set_title("Attitude - yaw is held by rotor differential, the vehicle's "
-                 "only yaw authority", fontsize=10, color=INK, loc="left")
+    ax.set_title("Attitude - roll is held by rotor differential, the vehicle's "
+                 "only roll authority", fontsize=10, color=INK, loc="left")
     ax.legend(fontsize=8, frameon=False, loc="upper right", ncol=3)
 
     # --- gimbal -----------------------------------------------------------
@@ -85,9 +85,9 @@ def main():
     ax.annotate("+/-%g deg mechanical limit" % glim, (t[-1], glim),
                 xytext=(-6, -12), textcoords="offset points", ha="right",
                 fontsize=8, color=C_RED)
-    ax.plot(t, d["gimbal_roll_deg"], color=C_BLUE, lw=2, label="gimbal roll",
+    ax.plot(t, d["gimbal_outer_deg"], color=C_BLUE, lw=2, label="gimbal pitch",
             zorder=3)
-    ax.plot(t, d["gimbal_pitch_deg"], color=C_ORANGE, lw=2, label="gimbal pitch",
+    ax.plot(t, d["gimbal_inner_deg"], color=C_ORANGE, lw=2, label="gimbal yaw",
             zorder=3)
     ax.set_ylabel("deflection [deg]", color=INK)
     ax.set_xlabel("time [s]", color=INK)
@@ -109,11 +109,11 @@ def main():
     fig.savefig(out, dpi=130, facecolor="white")
     print("wrote %s" % out)
     n = len(t)
-    print("final: z=%.2f m  drift=%.2f m  tilt=%.1f deg  yaw=%.1f deg"
+    print("final: z=%.2f m  drift=%.2f m  tilt=%.1f deg  roll=%.1f deg"
           % (d["z_m"][-1],
              (d["x_m"][-1] ** 2 + d["y_m"][-1] ** 2) ** 0.5,
-             (d["roll_deg"][-1] ** 2 + d["pitch_deg"][-1] ** 2) ** 0.5,
-             d["yaw_deg"][-1]))
+             (d["pitch_deg"][-1] ** 2 + d["yaw_deg"][-1] ** 2) ** 0.5,
+             d["roll_deg"][-1]))
     print("samples: %d over %.1f s" % (n, t[-1]))
 
 

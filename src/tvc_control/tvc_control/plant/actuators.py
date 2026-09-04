@@ -62,7 +62,7 @@ class GimbalActuator:
 
 
 class MotorLag:
-    """Command -> achieved (thrust, axial torque), with the measured lag.
+    """Command -> achieved (thrust, roll torque), with the measured lag.
 
     Acts on the PHYSICAL PAIR, not on rotor speed, because (T, tau_P) is what
     the bench measured. Filtering a rotor speed instead would put the lag on a

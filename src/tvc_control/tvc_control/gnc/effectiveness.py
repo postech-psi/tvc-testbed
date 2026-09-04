@@ -14,7 +14,7 @@ WHY THE COAX PAIR NEEDS A SURFACE AND NOT TWO CURVES
 
 WHY THE INVERSE IS MOSTLY ABOUT FEASIBILITY
     (T, tau_P) cannot be commanded independently. The reachable set is the image
-    of the command square -- a curved lens, not a rectangle -- and axial
+    of the command square -- a curved lens, not a rectangle -- and roll
     authority peaks near 11 N of thrust and collapses at both ends: +0.147 /
     -0.089 N*m at hover, essentially nothing at 96% throttle. So the inverse
     clamps to the feasible set in the documented priority order (thrust first,
@@ -41,15 +41,15 @@ _TERMS = ((0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2),
 
 
 class ThrustTorqueSurface:
-    """Bench-measured (PWM A, PWM B) -> (thrust, axial torque), and its inverse."""
+    """Bench-measured (PWM A, PWM B) -> (thrust, roll torque), and its inverse."""
 
     # Fraction of the true boundary the inverse promises. The tabulated extremes
     # sit exactly on the edge of the reachable set, which is precisely where the
     # surface's Jacobian degenerates -- Newton can approach it but not land on
     # it. Promising headroom the inverse cannot deliver makes the allocator ask
     # for the one target that fails, so what is handed out is 2% inside. The
-    # cost is 2% of axial authority; the alternative was a silent thrust
-    # shortfall at full axial command.
+    # cost is 2% of roll authority; the alternative was a silent thrust
+    # shortfall at full roll command.
     SOLVER_MARGIN = 0.98
 
     def __init__(self, coeffs_thrust, coeffs_torque, pwm_offset=1500.0,
@@ -88,11 +88,11 @@ class ThrustTorqueSurface:
         return da, db
 
     def forward_norm(self, a, b):
-        """Normalized commands -> (thrust N, axial torque N*m)."""
+        """Normalized commands -> (thrust N, roll torque N*m)."""
         return self._eval(self.c_T, a, b), self._eval(self.c_Q, a, b)
 
     def forward(self, pwm_a, pwm_b):
-        """PWM microseconds -> (thrust N, axial torque N*m)."""
+        """PWM microseconds -> (thrust N, roll torque N*m)."""
         return self.forward_norm(self._norm(pwm_a), self._norm(pwm_b))
 
     # --- feasible set --------------------------------------------------------
@@ -238,7 +238,7 @@ class ThrustTorqueSurface:
         return a, b, T, Q
 
     def inverse(self, thrust_n, torque_nm, iters=40, tol=1e-9, thrust_tol=1e-4):
-        """(thrust, axial torque) -> (PWM A, PWM B, achieved T, achieved tau_P).
+        """(thrust, roll torque) -> (PWM A, PWM B, achieved T, achieved tau_P).
 
         The achieved pair is returned rather than assumed because the clamping
         is part of the answer: a caller that logs the request instead of the
@@ -250,7 +250,7 @@ class ThrustTorqueSurface:
         solve -- it stalls with a large thrust residual and would silently
         return a command producing over a newton less lift than asked. When that
         happens, back the torque off in stages and re-solve: the vehicle gives
-        up axial authority, never lift.
+        up roll authority, never lift.
         """
         t_lo, t_hi = self.thrust_limits()
         T_t = min(max(thrust_n, t_lo), t_hi)

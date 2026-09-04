@@ -21,21 +21,21 @@ from ..plant.sensors import PerfectEstimator
 class SimConfig:
     """Simulation run configuration: horizon, control period, targets, disturbance.
 
-    roll_des_deg / pitch_des_deg are the LATERAL setpoints (body x / body y);
-    axial_des_deg is the thrust-axis channel the paper calls roll. See the
+    att_pitch_des_deg / att_yaw_des_deg are the LATERAL setpoints (body x / body y);
+    att_roll_des_deg is the thrust-axis channel the paper calls pitch. See the
     axis-naming note in the module docstring.
     """
 
     t_final: float = 5.0
     dt_ctrl: float = 0.01
 
-    roll_des_deg: float = 0.0
-    pitch_des_deg: float = 5.0
-    axial_des_deg: float = 0.0      # body-z (thrust-axis) attitude setpoint
+    att_pitch_des_deg: float = 0.0
+    att_yaw_des_deg: float = 5.0
+    att_roll_des_deg: float = 0.0      # body-z (thrust-axis) attitude setpoint
 
-    init_roll_deg: float = 3.0
-    init_pitch_deg: float = -4.0
-    init_axial_deg: float = 0.0
+    init_att_pitch_deg: float = 3.0
+    init_att_yaw_deg: float = -4.0
+    init_att_roll_deg: float = 0.0
 
     # Altitude loop. Disabled by default so the historical attitude-only smoke
     # test, the GUI, and every existing plot keep producing the same numbers:
@@ -84,13 +84,13 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         tilt_compensation=cfg.tilt_compensation,
     ))
 
-    roll_des = np.deg2rad(cfg.roll_des_deg)
-    pitch_des = np.deg2rad(cfg.pitch_des_deg)
-    axial_des = np.deg2rad(cfg.axial_des_deg)
+    pitch_des = np.deg2rad(cfg.att_pitch_des_deg)
+    yaw_des = np.deg2rad(cfg.att_yaw_des_deg)
+    roll_des = np.deg2rad(cfg.att_roll_des_deg)
 
-    q0 = euler_to_quat(np.deg2rad(cfg.init_roll_deg),
-                       np.deg2rad(cfg.init_pitch_deg),
-                       np.deg2rad(cfg.init_axial_deg))
+    q0 = euler_to_quat(np.deg2rad(cfg.init_att_pitch_deg),
+                       np.deg2rad(cfg.init_att_yaw_deg),
+                       np.deg2rad(cfg.init_att_roll_deg))
     x = np.concatenate([[0, 0, cfg.init_z], [0, 0, 0], q0, [0, 0, 0]])
 
     T_hover = vparams.m * vparams.g
@@ -108,10 +108,10 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     thrust_arr = np.zeros(n_steps)
     tau_p_arr = np.zeros(n_steps)
     motor_arr = np.zeros((n_steps, 2))
-    sat_arr = np.zeros((n_steps, 3), dtype=bool)   # gimbal, axial, thrust
+    sat_arr = np.zeros((n_steps, 3), dtype=bool)   # gimbal, roll, thrust
 
-    setpoint = Setpoint(roll_des=roll_des, pitch_des=pitch_des,
-                        axial_des=axial_des, z_des=cfg.z_des,
+    setpoint = Setpoint(pitch_des=pitch_des, yaw_des=yaw_des,
+                        roll_des=roll_des, z_des=cfg.z_des,
                         pos_des=(cfg.x_des, cfg.y_des, cfg.z_des))
 
     t = 0.0
@@ -131,7 +131,7 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         # between the two is one servo lag and is worth measuring later.
         cmd = controller.update(est, setpoint, cfg.dt_ctrl, gimbal_rad=delta)
         alloc = controller.attitude.last_alloc
-        delta_cmd = np.array([cmd.gimbal_delta1_rad, cmd.gimbal_delta2_rad])
+        delta_cmd = np.array([cmd.gimbal_inner_rad, cmd.gimbal_outer_rad])
         # Both actuator lags in one call: the gimbal's 30 ms transport delay and
         # slew, and the motors' ~100 ms thrust response. What reaches the rigid
         # body is what the actuators ACHIEVED, not what was commanded.
@@ -156,7 +156,7 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         thrust_arr[k] = T_ach
         tau_p_arr[k] = tau_p_ach
         motor_arr[k] = (alloc.T1, alloc.T2)
-        sat_arr[k] = (cmd.sat_gimbal, cmd.sat_axial, cmd.sat_thrust)
+        sat_arr[k] = (cmd.sat_gimbal, cmd.sat_roll, cmd.sat_thrust)
 
     metrics = _compute_metrics(t_arr, euler_arr, delta_arr, cfg,
                                pos_arr=pos_arr, tau_p_arr=tau_p_arr,
@@ -181,45 +181,45 @@ def _compute_metrics(t_arr, euler_arr, delta_arr, cfg: SimConfig, band=0.02,
                      pos_arr=None, tau_p_arr=None, sat_arr=None):
     """
     Compute summary metrics:
-      - final roll/pitch error
+      - final pitch/yaw error
       - max |delta1|, max |delta2|
-      - 2%-band settling time for pitch (first time after which the response
+      - 2%-band settling time for yaw (first time after which the response
         stays within +/- band*|step size| of the final value)
     """
-    final_roll = euler_arr[-1, 0]
-    final_pitch = euler_arr[-1, 1]
+    final_pitch = euler_arr[-1, 0]
+    final_yaw = euler_arr[-1, 1]
 
-    roll_err = final_roll - cfg.roll_des_deg
-    pitch_err = final_pitch - cfg.pitch_des_deg
+    pitch_err = final_pitch - cfg.att_pitch_des_deg
+    yaw_err = final_yaw - cfg.att_yaw_des_deg
 
     max_d1 = np.max(np.abs(delta_arr[:, 0]))
     max_d2 = np.max(np.abs(delta_arr[:, 1]))
 
-    # settling time on pitch (typically the dominant commanded motion)
-    step_size = max(abs(cfg.pitch_des_deg - cfg.init_pitch_deg), 1e-6)
-    # A 2% band on a zero-size step is not a band. When pitch is commanded from
+    # settling time on yaw (typically the dominant commanded motion)
+    step_size = max(abs(cfg.att_yaw_des_deg - cfg.init_att_yaw_deg), 1e-6)
+    # A 2% band on a zero-size step is not a band. When yaw is commanded from
     # 0 to 0, step_size collapses to the 1e-6 floor and any cross-axis coupling
     # -- which the full inertia tensor now produces, ~0.2 deg of it -- reads as
     # "never settled" for the whole horizon. Below the angle this vehicle can
     # actually hold, settling is not a meaningful measurement, so an absolute
     # floor applies.
     tol = max(band * step_size, 0.05)
-    err_series = np.abs(euler_arr[:, 1] - cfg.pitch_des_deg)
+    err_series = np.abs(euler_arr[:, 1] - cfg.att_yaw_des_deg)
     outside = np.where(err_series > tol)[0]
     settling_time = t_arr[outside[-1]] if len(outside) > 0 else 0.0
 
     m = {
-        "final_roll_deg": final_roll,
         "final_pitch_deg": final_pitch,
-        "roll_error_deg": roll_err,
+        "final_yaw_deg": final_yaw,
         "pitch_error_deg": pitch_err,
-        "max_delta1_deg": max_d1,
-        "max_delta2_deg": max_d2,
+        "yaw_error_deg": yaw_err,
+        "max_gimbal_inner_deg": max_d1,
+        "max_gimbal_outer_deg": max_d2,
         "gimbal_max_deg": np.rad2deg(0.0),  # filled in by caller if needed
         "settling_time_s": settling_time,
-        # Axial channel (the paper's roll axis).
-        "final_axial_deg": euler_arr[-1, 2],
-        "axial_error_deg": euler_arr[-1, 2] - cfg.axial_des_deg,
+        # Roll channel (the paper's pitch axis).
+        "final_roll_deg": euler_arr[-1, 2],
+        "roll_error_deg": euler_arr[-1, 2] - cfg.att_roll_des_deg,
     }
     if tau_p_arr is not None:
         m["max_tau_p_Nm"] = float(np.max(np.abs(tau_p_arr)))
@@ -232,6 +232,6 @@ def _compute_metrics(t_arr, euler_arr, delta_arr, cfg: SimConfig, band=0.02,
         m["altitude_error_m"] = float(pos_arr[-1, 2] - ref)
     if sat_arr is not None:
         m["gimbal_sat_frac"] = float(np.mean(sat_arr[:, 0]))
-        m["axial_sat_frac"] = float(np.mean(sat_arr[:, 1]))
+        m["roll_sat_frac"] = float(np.mean(sat_arr[:, 1]))
         m["thrust_sat_frac"] = float(np.mean(sat_arr[:, 2]))
     return m

@@ -33,8 +33,8 @@ def generate_launch_description():
                 # 250 Hz to match Gazebo's odometry publisher, so the control
                 # loop sees the same sample rate on both plants.
                 'dt': 0.004,
-                'init_roll_deg': 3.0,
-                'init_pitch_deg': -4.0,
+                'init_att_pitch_deg': 3.0,
+                'init_att_yaw_deg': -4.0,
                 'init_z': 2.0,
                 # gimbal_rate_max_deg was passed here at 180.0, contradicting
                 # the measured per-ring rates (403 inner / 235 outer). It is
@@ -47,8 +47,8 @@ def generate_launch_description():
             parameters=[{
                 'rate_hz': 250.0,
                 'gain_profile': profile,
-                'roll_des_deg': 0.0,
-                'pitch_des_deg': 0.0,
+                'att_pitch_des_deg': 0.0,
+                'att_yaw_des_deg': 0.0,
                 'altitude_hold': LaunchConfiguration('altitude_hold'),
                 'position_hold': LaunchConfiguration('position_hold'),
                 'z_des': 2.0,

@@ -49,8 +49,8 @@ class SimulatorNode(Node):
                     "See docs/CONVENTIONS.md." % name)
 
         self.declare_parameter('dt', 0.004)
-        self.declare_parameter('init_roll_deg', 3.0)
-        self.declare_parameter('init_pitch_deg', -4.0)
+        self.declare_parameter('init_att_pitch_deg', 3.0)
+        self.declare_parameter('init_att_yaw_deg', -4.0)
         self.declare_parameter('init_z', 2.0)
 
         self.dt = float(self.get_parameter('dt').value)
@@ -63,8 +63,8 @@ class SimulatorNode(Node):
             motor_deadtime_s=md.get('deadtime_s', 0.0))
 
         q0 = euler_to_quat(
-            np.deg2rad(self.get_parameter('init_roll_deg').value),
-            np.deg2rad(self.get_parameter('init_pitch_deg').value), 0.0)
+            np.deg2rad(self.get_parameter('init_att_pitch_deg').value),
+            np.deg2rad(self.get_parameter('init_att_yaw_deg').value), 0.0)
         z0 = float(self.get_parameter('init_z').value)
         self.x = np.concatenate([[0, 0, z0], [0, 0, 0], q0, [0, 0, 0]])
         self.t = 0.0
@@ -86,20 +86,20 @@ class SimulatorNode(Node):
         self.get_logger().info('simulator_node: dt=%.4f s, z0=%.2f m' % (self.dt, z0))
 
     def on_cmd(self, msg: ActuatorCommand):
-        if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER:
+        if msg.axis_convention != ActuatorCommand.AXIS_CONVENTION_ROCKET_V2:
             raise SystemExit(
                 'axis convention mismatch: controller sent %d, this plant speaks '
                 '%d. See docs/CONVENTIONS.md.'
                 % (msg.axis_convention,
-                   ActuatorCommand.AXIS_CONVENTION_LEGACY_QUADCOPTER))
+                   ActuatorCommand.AXIS_CONVENTION_ROCKET_V2))
         self.cmd = msg
 
     def tick(self):
         if self.cmd is None:
             delta_cmd, T_cmd, tau_p_cmd = np.zeros(2), self.T_hover, 0.0
         else:
-            delta_cmd = np.array([self.cmd.gimbal_delta1_rad,
-                                  self.cmd.gimbal_delta2_rad])
+            delta_cmd = np.array([self.cmd.gimbal_inner_rad,
+                                  self.cmd.gimbal_outer_rad])
             T_cmd, tau_p_cmd = self.cmd.thrust_n, self.cmd.tau_p_nm
 
         # The same actuator chain the analytic harness uses -- gimbal slew and

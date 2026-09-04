@@ -62,8 +62,8 @@ from .gnc.mathx import (
 from .gnc.pid import PID
 from .gnc.allocation import (
     Allocation,
-    axial_headroom,
-    axial_limits,
+    roll_headroom,
+    roll_limits,
     mix_motors,
     allocate,
     _lateral_gimbal,
@@ -83,7 +83,7 @@ __all__ = [
     "load_vehicle_params", "load_gains",
     "quat_normalize", "quat_to_rotmat", "quat_kinematics", "quat_to_euler",
     "euler_to_quat", "thrust_axis",
-    "PID", "Allocation", "axial_headroom", "axial_limits", "mix_motors",
+    "PID", "Allocation", "roll_headroom", "roll_limits", "mix_motors",
     "allocate", "AttitudeController", "AltitudeController",
     "GimbalActuator", "dynamics", "simulate",
 ]
@@ -99,8 +99,8 @@ if __name__ == "__main__":
     result = simulate(vp, gains, cfg)
     m = result["metrics"]
     print("Headless smoke test:")
-    print(f"  final roll:  {m['final_roll_deg']:+.3f} deg (target {cfg.roll_des_deg:.1f})")
-    print(f"  final pitch: {m['final_pitch_deg']:+.3f} deg (target {cfg.pitch_des_deg:.1f})")
-    print(f"  max |delta1|: {m['max_delta1_deg']:.2f} deg")
-    print(f"  max |delta2|: {m['max_delta2_deg']:.2f} deg")
-    print(f"  settling time (pitch, 2% band): {m['settling_time_s']:.2f} s")
+    print(f"  final pitch:  {m['final_pitch_deg']:+.3f} deg (target {cfg.att_pitch_des_deg:.1f})")
+    print(f"  final yaw: {m['final_yaw_deg']:+.3f} deg (target {cfg.att_yaw_des_deg:.1f})")
+    print(f"  max |delta1|: {m['max_gimbal_inner_deg']:.2f} deg")
+    print(f"  max |delta2|: {m['max_gimbal_outer_deg']:.2f} deg")
+    print(f"  settling time (yaw, 2% band): {m['settling_time_s']:.2f} s")

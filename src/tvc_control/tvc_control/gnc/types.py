@@ -71,11 +71,11 @@ class Setpoint:
     """
 
     # attitude targets, rad. Names follow the CURRENT repo convention
-    # (roll = body x, pitch = body y, axial = body z); the rename to the rocket
+    # (pitch = body x, yaw = body y, roll = body z); the rename to the rocket
     # convention is a later, separate commit -- see docs/CONVENTIONS.md.
-    roll_des: float = 0.0
     pitch_des: float = 0.0
-    axial_des: float = 0.0
+    yaw_des: float = 0.0
+    roll_des: float = 0.0
 
     z_des: float = 0.0                             # m, inertial altitude
     pos_des: tuple = field(default_factory=_v3)    # m, inertial x/y (z unused)
@@ -101,12 +101,12 @@ class ActuatorSetpoint:
 
     motor_a: float = 0.0             # [0,1], normalized against the surface
     motor_b: float = 0.0
-    gimbal_delta1_rad: float = 0.0   # inner ring, pitch plane (current naming)
-    gimbal_delta2_rad: float = 0.0   # outer ring, roll plane  (current naming)
+    gimbal_inner_rad: float = 0.0   # inner ring, yaw plane (current naming)
+    gimbal_outer_rad: float = 0.0   # outer ring, pitch plane  (current naming)
 
     thrust_n: float = 0.0            # expected achievement, not a command
     tau_p_nm: float = 0.0
 
     sat_gimbal: bool = False
-    sat_axial: bool = False
+    sat_roll: bool = False
     sat_thrust: bool = False
