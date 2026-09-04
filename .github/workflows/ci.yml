@@ -1,0 +1,64 @@
+name: ci
+
+# Two jobs, deliberately unequal in status.
+#
+# `unit` is the merge gate. It is pure Python -- no ROS, no Gazebo, no GUI --
+# so it runs in seconds and is never flaky, and it is what guards the two
+# invariants this project cannot check by eye: the flight code's porting
+# discipline, and the axis convention. Both fail silently otherwise. A numpy
+# import sneaking into gnc/ breaks nothing until someone attempts the PX4 port;
+# a mistyped SDF joint name produces a gimbal that never moves and reads as a
+# control bug.
+#
+# `sitl` is not a gate yet. Gazebo in CI is slow and flaky, and making it
+# blocking before it has been green for a while trains people to ignore red.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install numpy scipy pyyaml matplotlib pillow pytest
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      # The Gazebo model is generated from vehicle_params.yaml and must never be
+      # hand-edited; --check fails if the file on disk differs from what the
+      # generator produces, and also that the composite mass properties still
+      # reproduce the YAML's.
+      - name: Gazebo model is in sync with the parameters
+        run: python tools/gen_model_sdf.py --check
+
+      # The frozen numerical baseline. Any change here must be deliberate and
+      # explained in a commit message -- see sim/golden/README.md.
+      - name: Analytic baseline unchanged
+        run: python sim/capture_golden.py --check
+
+      - name: Control scenarios
+        run: python sim/validate_control.py
+
+  sitl:
+    # Non-blocking until it has been reliably green. Enable the schedule and
+    # drop continue-on-error once that is true.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: |
+          echo "SITL job not yet implemented."
+          echo "It needs a ROS 2 Jazzy + gz Harmonic container, then:"
+          echo "  colcon build --packages-select tvc_msgs"
+          echo "  colcon build --packages-select tvc_control"
+          echo "  ros2 launch tvc_control gazebo.launch.py gui:=false"
+          echo "See docs/CREDIBILITY.md -- the ROS2 path has never been built."

@@ -1,3 +1,21 @@
+# Desktop tools
+
+The host-side tools: the Tkinter GUI, the 3D viewer, the plotter and the GIF
+recorder. All of them drive the analytic plant or read its output; none of them
+needs Docker, ROS or Gazebo.
+
+> **This file used to be SIMULATOR.md and described the physics as well.** That
+> description is gone rather than updated, for two reasons. It had become false
+> — it stated that torque about the thrust axis "is not modeled in this
+> attitude-only simulator", which is now the roll channel and is very much
+> modeled — and duplicating physics prose is how two documents come to disagree.
+>
+> Frames, axis names, signs and vehicle numbers: [CONVENTIONS.md](CONVENTIONS.md).
+> How much to trust the output: [CREDIBILITY.md](CREDIBILITY.md).
+> Control architecture: [CONTROLLER_DESIGN.md](CONTROLLER_DESIGN.md).
+
+---
+
 # TVC 6-DOF Attitude Simulator — Interactive GUI
 
 Polished Step 2 simulator with an interactive desktop GUI: edit vehicle

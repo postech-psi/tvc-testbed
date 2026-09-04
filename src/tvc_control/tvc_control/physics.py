@@ -40,7 +40,7 @@ References carried over from the original module:
 
 if __package__ in (None, ""):
     # Executed as a script (`python src/tvc_control/tvc_control/physics.py`, the
-    # headless smoke test SIMULATOR.md documents). Relative imports need a
+    # headless smoke test docs/TOOLS.md documents). Relative imports need a
     # package context, which a script does not have, so establish one. Harmless
     # when imported normally -- this branch is then not taken.
     import os as _os

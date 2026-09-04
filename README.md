@@ -2,7 +2,53 @@
 
 This gets you a development environment — ROS2 Jazzy + Gazebo Harmonic + the PX4 bridge tool — that is identical on every machine it runs on, whether that's your laptop, a teammate's, or a lab workstation. That sameness is the entire point of using Docker here: "it works on my machine" stops being a possible excuse, because everyone's machine is running the same container.
 
-Looking for the Phase 1/2 standalone simulator (the plain-Python/Tkinter GUI, no Docker needed) instead? See [SIMULATOR.md](SIMULATOR.md).
+**Looking for the simulator?** Jump to [Running the simulator](#running-the-simulator) below. Start with [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — frames, axis names and signs live there and nowhere else — and read [docs/CREDIBILITY.md](docs/CREDIBILITY.md) before trusting any number that comes out.
+
+## Running the simulator
+
+One vehicle model, one controller, three ways to fly it. The flight code in
+`tvc_control/gnc/` is identical in all three — only the plant and the transport
+change, which is what makes a result obtained in one of them evidence about the
+others.
+
+| what | command | needs |
+|---|---|---|
+| **Fast analytic loop** — no ROS, no Gazebo. The inner loop for tuning and the fastest way to attribute a failure to control rather than physics. | `python sim/validate_control.py --verbose` | Python only |
+| **Interactive** — the Tkinter GUI and the 3D viewer over the same analytic plant. | `python tvc_gui.py` | Python + tkinter |
+| **Gazebo, no ROS** — the standalone gz-transport controller. Fewest moving parts of the two Gazebo paths. | `bash sim/run_hover.sh --duration 30 --altitude 2.0` | devcontainer |
+| **Gazebo + ROS 2** — the full stack: gz plant, ros_gz_bridge, controller node. | `ros2 launch tvc_control gazebo.launch.py` | devcontainer + `colcon build` |
+| **ROS 2, no Gazebo** — same nodes, analytic plant. Differs from the line above only in which plant process runs. | `ros2 launch tvc_control phase4.launch.py` | devcontainer + `colcon build` |
+
+Checks, all of which CI runs:
+
+```bash
+python -m pytest tests/ -q            # porting discipline, axis convention, allocation
+python sim/capture_golden.py --check  # the frozen numerical baseline
+python tools/gen_model_sdf.py --check # the Gazebo model matches the parameters
+```
+
+The ROS 2 packages have **never been built**. Before the first launch:
+
+```bash
+colcon build --packages-select tvc_msgs
+source install/setup.bash
+colcon build --packages-select tvc_control
+```
+
+### Where things live
+
+```
+tvc_control/gnc/      FLIGHT CODE. Controller, allocation, actuator effectiveness.
+                      Pure Python by rule (tests/test_gnc_purity.py enforces it)
+                      so the eventual PX4 module is a port, not a rewrite.
+tvc_control/plant/    SIMULATION ONLY. Rigid body, actuator lag, sensors.
+                      gnc must never import from here.
+tvc_control/hal/      Transport adapters. No control.
+tvc_control/harness/  Owns the clock and the I/O.
+docs/CONVENTIONS.md   Frames, axis names, signs, identifiers. The single source.
+docs/CREDIBILITY.md   How much to trust the output, and on what evidence.
+sim/golden/           Frozen numbers. A change here must be deliberate.
+```
 
 ## Concepts, briefly (skip if you already know Docker)
 

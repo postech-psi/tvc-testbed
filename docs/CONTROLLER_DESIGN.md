@@ -20,8 +20,11 @@ signal interfaces before they harden into firmware.
 - **Attitude representation:** unit quaternion throughout the loop; Euler angles
   are computed for readout/plotting only (no gimbal-lock singularity).
 - **Actuators:** `T` (total thrust, via motor PWM), `δ₁` (pitch-plane gimbal),
-  `δ₂` (roll-plane gimbal), and `τ_z` (yaw via differential RPM, future).
-- **Gimbal authority:** ±15° each axis, servo rate-limited (180°/s model /
+  `δ₂` (pitch-plane gimbal), and `τ_P` (roll via differential prop torque, **built**).
+- **Gimbal authority:** measured per ring and ASYMMETRIC — inner −6.46…+6.98°
+  at 403 °/s, outer −6.77…+6.86° at 235 °/s, both with ~30 ms transport
+  deadtime. (This said ±15° at 180°/s, a design-intent guess superseded by
+  the bench. Rate-limited (
   ~577°/s bench).
 
 ---
@@ -98,7 +101,7 @@ outermost, fastest innermost.
 flowchart LR
     REF["Guidance ref<br/>pos / alt / attitude setpoint"]
 
-    subgraph POS["Position / Altitude loop (outer, future)"]
+    subgraph POS["Position / Altitude loop (outer, BUILT)"]
         PZ["Altitude PID → thrust T"]
         PXY["Position PID → tilt setpoint"]
     end
@@ -116,7 +119,7 @@ flowchart LR
     end
 
     subgraph ALLOC["Control allocation"]
-        INV["invert gimbal map:<br/>δ₁ = asin(−τ_y / (L·T))<br/>δ₂ = asin(−τ_x / (L·T·cos δ₁))<br/>clip to ±15°"]
+        INV["allocate: 2×2 inverse incl. τ_P cross-terms,<br/>Newton refinement, cosine-loss iteration<br/>clip per ring, per sign"]
     end
 
     ACTU["Actuators<br/>gimbal servos + coax motors"]
@@ -144,12 +147,12 @@ flowchart LR
 
 | Loop | Rate (target) | Input error | Gain / law | Output | Status |
 |------|---------------|-------------|------------|--------|--------|
-| Position (x,y) | ~10–20 Hz | pos error | PID → tilt cmd | attitude setpoint | **future** |
-| Altitude (z) | ~50 Hz | alt/vel error | PID → thrust | `T` | **future** |
+| Position (x,y) | 250 Hz | pos error | PD → tilt cmd | attitude setpoint | **built** |
+| Altitude (z) | 250 Hz | alt/vel error | P-PID + 1/cosθ FF | `T` | **built** |
 | Attitude (angle) | ~100 Hz (→1 kHz) | quaternion error | `Kp_angle` (P-only) | body-rate setpoint | **built** |
 | Rate (ω) | ~100 Hz (→1 kHz) | rate error | full PID + anti-windup | torque `τ_x, τ_y` | **built** |
-| Allocation | with rate loop | — | inverse gimbal map (`arcsin`) | `δ₁, δ₂` | **built** |
-| Yaw (τ_z) | — | heading error | differential RPM | `τ_z` | **future** |
+| Allocation | with rate loop | — | 2×2 inverse + Newton, signed feasible set | `δ₁, δ₂, τ_P, u_a, u_b` | **built** |
+| Roll (τ_P) | 250 Hz | roll error | P-PID → differential prop torque | `τ_P` | **built** |
 
 The **attitude + rate loops + allocation** already exist and are validated
 (`physics.py`, `controller_node.py`). The **position/altitude/yaw** loops are
@@ -190,8 +193,8 @@ everything left of `/ctrl/gimbal_cmd` is portable into custom PX4 later.
    1. Attitude (angle) loop — quaternion error → rate setpoint.
    2. Rate loop — PID + anti-windup → torque.
    3. Control allocation — exact inverse gimbal map, saturation handling.
-   4. Altitude loop (future) — thrust command.
-   5. Position + yaw loops (future) — outer guidance, differential RPM.
+   4. Altitude loop — thrust command, with 1/cosθ feedforward.
+   5. Position + roll loops — outer guidance, differential prop torque.
 5. **Gain selection & tuning** — current gains, tuning method, GUI/param sweep.
 6. **Interfaces** — §4 signal table; topic boundary; port-to-PX4 plan.
 7. **Validation** — Python SIL → Gazebo SITL → tethered → free hover → full

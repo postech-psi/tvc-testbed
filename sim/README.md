@@ -48,12 +48,13 @@ ros2 topic echo /ctrl/gimbal_cmd --once        # what the controller commands
 
 **Calibrated from bench data** in the `tvc-data` repo:
 
-- `motorConstant` 8.26e-6 — from 20.0 N max combined thrust at full throttle,
+- `motorConstant` 7.35e-6 — from 17.79 N max combined thrust (measured surface),
   measured in `raw/2026-07-20/loadcell/` (loaded by `tvctools.legacy`; those are
   the only runs that reach PWM 2000)
 - `momentConstant` 0.016 — from the coax reaction-torque crossing in
   `out/pwm_thrust_torque_map.csv`
-- Gimbal limits ±15°, slew 180°/s — matches `VehicleParams`, which matches the
+- Gimbal limits are per ring and asymmetric (inner −6.46…+6.98°, outer
+  −6.77…+6.86°); slew 403/235 °/s — matches `VehicleParams`, which matches the
   hardware's mechanical limit
 
 **Geometry** is from `TVC Ver3.step`: gimbal pivot at the origin, rotors just
@@ -80,7 +81,7 @@ inertia measurement exists.
 
 ## Thrust margin
 
-Max thrust is **20.0 N** against **13.03 N** of weight → **T/W ≈ 1.54**, a
+Max thrust is **17.79 N** against **13.03 N** of weight → **T/W ≈ 1.37**, a
 workable VTVL margin. Hover sits at ~81% of max rotor speed
 (`gazebo_bridge_node` computes and logs this).
 
@@ -88,7 +89,11 @@ That figure comes from the **2026-07-20** runs — the only ones reaching full
 throttle (PWM 2000); every later session stops at 1850 µs. They drove both
 rotors from one signal, i.e. the *balanced* case, which is the right basis:
 unequal rotors make net roll torque, and roll is the one axis the gimbal cannot
-trim. Three runs gave 18.07 / 19.34 / 19.96 N; 20.0 N is the optimistic end.
+trim. Superseded by the 121-point measured surface, whose F(1,1) = 17.79 N.
+
+> NOTE: `maxRotVelocity` and `momentConstant` in the SDF are now SOLVER
+> constants, not physics — see `tvc_control/hal/gazebo.py`. Simulated rotor
+> speed is a control allocation variable and must not be read as an RPM.
 
 Corroborated independently: the 07-24 coax data, voltage-normalized to a fresh
 pack and extrapolated to PWM 2000, predicts 17.8 N against 18.07 N measured —

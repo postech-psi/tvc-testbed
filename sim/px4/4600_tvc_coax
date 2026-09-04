@@ -1,3 +1,11 @@
+# AXIS CONVENTION WARNING. This file speaks PX4's language, not ours.
+# PX4 uses the FRD body frame and calls rotation about the THRUST AXIS
+# "yaw"; our convention (docs/CONVENTIONS.md) calls that "roll", and our
+# frame is PX4's rotated 180 deg about x. Both are standard in their own
+# domain -- launch vehicle vs multicopter -- and PX4's names are not ours to
+# change. The translation table is in CONVENTIONS.md section 4 and is owned
+# by the PX4 HAL; get it wrong and two of three axes silently invert.
+#
 #!/bin/sh
 #
 # @name TVC Coaxial VTVL (POSTECH PSI UGRP)
@@ -51,7 +59,8 @@ param set-default CA_ROTOR0_PX 0.0
 param set-default CA_ROTOR0_PY 0.0
 param set-default CA_ROTOR0_PZ 0.0
 param set-default CA_ROTOR0_KM 0.016
-# Rotor B: CW -- opposite spin is the entire yaw authority on this airframe
+# Rotor B: CW -- opposite spin is the entire thrust-axis authority on this
+# airframe (PX4 calls that yaw; we call it roll -- see the header)
 param set-default CA_ROTOR1_PX 0.0
 param set-default CA_ROTOR1_PY 0.0
 param set-default CA_ROTOR1_PZ -0.03
@@ -67,14 +76,21 @@ param set-default SIM_GZ_EC_FUNC1 101      # rotor A
 param set-default SIM_GZ_EC_FUNC2 102      # rotor B
 param set-default SIM_GZ_EC_MIN1 0
 param set-default SIM_GZ_EC_MIN2 0
-param set-default SIM_GZ_EC_MAX1 1100
-param set-default SIM_GZ_EC_MAX2 1100
+param set-default SIM_GZ_EC_MAX1 1100   # see the maxRotVelocity note below
+param set-default SIM_GZ_EC_MAX2 1100   # see the maxRotVelocity note below
+# STALE: the SDF now uses maxRotVelocity 1300 as SOLVER HEADROOM, not a
+# physical limit -- simulated rotor speed is a control allocation variable
+# (tvc_control/hal/gazebo.py). These must be regenerated with the rest of
+# the PX4 path.
 
-param set-default SIM_GZ_SV_FUNC1 201      # gimbal pitch
-param set-default SIM_GZ_SV_FUNC2 202      # gimbal roll
-# +/- 15 deg mechanical limit, matching the SDF joint limits and
-# VehicleParams.gimbal_max_deg. Exceeding this in sim would silently model a
-# gimbal the hardware does not have.
+param set-default SIM_GZ_SV_FUNC1 201      # gimbal INNER ring (our yaw plane, body y)
+param set-default SIM_GZ_SV_FUNC2 202      # gimbal OUTER ring (our pitch plane, body x)
+# STALE: these encode +/- 15 deg, a design-intent guess. The bench measured
+# per-ring, ASYMMETRIC travel -- inner -6.46..+6.98 deg, outer -6.77..+6.86 --
+# and the SDF is generated from those. These PX4 params have not been
+# regenerated because the PX4 path has never been run; do it before trusting
+# them, or the sim models a gimbal the hardware does not have. See
+# tvc_control/vehicle_params.yaml (gimbal.axes) and docs/CONVENTIONS.md.
 param set-default SIM_GZ_SV_MIN1 -262
 param set-default SIM_GZ_SV_MAX1 262
 param set-default SIM_GZ_SV_MIN2 -262

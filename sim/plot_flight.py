@@ -17,11 +17,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-try:
-    from vehicle_params import load as _load_vehicle
-    GIMBAL_LIMIT_DEG = _load_vehicle().gimbal_max_deg
-except Exception:            # keep plotting even if the params file is absent
-    GIMBAL_LIMIT_DEG = 15.0
+# No fallback. This used to default to 15.0 deg if the params import failed --
+# a value superseded by the 7 deg bench measurement, which would have silently
+# drawn every gimbal trace against a limit line at twice the real travel. A plot
+# that lies about a limit is worse than no plot.
+from vehicle_params import load as _load_vehicle
+GIMBAL_LIMIT_DEG = _load_vehicle().gimbal_max_deg
 
 # Categorical slots in fixed order (never cycled), from the validated palette.
 C_BLUE, C_ORANGE, C_AQUA, C_RED = "#2a78d6", "#eb6834", "#1baf7a", "#e34948"

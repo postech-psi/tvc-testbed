@@ -1,3 +1,23 @@
+> **Restructured.** The simulator was rebuilt as a flight-software development
+> harness: flight code, plant and harness are now separate packages, the flight
+> code is pure-Python by enforced rule so the PX4 port is mechanical, and the
+> axis convention is unified (roll = thrust axis). Start at
+> [CONVENTIONS.md](CONVENTIONS.md); the honest account of what is and is not
+> verified is [CREDIBILITY.md](CREDIBILITY.md).
+>
+> **The highest-value measurement outstanding** is whether the bench's 100 ms
+> motor response is a transport delay or a first-order lag. Modelled both ways:
+> as a lag the roll channel recovers cleanly; as a delay it winds up to ~70 deg
+> and saturates 97% of the run. One bench run decides whether that channel is
+> controllable at the current gains.
+>
+> Deferred, with the data already in `vehicle_params.yaml` so re-enabling is a
+> code change and not a re-measurement: servo resonance (`resonance_db`,
+> `phase_lag_2hz_deg`), battery sag and thrust derating
+> (`motor_dynamics.sustained_load`), sensor noise and an estimator (Seam A is
+> already in place, so this drops in without touching the controller),
+> takeoff/landing, PIL and HIL, PX4 SITL.
+
 # TVC VTVL — where this is going
 
 POSTECH UGRP 2026. The goal is a **demonstrator that takes off vertically,

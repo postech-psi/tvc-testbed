@@ -1,4 +1,6 @@
 numpy
 scipy
 matplotlib
-pyyaml   # tools/mass_properties.py
+pyyaml     # config loading, tools/mass_properties.py
+pillow     # sim/record.py assembles the flight GIF
+pytest     # tests/
