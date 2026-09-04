@@ -22,7 +22,8 @@ Levels: **0** no evidence · **1** informal/anecdotal · **2** documented but
 unverified · **3** verified against an independent reference · **4** verified
 plus quantified uncertainty.
 
-Last updated: Phase 3 of the flight-software restructure.
+Last updated: end of the flight-software restructure (Phases 0-7; Phase 1, the
+first colcon build, is still outstanding and needs the devcontainer).
 
 ---
 
@@ -30,11 +31,11 @@ Last updated: Phase 3 of the flight-software restructure.
 
 | category | factor | level | one-line basis |
 |---|---|---|---|
-| M&S Development | Verification | **2** | four scenario checks + an allocation round-trip; no test suite, no CI |
+| M&S Development | Verification | **3** | 16-test suite + 5 scenarios + frozen baseline, all gated in CI |
 | M&S Development | Validation | **0** | *nothing has been compared against the real vehicle* |
 | M&S Operations | Input Pedigree | **3** | actuators bench-measured with stated fit error; mass properties are CAD + estimates |
 | M&S Operations | Results Uncertainty | **0** | measurement uncertainty is recorded but never propagated |
-| M&S Operations | Results Robustness | **2** | divergences enumerated; sensitivity untested |
+| M&S Operations | Results Robustness | **2** | divergences enumerated and one quantified (motor lag); sensitivity study still untested |
 | Supporting Evidence | Use History | **1** | one Gazebo hover demo; the ROS2 path has never run |
 | Supporting Evidence | M&S Management | **3** | single source of truth, generated model, version control, restore point |
 | Supporting Evidence | People Qualifications | — | not assessed |
@@ -61,12 +62,26 @@ Have:
 - `tools/gen_model_sdf.py --check` — the Gazebo model reproduces the YAML's mass
   properties (CG error 2e−16 mm).
 
-Missing:
-- No test suite, no CI. The four scenarios are a script nobody runs on a hook.
+Since raised to 3 by: `tests/` (16 tests) wired into a blocking CI job. It
+enforces the flight code's porting discipline by parsing it (no numpy/scipy/
+yaml/ROS import, no file I/O, no unbounded loop, no reach into the plant, and
+numpy blocked at the import hook), asserts the axis convention against the
+generated SDF including that every gimbal joint is actually driven by a plugin,
+checks the tau_P sign chain end to end, and verifies the Gazebo inversion
+round-trips over the measured envelope. The frozen baseline and the
+SDF-vs-parameters check run there too.
+
+The suite earned its keep immediately: it caught an incomplete axis rename (a
+three-cycle applied two-thirds of the way) on the commit it was written for.
+
+Still missing:
 - Integrator convergence never checked (no step-size refinement study).
+- No cross-plant comparison has been RUN. The machinery for it now exists --
+  both plants share one controller, one gain file and one actuator chain, and
+  the two launch files differ only in which plant process starts -- but the
+  first colcon build has not happened, so analytic-vs-Gazebo agreement remains
+  a claim about the architecture rather than a measurement.
 - No conservation check (energy/momentum with control off).
-- The τ_P sign chain — measured surface → allocator → Gazebo plugin — currently
-  agrees **by luck**; nothing asserts it.
 
 Raise to 3 by: `tests/` + CI (restructure Phase 6/7), a step-refinement study,
 and the sign-chain assertion.
