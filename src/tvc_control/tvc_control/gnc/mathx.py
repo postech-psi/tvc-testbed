@@ -86,3 +86,40 @@ def isclose(a, b):
     behaviour. rtol=1e-5, atol=1e-8, compared against |b|.
     """
     return abs(a - b) <= 1e-8 + 1e-5 * abs(b)
+
+
+def quat_mul(p, q):
+    """Hamilton product p (x) q, both (qw, qx, qy, qz)."""
+    pw, px, py, pz = p
+    qw, qx, qy, qz = q
+    return (pw*qw - px*qx - py*qy - pz*qz,
+            pw*qx + px*qw + py*qz - pz*qy,
+            pw*qy - px*qz + py*qw + pz*qx,
+            pw*qz + px*qy - py*qx + pz*qw)
+
+
+def quat_conj(q):
+    """Conjugate = inverse for a unit quaternion."""
+    return (q[0], -q[1], -q[2], -q[3])
+
+
+def attitude_error(q, q_des):
+    """Body-frame attitude error vector [rad], sign-matched to (desired - actual).
+
+    Returns 2*sgn(qe_w)*qe_v for qe = q^-1 (x) q_des, which is the standard
+    small-rotation error and equals the Euler difference to first order -- the
+    equivalence is asserted in tests/test_attitude_error.py rather than argued.
+
+    The sgn() picks the short way round. Without it the controller happily takes
+    the 350 deg path to a 10 deg target, which on a vehicle with 7 deg of gimbal
+    travel is not a slow recovery but a tumble.
+
+    Why this replaces the Euler difference: the Euler path had an arcsin
+    singularity at +/-90 deg on one specific axis, which meant the axis names
+    carried a stability caveat. Under the rocket convention that axis becomes
+    "yaw", and a reader would have to know which of three similar-looking
+    channels was the fragile one. This form has no preferred axis at all.
+    """
+    qe = quat_mul(quat_conj(q), q_des)
+    s = 1.0 if qe[0] >= 0.0 else -1.0
+    return (2.0 * s * qe[1], 2.0 * s * qe[2], 2.0 * s * qe[3])

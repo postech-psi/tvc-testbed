@@ -5,7 +5,7 @@ Moved verbatim from physics.py.
 """
 
 from .params import VehicleParams, ControlGains
-from .mathx import quat_to_euler
+from .mathx import attitude_error, euler_to_quat
 from .pid import PID
 from .allocation import Allocation, allocate
 
@@ -54,20 +54,24 @@ class AttitudeController:
     def desired_moment(self, q, omega, roll_des, pitch_des, axial_des, dt):
         """Attitude + rate cascade -> desired body moment (M_x, M_y, M_z) [N*m].
 
-        Euler angles are used for the OUTER loop error only. That is safe here
-        and is not the gimbal-lock trap the module docstring warns about: the
-        trap is propagating kinematics through Euler angles (this module never
-        does -- see quat_kinematics), whereas an error measured at the few
-        degrees this vehicle actually flies is nowhere near the +/-90 deg
-        singularity. If the envelope ever grows, swap in the quaternion error
-        2*sgn(qe_w)*qe_v; it agrees with this to first order.
+        The attitude error is the quaternion form 2*sgn(qe_w)*qe_v, not an
+        Euler difference. Both are the same to first order and this vehicle
+        flies at a few degrees, so the change is small -- but the Euler path
+        carried an arcsin singularity on one specific axis, which meant the
+        axis NAMES carried a stability caveat. After the rename that axis is
+        called "yaw", and a reader would have to know which of three
+        similar-looking channels was the fragile one. This form has no
+        preferred axis, so the caveat disappears instead of moving.
+
+        The setpoint is still specified as Euler angles because that is what a
+        human types; it is converted here, once, at the boundary.
         """
-        roll, pitch, axial = quat_to_euler(q)
+        e = attitude_error(q, euler_to_quat(roll_des, pitch_des, axial_des))
         sat = self.last_alloc
 
-        roll_rate_des = self.pid_roll_angle.update(roll_des - roll, dt)
-        pitch_rate_des = self.pid_pitch_angle.update(pitch_des - pitch, dt)
-        axial_rate_des = self.pid_axial_angle.update(axial_des - axial, dt)
+        roll_rate_des = self.pid_roll_angle.update(e[0], dt)
+        pitch_rate_des = self.pid_pitch_angle.update(e[1], dt)
+        axial_rate_des = self.pid_axial_angle.update(e[2], dt)
 
         # Freeze the lateral integrators when the gimbal is on its stops, and
         # the axial one when tau_P is capped -- see PID.update / Allocation.

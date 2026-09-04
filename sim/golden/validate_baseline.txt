@@ -12,8 +12,8 @@ control authority at hover (T = 13.03 N, 73% of the 17.79 N ceiling):
        3.3x the angular acceleration of the lateral pair but its
        actuator is ~3x slower (motor ~100 ms vs gimbal ~30 ms).
 
-[PASS] lateral upset recovery               final lateral = (-0.248, +0.202) deg, peak gimbal 4.03/2.35 deg of 7.0, saturated 0% of the run
-[PASS] axial upset recovery                 final axial = -0.351 deg, peak |tau_P| = 0.0514 N.m of 0.0888 available at hover (58%), capped 0% of the run
+[PASS] lateral upset recovery               final lateral = (-0.248, +0.205) deg, peak gimbal 4.03/2.35 deg of 7.0, saturated 0% of the run
+[PASS] axial upset recovery                 final axial = -0.361 deg, peak |tau_P| = 0.0511 N.m of 0.0888 available at hover (58%), capped 0% of the run
 [PASS] climb and hold                       final z = 1.997 m (err -0.003), thrust 10.71-17.79 N, saturated 2% of the run
 [PASS] tilted hover (1/cos compensation)    peak altitude sag 0.0001 m with compensation vs 0.0119 m without (100% less); final tilt +5.99 deg
 

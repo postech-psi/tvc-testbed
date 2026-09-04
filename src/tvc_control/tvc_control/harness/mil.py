@@ -182,7 +182,13 @@ def _compute_metrics(t_arr, euler_arr, delta_arr, cfg: SimConfig, band=0.02,
 
     # settling time on pitch (typically the dominant commanded motion)
     step_size = max(abs(cfg.pitch_des_deg - cfg.init_pitch_deg), 1e-6)
-    tol = band * step_size
+    # A 2% band on a zero-size step is not a band. When pitch is commanded from
+    # 0 to 0, step_size collapses to the 1e-6 floor and any cross-axis coupling
+    # -- which the full inertia tensor now produces, ~0.2 deg of it -- reads as
+    # "never settled" for the whole horizon. Below the angle this vehicle can
+    # actually hold, settling is not a meaningful measurement, so an absolute
+    # floor applies.
+    tol = max(band * step_size, 0.05)
     err_series = np.abs(euler_arr[:, 1] - cfg.pitch_des_deg)
     outside = np.where(err_series > tol)[0]
     settling_time = t_arr[outside[-1]] if len(outside) > 0 else 0.0

@@ -61,9 +61,20 @@ def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
     # full authority once tau_P is commanded.
     tau = np.cross(d_cm, f_body) + tau_p * n_hat
 
-    I = np.diag([params.Ix, params.Iy, params.Iz])
-    I_inv = np.diag([1/params.Ix, 1/params.Iy, 1/params.Iz])
-    omega_dot = I_inv @ (tau - np.cross(omega, I @ omega))
+    # FULL inertia tensor, not the diagonal. The products of inertia are not
+    # small on this airframe -- Iyz/Izz = 27.3%, Ixz/Izz = 15.4% -- so the
+    # diagonal approximation dominates the thrust-axis response and would make
+    # any comparison against Gazebo (which carries the full tensor in the SDF)
+    # disagree for a reason that has nothing to do with the control model.
+    # Off-diagonal sign convention follows the SDF's: I = [[ixx, ixy, ixz],
+    # [ixy, iyy, iyz], [ixz, iyz, izz]], which is what gen_model_sdf.py emits
+    # from the same YAML fields.
+    I = np.array([
+        [params.Ix,  params.Ixy, params.Ixz],
+        [params.Ixy, params.Iy,  params.Iyz],
+        [params.Ixz, params.Iyz, params.Iz],
+    ])
+    omega_dot = np.linalg.solve(I, tau - np.cross(omega, I @ omega))
 
     q_dot = quat_kinematics(q, omega)
 
