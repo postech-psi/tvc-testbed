@@ -2,7 +2,7 @@
 <!--
   GENERATED FILE. Do not edit by hand.
   Regenerate with:  python tools/gen_model_sdf.py
-  Source of truth:  sim/vehicle_params.yaml
+  Source of truth:  tvc_control/vehicle_params.yaml
 
   Coaxial TVC VTVL vehicle for Gazebo Harmonic (gz-sim 8). base_link carries the
   WHOLE-vehicle mass properties solved so the composite of all links reproduces
@@ -106,7 +106,7 @@
           <lower>-0.1222</lower>
           <upper>0.1222</upper>
           <effort>5.0</effort>
-          <velocity>4.1015</velocity>
+          <velocity>41.0152</velocity>
         </limit>
         <dynamics><damping>0.01</damping></dynamics>
       </axis>
@@ -131,7 +131,7 @@
           <lower>-0.1222</lower>
           <upper>0.1222</upper>
           <effort>5.0</effort>
-          <velocity>4.1015</velocity>
+          <velocity>41.0152</velocity>
         </limit>
         <dynamics><damping>0.01</damping></dynamics>
       </axis>
@@ -193,15 +193,21 @@
       <jointName>rotor_a_joint</jointName>
       <linkName>rotor_a</linkName>
       <turningDirection>ccw</turningDirection>
-      <timeConstantUp>0.0125</timeConstantUp>
-      <timeConstantDown>0.025</timeConstantDown>
-      <maxRotVelocity>1100.0</maxRotVelocity>
+      <!-- Near-zero on purpose. The motor lag is owned by the plant model
+           (tvc_control/plant/actuators.py::MotorLag), in ONE place, so both
+           plants agree. It cannot live here anyway: this filters the rotor
+           VELOCITY reference, and since T ~ omega^2 a first-order lag in omega
+           is not a first-order lag in thrust -- it is faster near hover and
+           asymmetric between spin-up and spin-down. -->
+      <timeConstantUp>0.0010</timeConstantUp>
+      <timeConstantDown>0.0010</timeConstantDown>
+      <maxRotVelocity>1300.0</maxRotVelocity>
       <motorConstant>7.350e-06</motorConstant>
-      <momentConstant>0.016</momentConstant>
+      <momentConstant>0.04</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>0</motorNumber>
-      <rotorDragCoefficient>8.060e-05</rotorDragCoefficient>
-      <rollingMomentCoefficient>1.000e-06</rollingMomentCoefficient>
+      <rotorDragCoefficient>0.000e+00</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.000e+00</rollingMomentCoefficient>
       <motorType>velocity</motorType>
     </plugin>
 
@@ -211,15 +217,21 @@
       <jointName>rotor_b_joint</jointName>
       <linkName>rotor_b</linkName>
       <turningDirection>cw</turningDirection>
-      <timeConstantUp>0.0125</timeConstantUp>
-      <timeConstantDown>0.025</timeConstantDown>
-      <maxRotVelocity>1100.0</maxRotVelocity>
+      <!-- Near-zero on purpose. The motor lag is owned by the plant model
+           (tvc_control/plant/actuators.py::MotorLag), in ONE place, so both
+           plants agree. It cannot live here anyway: this filters the rotor
+           VELOCITY reference, and since T ~ omega^2 a first-order lag in omega
+           is not a first-order lag in thrust -- it is faster near hover and
+           asymmetric between spin-up and spin-down. -->
+      <timeConstantUp>0.0010</timeConstantUp>
+      <timeConstantDown>0.0010</timeConstantDown>
+      <maxRotVelocity>1300.0</maxRotVelocity>
       <motorConstant>7.350e-06</motorConstant>
-      <momentConstant>0.016</momentConstant>
+      <momentConstant>0.04</momentConstant>
       <commandSubTopic>command/motor_speed</commandSubTopic>
       <motorNumber>1</motorNumber>
-      <rotorDragCoefficient>8.060e-05</rotorDragCoefficient>
-      <rollingMomentCoefficient>1.000e-06</rollingMomentCoefficient>
+      <rotorDragCoefficient>0.000e+00</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.000e+00</rollingMomentCoefficient>
       <motorType>velocity</motorType>
     </plugin>
 
@@ -227,23 +239,33 @@
             name="gz::sim::systems::JointPositionController">
       <joint_name>gimbal_pitch_joint</joint_name>
       <topic>/tvc_vehicle/gimbal_pitch</topic>
-      <p_gain>3.0</p_gain>
-      <i_gain>0.02</i_gain>
-      <d_gain>0.15</d_gain>
-      <!-- PTK 8515 MG-D stalls ~1.5 N.m; cmd limit models that real servo. -->
-      <cmd_max>1.2</cmd_max>
-      <cmd_min>-1.2</cmd_min>
+      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
+           Gazebo its own gimbal lag and slew, on top of the plant model's --
+           double-counting, and with a single symmetric rate where the bench
+           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
+           have one owner (plant/actuators.py::GimbalActuator), so this
+           controller is asked only to track its command as fast as it can. -->
+      <p_gain>60.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>1.0</d_gain>
+      <cmd_max>5.0</cmd_max>
+      <cmd_min>-5.0</cmd_min>
     </plugin>
     <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>gimbal_roll_joint</joint_name>
       <topic>/tvc_vehicle/gimbal_roll</topic>
-      <p_gain>3.0</p_gain>
-      <i_gain>0.02</i_gain>
-      <d_gain>0.15</d_gain>
-      <!-- PTK 8515 MG-D stalls ~1.5 N.m; cmd limit models that real servo. -->
-      <cmd_max>1.2</cmd_max>
-      <cmd_min>-1.2</cmd_min>
+      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
+           Gazebo its own gimbal lag and slew, on top of the plant model's --
+           double-counting, and with a single symmetric rate where the bench
+           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
+           have one owner (plant/actuators.py::GimbalActuator), so this
+           controller is asked only to track its command as fast as it can. -->
+      <p_gain>60.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>1.0</d_gain>
+      <cmd_max>5.0</cmd_max>
+      <cmd_min>-5.0</cmd_min>
     </plugin>
 
     <plugin filename="gz-sim-odometry-publisher-system"

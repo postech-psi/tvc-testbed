@@ -75,6 +75,7 @@ from gz.msgs10.odometry_pb2 import Odometry
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from vehicle_params import load as _load_vehicle
+from tvc_control.hal.gazebo import rotor_speeds
 
 # --- vehicle constants: ALL from sim/vehicle_params.yaml (single source of
 # truth), so this controller and the model it flies can never disagree. Edit
@@ -86,7 +87,8 @@ L_ARM = _VP.L                 # m, control lever arm (mode set in the YAML)
 G = _VP.g
 WEIGHT_N = _VP.weight_n
 
-MAX_ROT_VEL = _VP.max_rot_velocity       # rad/s, matches the SDF
+MAX_ROT_VEL = _VP.max_rot_velocity       # rad/s, solver headroom (see hal/gazebo.py)
+MOTOR_CONSTANT = _VP.motor_constant      # N/(rad/s)^2, physical
 THRUST_AT_MAX = _VP.thrust_at_max_n      # N combined, full throttle (2026-07-20 bench)
 GIMBAL_MAX = math.radians(_VP.gimbal_max_deg)
 
@@ -253,10 +255,15 @@ class Hover:
         dp = clamp((tau_p * tau_x - lt * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
         dr = clamp((-lt * tau_x - tau_p * tau_y) / det, -GIMBAL_MAX, GIMBAL_MAX)
 
-        # --- thrust -> rotor speed (per rotor: thrust = k*omega^2) ---
-        half_max = THRUST_AT_MAX / 2.0
-        omega_a = MAX_ROT_VEL * math.sqrt(clamp(t_a / half_max, 0.0, 1.0))
-        omega_b = MAX_ROT_VEL * math.sqrt(clamp(t_b / half_max, 0.0, 1.0))
+        # --- thrust -> rotor speed ---
+        # One converter, shared with the ROS2 bridge: tvc_control.hal.gazebo.
+        # This used to calibrate from thrust_at_max_n / max_rot_velocity^2 while
+        # the Gazebo plugin used motor_constant -- two independently edited YAML
+        # fields that happened to agree. They no longer do, because
+        # max_rot_velocity is now solver headroom rather than a physical limit,
+        # so deriving omega from it would under-command thrust by 27%.
+        omega_a, omega_b = rotor_speeds(thrust, tau_p, MOTOR_CONSTANT,
+                                        MOMENT_CONSTANT, MAX_ROT_VEL)
         omega = 0.5 * (omega_a + omega_b)   # for the telemetry line
 
         act = Actuators()

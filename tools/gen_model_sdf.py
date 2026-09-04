@@ -101,7 +101,11 @@ def render(v, base_mass, base_pos, I_base_own):
     r = v.raw
     rot, gim = r["rotors"], v
     gmax = np.deg2rad(v.gimbal_max_deg)
-    grate = np.deg2rad(v.gimbal_rate_max_deg)
+    # The joint velocity limit is deliberately far above the measured slew: the
+    # plant model owns the rate limit (and does it per ring). Leaving the SDF's
+    # own limit at the measured value would apply it twice.
+    grate = np.deg2rad(v.gimbal_rate_max_deg) * 10.0
+    mtc = (r.get("motor_dynamics") or {}).get("gazebo_time_constant_s", 0.001)
     bx, by, bz = base_pos
     Ib = I_base_own
 
@@ -135,8 +139,14 @@ def render(v, base_mass, base_pos, I_base_own):
       <jointName>{joint}</jointName>
       <linkName>{link}</linkName>
       <turningDirection>{turn}</turningDirection>
-      <timeConstantUp>0.0125</timeConstantUp>
-      <timeConstantDown>0.025</timeConstantDown>
+      <!-- Near-zero on purpose. The motor lag is owned by the plant model
+           (tvc_control/plant/actuators.py::MotorLag), in ONE place, so both
+           plants agree. It cannot live here anyway: this filters the rotor
+           VELOCITY reference, and since T ~ omega^2 a first-order lag in omega
+           is not a first-order lag in thrust -- it is faster near hover and
+           asymmetric between spin-up and spin-down. -->
+      <timeConstantUp>{mtc:.4f}</timeConstantUp>
+      <timeConstantDown>{mtc:.4f}</timeConstantDown>
       <maxRotVelocity>{rot['max_rot_velocity']:.1f}</maxRotVelocity>
       <motorConstant>{rot['motor_constant']:.3e}</motorConstant>
       <momentConstant>{rot['moment_constant']:.4g}</momentConstant>
@@ -152,12 +162,17 @@ def render(v, base_mass, base_pos, I_base_own):
             name="gz::sim::systems::JointPositionController">
       <joint_name>{joint}</joint_name>
       <topic>{topic}</topic>
-      <p_gain>3.0</p_gain>
-      <i_gain>0.02</i_gain>
-      <d_gain>0.15</d_gain>
-      <!-- PTK 8515 MG-D stalls ~1.5 N.m; cmd limit models that real servo. -->
-      <cmd_max>1.2</cmd_max>
-      <cmd_min>-1.2</cmd_min>
+      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
+           Gazebo its own gimbal lag and slew, on top of the plant model's --
+           double-counting, and with a single symmetric rate where the bench
+           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
+           have one owner (plant/actuators.py::GimbalActuator), so this
+           controller is asked only to track its command as fast as it can. -->
+      <p_gain>60.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>1.0</d_gain>
+      <cmd_max>5.0</cmd_max>
+      <cmd_min>-5.0</cmd_min>
     </plugin>"""
 
     return f"""<?xml version="1.0"?>

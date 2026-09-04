@@ -118,17 +118,28 @@ gimbal:
 
 # --- coax rotors / thrust (bench-calibrated; see docs/MASS_BUDGET.md) --------
 rotors:
-  max_rot_velocity: 1100.0     # rad/s, matches the SDF
+  # SOLVER CONSTANTS, not physics. Since the Gazebo path now inverts the
+  # plugin's own algebra to reproduce the measured surface exactly (see
+  # tvc_control/hal/gazebo.py), rotor speed in simulation is a control
+  # allocation variable and these two are the scaling that makes the inversion
+  # feasible over the whole measured envelope. At the original 1100 / 0.016 no
+  # single moment_constant covers it -- the requirement diverges near full
+  # thrust. At 1200+ it converges to 0.0323, so 1300 / 0.04 leaves margin.
+  # Nothing may read simulated rotor omega as a physical RPM.
+  max_rot_velocity: 1300.0     # rad/s, solver headroom (was 1100 = physical)
   motor_constant: 7.35e-06     # N/(rad/s)^2, from 17.79 N combined at full throttle
-  moment_constant: 0.016       # m, drag-torque / thrust -- SUPERSEDED by the
+  moment_constant: 0.04        # m, solver scaling -- SUPERSEDED as physics by the
                                # measured surface below; kept because the Gazebo
                                # multicopter plugin and gen_model_sdf.py still
                                # consume it. It is a poor summary of the real
                                # coupling: the measured torque surface is not
                                # proportional to the thrust split (see below).
   thrust_at_max_n: 17.79       # N combined, both at PWM 2000 (measured surface)
-  rotor_drag_coefficient: 8.06e-05
-  rolling_moment_coefficient: 1.0e-06
+  # Zeroed for plant parity. Both produce body-velocity-dependent wrenches that
+  # scale with the now-fictitious rotor speed, and the analytic plant models
+  # neither. They were estimates, not measurements, so nothing measured is lost.
+  rotor_drag_coefficient: 0.0
+  rolling_moment_coefficient: 0.0
 
   # --- axial (thrust-axis) reaction torque, a.k.a. tau_P ---------------------
   # Deliberately unbalancing the two coax props leaves a net prop drag torque
