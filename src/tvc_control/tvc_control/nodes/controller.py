@@ -36,16 +36,25 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from tvc_msgs.msg import ActuatorCommand
 from tvc_control.config import load_gains, load_vehicle_params, load
 from tvc_control.gnc.controller import TvcController
+from tvc_control.gnc.mathx import quat_rotate
 from tvc_control.gnc.types import ControlMode, EstimatedState, Setpoint
 from tvc_control.hal.gazebo import rotor_speeds
+from tvc_control.nodes import reject_retired_parameters
 
 # Retired parameter names. Each one either changed meaning or stopped doing
 # anything, and a parameter that looks live while being ignored is worse than
 # one that is gone -- it makes a launch file document a control decision that
 # is not happening. See docs/4-CONVENTIONS.md.
-RETIRED_PARAMS = ('gimbal_rate_max_deg',
-                  'roll_des_deg', 'pitch_des_deg', 'axial_des_deg',
-                  'init_roll_deg', 'init_pitch_deg', 'init_axial_deg')
+_AXIS = ("the axis names changed with the rocket convention: roll is now the "
+         "THRUST axis. Use att_pitch_des_deg / att_yaw_des_deg / "
+         "att_roll_des_deg, which mean body x / body y / body z.")
+RETIRED_PARAMS = {
+    'gimbal_rate_max_deg': "the two rings have different measured slew rates "
+                           "(403 and 235 deg/s). Set gimbal.axes.*.rate_max_deg "
+                           "in vehicle_params.yaml.",
+    'roll_des_deg': _AXIS, 'pitch_des_deg': _AXIS, 'axial_des_deg': _AXIS,
+    'init_roll_deg': _AXIS, 'init_pitch_deg': _AXIS, 'init_axial_deg': _AXIS,
+}
 
 
 class ControllerNode(Node):
@@ -56,11 +65,7 @@ class ControllerNode(Node):
     def __init__(self):
         super().__init__('controller_node')
 
-        for name in RETIRED_PARAMS:
-            self.declare_parameter(name, rclpy.Parameter.Type.NOT_SET)
-            if self.get_parameter(name).type_ != rclpy.Parameter.Type.NOT_SET:
-                raise SystemExit(
-                    "parameter '%s' was retired -- see docs/4-CONVENTIONS.md" % name)
+        reject_retired_parameters(self, RETIRED_PARAMS)
 
         self.declare_parameter('rate_hz', 250.0)
         self.declare_parameter('gain_profile', '')
@@ -117,9 +122,15 @@ class ControllerNode(Node):
         v, w = msg.twist.twist.linear, msg.twist.twist.angular
         stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         # geometry_msgs/Quaternion is (x, y, z, w); gnc uses (qw, qx, qy, qz).
+        #
+        # twist is in child_frame_id -- the BODY frame, per REP-105 -- and both
+        # publishers on this topic obey that: gz-sim's OdometryPublisher because
+        # it differences the pose in the body frame, simulator_node because it
+        # is written to match. vel_i is inertial by definition, so rotate.
+        quat = (q.w, q.x, q.y, q.z)
         self._state = EstimatedState(
-            pos_i=(p.x, p.y, p.z), vel_i=(v.x, v.y, v.z),
-            quat=(q.w, q.x, q.y, q.z), omega_b=(w.x, w.y, w.z),
+            pos_i=(p.x, p.y, p.z), vel_i=quat_rotate(quat, (v.x, v.y, v.z)),
+            quat=quat, omega_b=(w.x, w.y, w.z),
             stamp_s=stamp)
 
     def control_step(self):

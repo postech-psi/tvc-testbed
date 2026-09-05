@@ -57,30 +57,47 @@ Both exist to stop the file flapping for reasons that are not the code's fault.
 
 ---
 
-## What is NOT frozen, and why it matters
+## The Gazebo baseline
 
-**The Gazebo flight.** `harness/gz.py` needs `gz-transport13`, which exists only
-in the devcontainer, and this baseline was captured on a Windows host. So the
-flight that is the *only* thing that has actually flown has no golden.
-
-That is the largest gap in the baseline, and it is not academic: the standalone
-Gazebo demo used to carry its own independent controller and now calls the shared
-flight code. The gains are the same set, ported into inertia-normalized units, so
-the loop dynamics should be identical — but *should be* is an argument, not a
-measurement.
-
-Capture it in the devcontainer:
+`harness/gz.py` needs `gz-transport13`, which exists only in the devcontainer,
+so this used to be the largest gap in the record: the pipeline with a real
+physics engine under it had no baseline at all. It has one now.
 
 ```bash
-bash gazebo/run_hover.sh --duration 30 --altitude 2.0 \
-     --log reference/golden/hover_baseline.csv
+bash gazebo/run_hover.sh --duration 30            # fly it
+python tvc.py hover --check-golden --unpause tvc_flight
+python tvc.py hover --capture-golden --unpause tvc_flight   # re-freeze
 ```
 
-Compare on **metrics** — final altitude error, peak tilt, lateral drift, settling
-time — rather than sample by sample. The harness now steps on odometry arrival
-rather than on a wall clock, so the run *is* reproducible in simulated time; a
-sample-wise comparison should become meaningful once that has been confirmed on
-two consecutive runs.
+| file | what |
+|---|---|
+| `hover_baseline.json` | fourteen metrics of a 30 s hover, plus the per-metric tolerance the check uses |
+| `hover_baseline.png` | the same run as a picture, for reading by eye |
+
+### Metrics, not samples — and that is a measurement
+
+The run is reproducible in **aggregate** and not sample by sample. Two
+consecutive 30 s runs differ by at most 1.5° of roll, 0.6° of gimbal and 12 mm
+of altitude at any one sample, because the first accepted odometry message can
+still land one or two physics steps apart. A sample-wise comparison against
+numbers that move by that much would fail on nothing.
+
+Every aggregate in the file agrees between those same two runs to far better
+than its tolerance, and the tolerances are set from that measured spread rather
+than chosen as performance targets. A tolerance tight enough to catch ordinary
+retuning is a tolerance people learn to regenerate.
+
+It was much worse before. When the shell script owned the unpause, the same two
+runs peaked at **14.6° and 58.0°** of thrust-axis roll — a factor of four, from
+nothing but how fast the host started a Python process. The controller now
+unpauses the world itself. That is what made a baseline possible at all.
+
+### Why there is no committed CSV
+
+The per-sample log is 1.8 MB and nothing compares against it, so committing it
+would be storing a large file to be ignored. The PNG is regenerated from the
+same run whenever the golden is re-captured, and is the artefact a person
+actually reads.
 
 ---
 

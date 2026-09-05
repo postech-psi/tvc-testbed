@@ -1,4 +1,4 @@
-# 5 — Running the simulator
+# 6 — Running the simulator
 
 Every pipeline, what it is for, what its output means, and what goes wrong.
 
@@ -118,18 +118,36 @@ bash gazebo/run_hover.sh --gui                     # with the Gazebo window
 bash gazebo/run_hover.sh --duration 60 --altitude 3.0
 bash gazebo/run_hover.sh --log flight.csv
 python tvc.py plot flight.csv                      # then plot it
+bash gazebo/run_hover.sh --record flight.gif       # chase camera to a GIF
 ```
 
-The script starts the world **paused**, attaches the controller, and only then
-unpauses. That ordering is not cosmetic: the vehicle free-falls from its 2 m
-spawn in about 0.6 s, so a controller connecting even a second after an unpaused
-start finds it already on the ground — and the resulting plot looks exactly like
-a control failure.
+The script starts the world **paused** and the *controller* unpauses it, from
+inside `harness/gz.py`, once it has subscribed. Both halves of that matter:
 
-`harness/gz.py` steps once per odometry message rather than on a wall clock, so
-the control loop runs in lockstep with simulated time. That is what makes a run
-reproducible, and a tolerance against a run that cannot be repeated means
-nothing.
+- **Paused.** The vehicle free-falls from its 2 m spawn in about 0.6 s, so a
+  controller attaching to an already-running world finds it on the ground — and
+  the resulting plot looks exactly like a control failure.
+- **By the controller, not by a `sleep` in this script.** Otherwise the number of
+  uncontrolled physics steps depends on how fast the host got Python to its
+  first publish. That is not a rounding effect: two consecutive 30 s runs peaked
+  at 14.6° and 58.0° of thrust-axis roll from the same nominal initial
+  condition. With the controller owning the start the same pair peaks at 0.8°
+  and 2.3°.
+
+`harness/gz.py` steps once per odometry message rather than on a wall clock, and
+takes `dt` from the simulator's own stamps, so the control loop runs in lockstep
+with simulated time. That is what makes a run reproducible, and a tolerance
+against a run that cannot be repeated means nothing.
+
+```bash
+python tvc.py hover --check-golden --unpause tvc_flight   # against the frozen run
+```
+
+compares fourteen metrics of the run against
+`reference/golden/hover_baseline.json`. Metrics, not samples: the run is
+reproducible in aggregate but two runs still differ by up to 1.5° of roll at any
+single sample, because the first accepted odometry message can land a physics
+step apart.
 
 Pass/fail: altitude error < 0.30 m, tilt < 15°, drift < 1.00 m. Loose on purpose
 — it is a smoke test that the vehicle stays where it was put.
@@ -152,13 +170,18 @@ ros2 launch tvc_control gazebo.launch.py gui:=false    # headless (Windows/macOS
 ros2 launch tvc_control analytic.launch.py             # same nodes, analytic plant
 ```
 
-> ⚠ **Both packages build, and the nodes import. Nothing has flown under ROS 2
-> yet.** The first `colcon build` succeeded in the devcontainer: `tvc_msgs` in
-> 69 s, `tvc_control` in 19 s, no stderr, all four entry points installed, and
-> `tvc_control.nodes.{controller,simulator,gazebo_bridge}` import from the
-> *installed* package. `gazebo.launch.py` produces a valid launch description.
-> What remains untested is `ros2 launch` itself -- the bridge type strings have
-> still never carried a message. See [7-CREDIBILITY.md](7-CREDIBILITY.md).
+Both launch files run. The vehicle holds 2.000 m with pitch and yaw inside
+±0.01°, and messages cross the `ros_gz_bridge` in both directions.
+
+> ⚠ **The thrust-axis channel holds a 1.5–2.5° limit cycle here that Pipeline 3
+> does not have** — same control code, same gains, same plant. It is the channel
+> with 11.5× less inertia and the slowest actuator, so the bridge's transport
+> delay costs margin exactly where there is least. Bounded and attributable, not
+> explained. See [7-CREDIBILITY.md](7-CREDIBILITY.md).
+
+`analytic.launch.py` leaves `position_hold` false, so the vehicle holds attitude
+and altitude exactly and translates away at a constant velocity imparted by the
+world's initial tilt. That is the launch file doing what it says, not drift.
 
 Five processes:
 

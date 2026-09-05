@@ -42,12 +42,14 @@ Usage (with `gz sim` already running on the world):
 """
 import argparse
 import csv
+import json
 import math
+import os
 import time
 
 from ..config import load, load_gains, load_vehicle_params
 from ..gnc.controller import TvcController
-from ..gnc.mathx import quat_to_euler
+from ..gnc.mathx import quat_rotate, quat_to_euler
 from ..gnc.types import ControlMode, EstimatedState, Setpoint
 from ..hal.gazebo import rotor_speeds
 
@@ -95,6 +97,10 @@ class GazeboHarness:
         self.steps_done = 0
         self.running = False
         self._t_sim = 0.0
+        self._t0 = None            # first accepted stamp, so the log starts at 0
+        self._last_stamp = None    # previous accepted stamp, for dt
+        self._prev = None          # (pos, stamp) of the previous message
+        self.rejected = 0          # messages whose twist contradicted the pose
         self._last_print = 0.0
 
         self.node = Node()
@@ -112,27 +118,80 @@ class GazeboHarness:
         Seam A: the controller is handed an ESTIMATE even though this one is
         ground truth relabelled. gz reports the quaternion as (w,x,y,z) fields
         and body rates in twist.angular, which is already the gnc convention.
+
+        TWO THINGS THIS MESSAGE GETS WRONG, AND WHY THEY ARE HANDLED HERE
+        1. The twist is in the CHILD (body) frame -- REP-105, and confirmed by
+           measurement: in free fall from the world's 12.2 deg tilt the reported
+           velocity is (-0.40, -0.57, -3.22) where the world velocity is purely
+           vertical, and 3.295*sin(12.2 deg) = 0.696 = hypot(0.40, 0.57) to three
+           digits. EstimatedState.vel_i is inertial by definition, so it is
+           rotated. Feeding it through unrotated is exact only while level.
+        2. The first messages carry a garbage twist. OdometryPublisher
+           differences the pose against a zero-initialised `lastUpdatePose`, so
+           the first sample reports the whole spawn pose divided by one step:
+           651 m/s and 58 rad/s, measured. The controller's rate loop sees that
+           as an enormous error and saturates the gimbal on step one.
+
+        The gate for (2) is not a count of samples to skip and not a tuned speed
+        limit. The twist has to agree with the pose derivative, which we can see
+        independently; on the garbage samples the position has not moved at all
+        while the twist claims hundreds of m/s, so they fail by four orders of
+        magnitude. The 2x factor and the 1 m/s floor are slack for the
+        publisher's own smoothing, not a threshold anything is tuned to.
         """
         p, q, tw = msg.pose.position, msg.pose.orientation, msg.twist
+        pos = (p.x, p.y, p.z)
+        quat = (q.w, q.x, q.y, q.z)
+        v_body = (tw.linear.x, tw.linear.y, tw.linear.z)
+        stamp = msg.header.stamp.sec + msg.header.stamp.nsec * 1e-9
+
+        if not self._twist_agrees_with_pose(pos, v_body, stamp):
+            self.rejected += 1
+            self._prev = (pos, stamp)
+            return
+        self._prev = (pos, stamp)
+
+        # dt from the SIMULATOR's clock, not from the nominal rate: if the
+        # odometry publisher and --rate disagree, every derivative and every
+        # integrator in the cascade is scaled by the ratio, silently.
+        nominal = self.dt
+        dt = nominal if self._last_stamp is None else stamp - self._last_stamp
+        dt = min(max(dt, 0.2 * nominal), 5.0 * nominal)
+        self._last_stamp = stamp
+
         self.state = EstimatedState(
-            pos_i=(p.x, p.y, p.z),
-            vel_i=(tw.linear.x, tw.linear.y, tw.linear.z),
-            quat=(q.w, q.x, q.y, q.z),
+            pos_i=pos,
+            vel_i=quat_rotate(quat, v_body),
+            quat=quat,
             omega_b=(tw.angular.x, tw.angular.y, tw.angular.z),
-            stamp_s=self._t_sim,
+            stamp_s=stamp,
         )
         if self.running:
+            if self._t0 is None:
+                self._t0 = stamp
+            self._t_sim = stamp - self._t0
             self.steps_done += 1
-            self._t_sim += self.dt
-            self.step()
+            self.step(dt)
+
+    def _twist_agrees_with_pose(self, pos, v_body, stamp):
+        """Is this message's reported speed consistent with how far it moved?"""
+        if self._prev is None:
+            return False
+        p0, t0 = self._prev
+        span = stamp - t0
+        if span <= 0.0:
+            return False
+        observed = math.sqrt(sum((a - b) ** 2 for a, b in zip(pos, p0))) / span
+        reported = math.sqrt(sum(c * c for c in v_body))
+        return reported <= max(2.0 * observed, 1.0)
 
     # --- one control step -----------------------------------------------------
-    def step(self):
+    def step(self, dt):
         """One control step: state -> TvcController -> HAL -> the three gz topics."""
         if self.state is None:
             return
 
-        cmd = self.controller.update(self.state, self.setpoint, self.dt)
+        cmd = self.controller.update(self.state, self.setpoint, dt)
         wa, wb = rotor_speeds(cmd.thrust_n, cmd.tau_p_nm,
                               self._k, self._c, self._wmax)
 
@@ -147,14 +206,16 @@ class GazeboHarness:
     def _record(self, cmd):
         s = self.state
         pitch, yaw, roll = quat_to_euler(s.quat)
-        if self.log_path is not None:
-            self.log.append((
-                self._t_sim, s.pos_i[2], s.pos_i[0], s.pos_i[1],
-                math.degrees(pitch), math.degrees(yaw), math.degrees(roll),
-                s.omega_b[2],
-                math.degrees(cmd.gimbal_outer_rad),
-                math.degrees(cmd.gimbal_inner_rad),
-                cmd.thrust_n, cmd.tau_p_nm))
+        # Always accumulated, not only when --log was given: the golden metrics
+        # are computed from this, and a summary that only exists when someone
+        # remembered a flag is a summary nobody checks.
+        self.log.append((
+            self._t_sim, s.pos_i[2], s.pos_i[0], s.pos_i[1],
+            math.degrees(pitch), math.degrees(yaw), math.degrees(roll),
+            s.omega_b[2],
+            math.degrees(cmd.gimbal_outer_rad),
+            math.degrees(cmd.gimbal_inner_rad),
+            cmd.thrust_n, cmd.tau_p_nm))
         if self.verbose:
             now = time.time()
             if now - self._last_print > 1.0:
@@ -172,6 +233,79 @@ class GazeboHarness:
                                      or cmd.sat_thrust) else ""),
                       flush=True)
 
+    def unpause(self, world):
+        """Start the world's physics, now that this controller is subscribed.
+
+        THE CONTROLLER OWNS THE START. It used to be the shell script: launch
+        Gazebo, `sleep 2`, unpause. That makes the number of uncontrolled
+        physics steps a function of how fast the host got this process to its
+        first publish, and it is not a small effect -- two consecutive 30 s runs
+        peaked at 14.6 and 58.0 degrees of thrust-axis roll from the same
+        nominal initial condition. The roll channel has 11.5x less inertia than
+        the lateral pair and an actuator about 3x slower, so a couple of
+        milliseconds of head start is worth 4x in the transient.
+
+        Unpausing from here closes that: the first physics step of the run
+        happens with the controller already listening.
+        """
+        from gz.msgs10.boolean_pb2 import Boolean
+        from gz.msgs10.world_control_pb2 import WorldControl
+
+        req = WorldControl()
+        req.pause = False
+        service = "/world/%s/control" % world
+        ok, rep = self.node.request(service, req, WorldControl, Boolean, 5000)
+        if not (ok and rep.data):
+            print("could not unpause via %s -- is that the world's name?"
+                  % service)
+            return False
+        print("unpaused %s from the controller" % world, flush=True)
+        return True
+
+    def metrics(self):
+        """The summary the Gazebo golden is compared on.
+
+        METRICS, NOT SAMPLES, and that is a measurement rather than a
+        preference. With the controller owning the unpause the run is close to
+        reproducible but not bit-identical: two consecutive 30 s runs differ by
+        at most 1.5 deg of roll, 0.6 deg of gimbal and 12 mm of altitude at any
+        one sample, because the first accepted odometry message can still land
+        one or two physics steps apart. Sample-wise comparison against numbers
+        that move by that much would fail on nothing. These aggregates do not
+        move: every one of them agrees between those same two runs to better
+        than the tolerance the golden file carries.
+        """
+        if not self.log:
+            return {}
+        col = list(zip(*self.log))
+        t, z, x, y, pitch, yaw, roll = col[0], col[1], col[2], col[3], col[4], col[5], col[6]
+        g_out, g_in, thrust = col[8], col[9], col[10]
+        tilt = [math.hypot(pitch[i], yaw[i]) for i in range(len(t))]
+        drift = [math.hypot(x[i], y[i]) for i in range(len(t))]
+        # Settling: the last moment the vehicle was outside a 1 deg tilt band.
+        # 1 deg, not a fraction of the upset, so the number stays comparable
+        # when the world's spawn attitude changes.
+        outside = [i for i, v in enumerate(tilt) if v > 1.0]
+        return {
+            "duration_s": t[-1],
+            "samples": len(t),
+            "final_altitude_m": z[-1],
+            "final_drift_m": drift[-1],
+            "final_tilt_deg": tilt[-1],
+            "final_roll_deg": roll[-1],
+            "peak_tilt_deg": max(tilt),
+            "peak_roll_deg": max(abs(v) for v in roll),
+            "peak_drift_m": max(drift),
+            "min_altitude_m": min(z),
+            "max_altitude_m": max(z),
+            "peak_gimbal_outer_deg": max(abs(v) for v in g_out),
+            "peak_gimbal_inner_deg": max(abs(v) for v in g_in),
+            "min_thrust_N": min(thrust),
+            "max_thrust_N": max(thrust),
+            "tilt_settling_time_s": t[outside[-1]] if outside else 0.0,
+            "rejected_odometry": self.rejected,
+        }
+
     def write_log(self):
         """Write the flight log CSV, with its axis-convention header line."""
         if not (self.log_path and self.log):
@@ -185,6 +319,81 @@ class GazeboHarness:
             w.writerow(CSV_HEADER)
             w.writerows(self.log)
         print("wrote %s (%d samples)" % (self.log_path, len(self.log)))
+
+
+# --- the Gazebo golden -------------------------------------------------------
+# Tolerances, per metric, chosen from the measured run-to-run spread and then
+# rounded up. They are NOT performance targets: a tolerance tight enough to
+# catch ordinary retuning is a tolerance people learn to regenerate. Each of
+# these is comfortably larger than the difference between two consecutive runs
+# and comfortably smaller than the difference the old servo gains produced,
+# which was the whole vehicle tumbling.
+# harness/ -> tvc_control/ -> tvc_control/ -> src/ -> the repository root.
+# Five levels, and the count is the kind of thing that is wrong by one until
+# someone runs it, so tests/test_consistency.py asserts the file is there.
+_REPO = os.path.abspath(__file__)
+for _ in range(5):
+    _REPO = os.path.dirname(_REPO)
+GOLDEN_PATH = os.path.join(_REPO, "reference", "golden", "hover_baseline.json")
+
+GOLDEN_TOLERANCE = {
+    "final_altitude_m": 0.02,
+    "final_drift_m": 0.02,
+    "final_tilt_deg": 0.20,
+    "final_roll_deg": 0.20,
+    "peak_tilt_deg": 0.50,
+    "peak_roll_deg": 5.00,      # the softest channel; see docs/7-CREDIBILITY.md
+    "peak_drift_m": 0.05,
+    "min_altitude_m": 0.05,
+    "max_altitude_m": 0.05,
+    "peak_gimbal_outer_deg": 1.00,
+    "peak_gimbal_inner_deg": 1.00,
+    "min_thrust_N": 0.50,
+    "max_thrust_N": 0.50,
+    "tilt_settling_time_s": 0.50,
+}
+
+
+def write_golden(metrics, args, path=GOLDEN_PATH):
+    """Freeze this run as the Gazebo baseline."""
+    doc = {
+        "what": "Gazebo hover metrics. Compared on aggregates, not samples -- "
+                "see GazeboHarness.metrics for why.",
+        "run": {"world": args.unpause or "(already running)",
+                "duration_s": args.duration, "altitude_m": args.altitude,
+                "rate_hz": args.rate},
+        "metrics": metrics,
+        "tolerance": GOLDEN_TOLERANCE,
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, indent=2, sort_keys=True)
+        f.write("\n")
+    print("wrote %s" % path)
+
+
+def check_golden(metrics, path=GOLDEN_PATH):
+    """-> True if every metric is inside tolerance. Names each one that is not."""
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    ref, tol = doc["metrics"], doc["tolerance"]
+    bad = []
+    for key, limit in sorted(tol.items()):
+        got, want = metrics.get(key), ref.get(key)
+        if got is None or want is None:
+            bad.append("%-24s MISSING (golden %s, run %s)" % (key, want, got))
+        elif abs(got - want) > limit:
+            bad.append("%-24s %+.4f vs golden %+.4f  (drift %+.4f > %.4f)"
+                       % (key, got, want, got - want, limit))
+    if bad:
+        print("\nGAZEBO GOLDEN DRIFTED:")
+        for line in bad:
+            print("  " + line)
+        print("\nIf this was meant to change the flight, re-capture with "
+              "`--capture-golden` in its own commit that says which numbers "
+              "moved and why. Never re-capture to make a check pass.")
+        return False
+    print("gazebo golden matches (%d metrics within tolerance)" % len(tol))
+    return True
 
 
 # --- pass/fail thresholds for the hover demo ---------------------------------
@@ -204,38 +413,59 @@ def main(argv=None):
     ap.add_argument("--altitude", type=float, default=2.0, help="target altitude [m]")
     ap.add_argument("--duration", type=float, default=25.0, help="simulated seconds")
     ap.add_argument("--rate", type=float, default=250.0,
-                    help="control rate [Hz]; must match the odometry publisher")
+                    help="nominal control rate [Hz]. Only a fallback and a clamp now: dt comes from the odometry stamps, so a mismatch with the publisher no longer silently rescales every derivative.")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--log", help="write per-sample flight data to this CSV")
+    ap.add_argument("--capture-golden", action="store_true",
+                    help="freeze this run's metrics as reference/golden/"
+                         "hover_baseline.json")
+    ap.add_argument("--check-golden", action="store_true",
+                    help="compare this run's metrics against that baseline; "
+                         "exit 2 and name every drifted metric")
+    ap.add_argument("--unpause", metavar="WORLD", default=None,
+                    help="start this world's physics once subscribed, so "
+                         "the run begins deterministically (see "
+                         "GazeboHarness.unpause). Omit when the world is "
+                         "already running.")
     args = ap.parse_args(argv)
 
     h = GazeboHarness(args.altitude, rate_hz=args.rate,
                       verbose=not args.quiet, log_path=args.log)
 
-    print("waiting for odometry on %s ..." % ODOM_TOPIC, flush=True)
-    for _ in range(200):
-        if h.state is not None:
-            break
-        time.sleep(0.05)
-    if h.state is None:
-        print("no odometry. Start the world first:\n"
-              "  bash gazebo/run_hover.sh")
-        return 1
-
     print("hovering to %.1f m for %.0f simulated seconds\n"
           % (args.altitude, args.duration), flush=True)
+    # running BEFORE unpause: the first message off a paused world is the first
+    # message of the run, so there is no window in which the vehicle flies
+    # uncommanded and no dependence on how fast this process started.
     h.running = True
-    target_steps = int(args.duration * args.rate)
-    # Wall-clock safety net only. The run ends on simulated steps; this stops a
-    # simulator running far below real time from hanging the script forever.
+    if args.unpause:
+        if not h.unpause(args.unpause):
+            return 1
+    else:
+        print("waiting for odometry on %s ..." % ODOM_TOPIC, flush=True)
+        for _ in range(200):
+            if h.state is not None:
+                break
+            time.sleep(0.05)
+        if h.state is None:
+            print("no odometry. Start the world first:\n"
+                  "  bash gazebo/run_hover.sh")
+            return 1
+    # The run ends on SIMULATED time, read from the odometry stamps, so a host
+    # that cannot keep up produces a shorter wall-clock run and not a different
+    # flight. The wall-clock deadline is a safety net so a stalled or paused
+    # simulator cannot hang the script forever.
     deadline = time.time() + args.duration * 3.0 + 10.0
-    while h.steps_done < target_steps and time.time() < deadline:
+    while h._t_sim < args.duration and time.time() < deadline:
         time.sleep(0.05)
     h.running = False
-    if h.steps_done < target_steps:
-        print("WARNING: %d of %d control steps ran before the wall-clock limit "
-              "-- the simulation is far below real time."
-              % (h.steps_done, target_steps))
+    if h._t_sim < args.duration:
+        print("WARNING: %.1f of %.1f simulated seconds ran before the wall-clock "
+              "limit -- the simulation is far below real time."
+              % (h._t_sim, args.duration))
+    if h.rejected:
+        print("rejected %d odometry message(s) whose twist contradicted the "
+              "pose (see harness/gz.py::_on_odom)" % h.rejected)
 
     s = h.state
     pitch, yaw, _ = quat_to_euler(s.quat)
@@ -248,4 +478,10 @@ def main(argv=None):
 
     ok = (err < ALT_ERR_MAX_M and tilt < TILT_MAX_DEG and drift < DRIFT_MAX_M)
     print("HOVER OK" if ok else "NOT STABLE -- see the numbers above")
+
+    m = h.metrics()
+    if args.capture_golden:
+        write_golden(m, args)
+    if args.check_golden and not check_golden(m):
+        ok = False
     return 0 if ok else 2

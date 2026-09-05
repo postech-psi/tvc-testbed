@@ -205,6 +205,8 @@ FLIGHT CODE -- runs on the vehicle. Pure Python by enforced rule.
 |---|---|
 | `quat_normalize(q)` | Renormalize to unit quaternion (mandatory after every integration step; truncation error accumulates otherwise -- see Step 1 guide, Prop. |
 | `quat_to_rotmat(q)` | Body -> inertial rotation matrix R(q), from unit quaternion q=(qw,qx,qy,qz). |
+| `quat_rotate(q, v)` | Rotate v from BODY into INERTIAL: returns R(q) @ v. |
+| `quat_rotate_inv(q, v)` | Rotate v from INERTIAL into BODY: returns R(q).T @ v. |
 | `quat_to_euler(q)` | ZYX (roll-yaw-pitch) Euler angles, for readout/plotting ONLY -- never used internally for kinematics propagation (that would reintroduce gimbal lock). |
 | `euler_to_quat(pitch, yaw, roll)` | Construct a quaternion from ZYX Euler angles (used only to set up initial conditions / disturbances in a human-friendly way). |
 | `thrust_axis(delta)` | Unit vector n_hat along the gimballed thrust axis, in the body frame. |
@@ -303,8 +305,12 @@ Owns the clock and the I/O. Picks a plant, wires it to gnc/.
 | | |
 |---|---|
 | class `GazeboHarness` | One control step per odometry message. |
-| &nbsp;&nbsp;&nbsp;`.step()` | One control step: state -> TvcController -> HAL -> the three gz topics. |
+| &nbsp;&nbsp;&nbsp;`.step(dt)` | One control step: state -> TvcController -> HAL -> the three gz topics. |
+| &nbsp;&nbsp;&nbsp;`.unpause(world)` | Start the world's physics, now that this controller is subscribed. |
+| &nbsp;&nbsp;&nbsp;`.metrics()` | The summary the Gazebo golden is compared on. |
 | &nbsp;&nbsp;&nbsp;`.write_log()` | Write the flight log CSV, with its axis-convention header line. |
+| `write_golden(metrics, args, path=)` | Freeze this run as the Gazebo baseline. |
+| `check_golden(metrics, path=)` | -> True if every metric is inside tolerance. |
 | `main(argv=)` | Run the hover demo. Returns 0 on a stable hover, 2 otherwise. |
 
 **`mil.py`** — Model-in-the-loop harness: analytic plant + flight code, fixed step.
@@ -362,12 +368,14 @@ Desktop tools. They read the simulator; they are not part of it.
 | &nbsp;&nbsp;&nbsp;`.run_button_disabled_call()` | Grey the Run button while a simulation is in flight. |
 | `main(argv=)` | Open the GUI window. |
 
-**`plot.py`** — Plot a Gazebo flight log.
+**`plot.py`** — The four-panel flight figure, for either plant.
 
 | | |
 |---|---|
 | `read_log(path)` | -> {column: [float]}, after checking the convention token. |
-| `main(argv=)` | Read a flight log and write the four-panel PNG. |
+| `series_from_run(r)` | -> the nine series, from a harness.mil.simulate() result dict. |
+| `four_panel(d, out, title, subtitle, target_m=)` | Draw altitude / position / attitude / gimbal and write `out`. |
+| `main(argv=)` | Read a Gazebo flight log and write the four-panel PNG. |
 
 **`record.py`** — Capture the Gazebo chase camera into an animated GIF.
 

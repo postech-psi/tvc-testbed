@@ -1,17 +1,23 @@
 """
-Plot a Gazebo flight log.
+The four-panel flight figure, for either plant.
 ================================================================================
-    python tvc.py plot flight_log.csv [out.png]
+    python tvc.py plot flight_log.csv [out.png]     a Gazebo run
+    python tvc.py validate --plot out/              the analytic scenarios
 
-Reads the CSV written by `tvc.py hover --log`. Small multiples on a shared time
-axis rather than one crowded plot with twin y-axes: altitude (m), position (m),
-attitude (deg) and gimbal (deg) are four different scales, and overlaying them
-on two axes makes the reader guess which curve belongs to which axis.
+Small multiples on a shared time axis rather than one crowded plot with twin
+y-axes: altitude (m), position (m), attitude (deg) and gimbal (deg) are four
+different scales, and overlaying them on two axes makes the reader guess which
+curve belongs to which axis.
 
-The log carries an axis-convention token in its first line and this refuses to
-plot one it does not recognise. A pre-rename log has the same column NAMES with
-different meanings, so plotting it would produce a picture that is wrong in a
-way nothing about it looks wrong. See docs/4-CONVENTIONS.md.
+ONE FIGURE, TWO PLANTS. `four_panel` is the only place the layout exists, and
+both the Gazebo CSV and the analytic harness feed it the same nine series. That
+is the point: when the two plants disagree, the pictures have to be comparable
+at a glance, and they cannot be if each pipeline draws its own.
+
+The Gazebo log carries an axis-convention token in its first line and this
+refuses to plot one it does not recognise. A pre-rename log has the same column
+NAMES with different meanings, so plotting it would produce a picture that is
+wrong in a way nothing about it looks wrong. See docs/4-CONVENTIONS.md.
 """
 import argparse
 import csv
@@ -31,6 +37,10 @@ GIMBAL_LIMIT_DEG = load().gimbal_max_deg
 # Categorical slots in fixed order (never cycled), from the validated palette.
 C_BLUE, C_ORANGE, C_AQUA, C_RED = "#2a78d6", "#eb6834", "#1baf7a", "#e34948"
 INK, MUTED, GRID = "#1a1a18", "#6b6b66", "#d8d8d4"
+
+# The nine series every panel needs, in the order they are drawn.
+SERIES = ("t_s", "z_m", "x_m", "y_m", "pitch_deg", "yaw_deg", "roll_deg",
+          "gimbal_outer_deg", "gimbal_inner_deg")
 
 
 def read_log(path):
@@ -55,33 +65,43 @@ def read_log(path):
     return {k: [float(r[k]) for r in rows] for k in rows[0]}
 
 
-def main(argv=None):
-    """Read a flight log and write the four-panel PNG."""
-    ap = argparse.ArgumentParser(
-        prog="tvc.py plot", description="Plot a Gazebo flight log CSV.")
-    ap.add_argument("log", help="CSV written by `tvc.py hover --log`")
-    ap.add_argument("out", nargs="?", default="flight_plot.png",
-                    help="output PNG (default: flight_plot.png)")
-    args = ap.parse_args(argv)
-    src, out = args.log, args.out
-    d = read_log(src)
+def series_from_run(r):
+    """-> the nine series, from a harness.mil.simulate() result dict.
+
+    The analytic harness keeps its history as numpy arrays with a shape per
+    quantity; this is the one place that knows which column is which, so the
+    plotting code below never has to.
+    """
+    euler, delta, pos = r["euler_deg"], r["delta_deg"], r["pos"]
+    return {
+        "t_s": r["t"],
+        "z_m": pos[:, 2], "x_m": pos[:, 0], "y_m": pos[:, 1],
+        "pitch_deg": euler[:, 0], "yaw_deg": euler[:, 1], "roll_deg": euler[:, 2],
+        # delta is stored [inner, outer] -- the order the controller emits.
+        "gimbal_inner_deg": delta[:, 0], "gimbal_outer_deg": delta[:, 1],
+    }
+
+
+def four_panel(d, out, title, subtitle, target_m=None):
+    """Draw altitude / position / attitude / gimbal and write `out`."""
+    missing = [k for k in SERIES if k not in d]
+    if missing:
+        raise ValueError("series missing from the run: %s" % ", ".join(missing))
     t = d["t_s"]
-    target = round(max(d["z_m"]), 1)
 
     fig, axes = plt.subplots(4, 1, figsize=(11, 10), sharex=True)
-    fig.suptitle("Coaxial TVC vehicle - Gazebo hover\n"
-                 "thrust vectoring only: 2-axis gimbal for yaw/pitch, "
-                 "rotor differential for roll",
-                 fontsize=12, color=INK, y=0.985)
+    fig.suptitle("%s\n%s" % (title, subtitle), fontsize=12, color=INK, y=0.985)
 
     # --- altitude ---------------------------------------------------------
     ax = axes[0]
-    ax.axhline(target, color=MUTED, lw=1, ls="--", zorder=1)
-    ax.annotate("target %.1f m" % target, (t[-1], target), xytext=(-6, 6),
-                textcoords="offset points", ha="right", fontsize=8, color=MUTED)
+    if target_m is not None:
+        ax.axhline(target_m, color=MUTED, lw=1, ls="--", zorder=1)
+        ax.annotate("target %.1f m" % target_m, (t[-1], target_m),
+                    xytext=(-6, 6), textcoords="offset points", ha="right",
+                    fontsize=8, color=MUTED)
     ax.plot(t, d["z_m"], color=C_BLUE, lw=2, zorder=3)
     ax.set_ylabel("altitude [m]", color=INK)
-    ax.set_title("Altitude hold", fontsize=10, color=INK, loc="left")
+    ax.set_title("Altitude", fontsize=10, color=INK, loc="left")
 
     # --- horizontal position ---------------------------------------------
     ax = axes[1]
@@ -134,14 +154,32 @@ def main(argv=None):
 
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(out, dpi=130, facecolor="white")
+    plt.close(fig)
     print("wrote %s" % out)
-    n = len(t)
+
+
+def main(argv=None):
+    """Read a Gazebo flight log and write the four-panel PNG."""
+    ap = argparse.ArgumentParser(
+        prog="tvc.py plot", description="Plot a Gazebo flight log CSV.")
+    ap.add_argument("log", help="CSV written by `tvc.py hover --log`")
+    ap.add_argument("out", nargs="?", default="flight_plot.png",
+                    help="output PNG (default: flight_plot.png)")
+    args = ap.parse_args(argv)
+    d = read_log(args.log)
+    four_panel(d, args.out,
+               "Coaxial TVC vehicle - Gazebo hover",
+               "thrust vectoring only: 2-axis gimbal for yaw/pitch, "
+               "rotor differential for roll",
+               target_m=round(max(d["z_m"]), 1))
+
+    t = d["t_s"]
     print("final: z=%.2f m  drift=%.2f m  tilt=%.1f deg  roll=%.1f deg"
           % (d["z_m"][-1],
              (d["x_m"][-1] ** 2 + d["y_m"][-1] ** 2) ** 0.5,
              (d["pitch_deg"][-1] ** 2 + d["yaw_deg"][-1] ** 2) ** 0.5,
              d["roll_deg"][-1]))
-    print("samples: %d over %.1f s" % (n, t[-1]))
+    print("samples: %d over %.1f s" % (len(t), t[-1]))
 
 
 if __name__ == "__main__":

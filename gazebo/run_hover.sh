@@ -64,34 +64,48 @@ else
   echo "starting Gazebo headless (paused)..."
   # --headless-rendering: required for the chase camera to produce frames with
   # no display attached. Without it the sensor exists but never renders.
-  gz sim -s -r --headless-rendering "${WORLD}" &
+  #
+  # NO -r. This branch used to carry it, which starts physics immediately and
+  # flatly contradicts the paused-start design this script's header explains --
+  # the vehicle was already falling before the controller had subscribed. The
+  # GUI branch never had it, so the headless run and the one you watched were
+  # not the same experiment.
+  gz sim -s --headless-rendering "${WORLD}" &
 fi
 
-# Wait on the world CONTROL SERVICE, not on a topic: while the sim is paused no
-# physics steps run, so the odometry topic does not exist yet and polling for it
-# would wait forever. The service is up as soon as the world loads.
+# Wait by CALLING the control service, not by listing it. Two reasons: while the
+# sim is paused no physics steps run, so the odometry topic does not exist yet
+# and polling for that would wait forever; and gz-transport keeps a killed
+# server's service NAMES in discovery for some seconds afterwards, so
+# `gz service -l | grep` returns instantly on the corpse of the previous run and
+# everything downstream then talks to a world that has not loaded. A call that
+# returns proves a live server. The request is `pause: true`, so waiting cannot
+# accidentally start the run.
 echo -n "waiting for simulator"
 for _ in $(seq 60); do
-  if gz service -l 2>/dev/null | grep -q "/world/${WORLD_NAME}/control$"; then
+  if gz service -s "/world/${WORLD_NAME}/control" \
+       --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
+       --timeout 1000 --req "pause: true" 2>/dev/null | grep -q "data: true"; then
     echo " ready"; break
   fi
   echo -n "."; sleep 1
 done
 
-python3 "${REPO}/tvc.py" hover --duration "${DURATION}" \
-        --altitude "${ALTITUDE}" --log "${LOG}" &
-CTRL=$!
 REC=""
 if [[ -n "${RECORD}" ]]; then
   python3 "${REPO}/tvc.py" record --duration "${DURATION}" --out "${RECORD}" &
   REC=$!
+  sleep 2   # the camera recorder must be attached before the first frame
 fi
-sleep 2   # let the controller subscribe and start publishing
 
-echo "unpausing physics"
-gz service -s "/world/${WORLD_NAME}/control" \
-  --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \
-  --timeout 3000 --req "pause: false" >/dev/null
+# THE CONTROLLER UNPAUSES, not this script. A `sleep 2; gz service` here made
+# the number of uncontrolled physics steps depend on how fast the host got
+# Python to its first publish, and two consecutive 30 s runs then peaked at
+# 14.6 and 58.0 degrees of thrust-axis roll from the same initial condition.
+# See tvc_control/harness/gz.py::unpause.
+python3 "${REPO}/tvc.py" hover --duration "${DURATION}" \
+        --altitude "${ALTITUDE}" --log "${LOG}" --unpause "${WORLD_NAME}" &
+CTRL=$!
 
 wait "${CTRL}"
 [[ -n "${REC}" ]] && wait "${REC}" || true

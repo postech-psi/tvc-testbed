@@ -187,8 +187,19 @@ class ThrustTorqueSurface:
 
         The conservative summary, for sizing gains and quoting authority. Use
         torque_limits_at() where the extra authority on the strong side matters.
+
+        ZERO once the feasible interval stops containing zero. Above ~17.0 N of
+        the 17.79 N ceiling both props are near their stops, and the coax
+        asymmetry means the interval is entirely positive -- at 17.4 N it is
+        [+0.0090, +0.0301] N.m. There is then no authority in either direction:
+        every reachable tau_P is a POSITIVE bias the vehicle has to wear, not a
+        torque it can choose. min(|lo|,|hi|) reports 0.0090 there, which reads
+        as authority and is the exact opposite of the truth. Getting this wrong
+        is how a vehicle ends up sized on control it does not have.
         """
         q_lo, q_hi = self.torque_limits_at(thrust_n)
+        if q_lo > 0.0 or q_hi < 0.0:
+            return 0.0
         return min(abs(q_lo), abs(q_hi))
 
     # --- inverse -------------------------------------------------------------

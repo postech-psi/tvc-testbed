@@ -1,4 +1,4 @@
-# 6 — Credibility
+# 7 — Credibility
 
 How much this simulator's output should be trusted, and on what evidence.
 
@@ -58,16 +58,17 @@ uncertainty.
 <!-- <<<EMIT:tests -->
 | file | test functions | what it guards |
 |---|---|---|
-| `test_allocation.py` | 6 | Control allocation: does it realize the moment it was asked for? |
-| `test_attitude_error.py` | 5 | The quaternion attitude error, and why it replaced the Euler difference. |
+| `test_allocation.py` | 7 | Control allocation: does it realize the moment it was asked for? |
+| `test_attitude_error.py` | 8 | The quaternion attitude error, and why it replaced the Euler difference. |
 | `test_axis_convention.py` | 11 | The axis convention, asserted rather than documented. |
-| `test_consistency.py` | 13 | The numbers that live in two places must agree. |
+| `test_consistency.py` | 16 | The numbers that live in two places must agree. |
 | `test_container.py` | 7 | The Dockerfile must build, and it must not be a second copy of requirements.txt. |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
+| `test_gazebo_servo.py` | 6 | The Gazebo gimbal servo must be stable at the world's physics step. |
 | `test_gnc_purity.py` | 6 | Enforce the porting discipline on the flight code. |
 | `test_scenarios.py` | 2 | The five closed-loop scenarios, run as tests. |
-| | **65** | |
+| | **78** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -192,16 +193,41 @@ introduced.
 | no sensor model | state feedback is perfect; real noise, bias and latency absent | deferred — **Seam A already exists**, so this drops in without touching the controller |
 | the analytic plant has no gimbal-ring or rotor gyroscopic terms and no ground contact | limits analytic↔Gazebo agreement | accepted; keep every scenario airborne |
 | Gazebo rotor speed is not a physical RPM | `momentConstant` is a solver scaling and `maxRotVelocity` is solver headroom; the plugin no longer enforces the real 17.79 N ceiling | **accepted deliberately** — it is the price of reproducing the measured surface exactly. The allocator enforces the ceiling instead, and `tests/test_allocation.py` asserts it. |
+| **the ROS 2 path holds a 1.5-2.5 deg roll limit cycle the direct path does not** | the two SIL pipelines run identical control code and agree on every channel except the thrust axis; the bridge's transport delay costs phase margin exactly where the vehicle has least inertia and the slowest actuator | **OPEN — measured, bounded, not explained in detail** |
+| **above ~17.0 N the feasible tau_P interval excludes zero** | a full-throttle climb applies a forced +0.017 N.m roll torque and the vehicle takes 53 deg of thrust-axis roll before the throttle comes off the stop | real airframe behaviour, modelled correctly; an operational limit rather than a modelling gap |
+| Gazebo's gimbal servo settles in 12.5 ms against the 30 ms the plant models | a factor of ~2, not a decade; the servo is nearly but not entirely transparent | bounded by `tests/test_gazebo_servo.py`; a coarser physics step would spend the margin |
+| the Gazebo run is reproducible in aggregate but not sample-wise | two consecutive 30 s runs differ by up to 1.5 deg of roll and 12 mm of altitude at any one sample, because the first accepted odometry message can land a physics step apart | why the Gazebo golden compares metrics; was 49 deg before the controller took ownership of the unpause |
 | the feasible-set table is binned (200 bins over 18 N) | over-promises roll torque by up to 0.007 N·m below ~8% and above ~95% throttle; the inverse then trades that torque away to keep thrust exact | measured and bounded by test |
 
 **No sensitivity study has been run**, so nothing tells us which of these matters
 most. That is what keeps this factor at 2.
 
-**Two divergences that were closed** and are recorded because closing them
-changed real numbers: the Gazebo `momentConstant` used to reproduce only ~50% of
-the measured roll torque at hover and none of its sign asymmetry (fixed by the
-command-side inversion), and the rigid body used to be integrated with a diagonal
-inertia when `Iyz/Izz = 27.3%` (fixed by carrying the full tensor).
+**Divergences that were closed**, recorded because closing them changed real
+numbers:
+
+- the Gazebo `momentConstant` reproduced only ~50% of the measured roll torque at
+  hover and none of its sign asymmetry — fixed by the command-side inversion;
+- the rigid body was integrated with a diagonal inertia when `Iyz/Izz = 27.3%` —
+  fixed by carrying the full tensor;
+- **Gazebo's gimbal servo was numerically unstable at the 1 ms step** and tumbled
+  the vehicle from a level, zero-command state — fixed by deriving the gains from
+  each ring's inertia;
+- **the odometry twist was read as inertial when it is body-frame** (REP-105).
+  At the world's 12.2° spawn that is 21% of the descent rate appearing as
+  lateral velocity that is not there. It was wrong in all three consumers, and
+  `simulator_node` published the wrong frame as well — so the analytic plant and
+  gz-sim disagreed about what the same message meant, which is the one thing two
+  plants sharing one controller may not do;
+- **the first two odometry messages carry a garbage twist** — gz-sim's
+  `OdometryPublisher` differences the pose against a zero-initialised previous
+  pose, so message one reports 651 m/s and 58 rad/s. The controller's rate loop
+  saw that and saturated the gimbal on step one. They are now rejected by
+  checking the reported twist against the pose derivative, which needs no tuned
+  threshold: the position has not moved at all while the twist claims hundreds
+  of m/s;
+- **`tvc.py view3d` and the GUI's 3D button raised `AttributeError` on the first
+  frame** — `quat_to_rotmat` is flight code and returns a tuple of rows, and the
+  viewer asked it for `.T`. Neither had opened since the math moved into `gnc/`.
 
 ---
 
@@ -209,32 +235,71 @@ inertia when `Iyz/Izz = 27.3%` (fixed by carrying the full tensor).
 
 ### Use History · level 1
 
-- **One Gazebo hover demo**, used repeatedly during tuning: spawned tilted,
-  recovered level in ~2 s, held 2.00 m with no drift. That demo carried its own
-  duplicate controller. The rewritten harness calls the shared flight code
-  instead, and does *not* reproduce the result — see the next bullet. The old
+- **The Gazebo hover, re-flown under the shared flight code**: spawned tilted,
+  level in 1.03 s, 2.000 m held with no drift, frozen as
+  `reference/golden/hover_baseline.json`. The old demo that produced the
+  original result carried its own duplicate controller. The old
   behaviour is therefore use history for code that no longer exists.
 - The analytic simulator drives the GUI and the 3D viewer, and is exercised on
   every commit by CI.
-- **The ROS 2 path builds but has never been run.** `colcon build` now succeeds
-  for both packages in the devcontainer, all three node modules import from the
-  installed package, and `gazebo.launch.py` produces a valid launch description.
-  No ROS 2 message has yet crossed the `ros_gz_bridge`, so the type strings
-  remain unverified.
-- **The Gazebo hover has been re-flown, and it does not recover.** First run of
-  the rewritten `harness/gz.py`: from the world's deliberate 10°/−7° spawn the
-  vehicle diverges to 180° tilt in ~1.1 s with the gimbal pinned at 6.9° of 7.0
-  for the whole run, landing at 0.25 m with 1.42 m of drift. The analytic plant
-  recovers the comparable upset with 1% saturation. **That is a MIL/SIL
-  disagreement, not a tuning problem** — a free-flying vehicle feels no gravity
-  moment about its CG, so nothing tips it but its own control action. It is the
-  single most informative open result in this document, and it is exactly what
-  cross-plant validation exists to find. The SDF servos are already neutralised,
-  so the next suspect is the sign of the actuator chain between
-  `ActuatorSetpoint` and the Gazebo joint and rotor topics.
-- **There is still no Gazebo golden**, and there should not be one until the
-  above is understood — freezing a divergence as a reference makes it permanent.
-  See [reference/golden/README.md](../reference/golden/README.md).
+- **The Gazebo hover flies, and it is now the second frozen baseline.** From the
+  world's deliberate 10°/−7° spawn the vehicle recovers level in **1.03 s**,
+  holds 2.000 m with 1 × 10⁻⁸ m of drift, and settles the gimbal at zero with
+  thrust at exactly *mg* = 13.03 N. `reference/golden/hover_baseline.json`
+  freezes fourteen metrics of that run and `tvc.py hover --check-golden`
+  compares against it. The picture is
+  [hover_baseline.png](../reference/golden/hover_baseline.png).
+
+  It did not fly a week ago; it tumbled to 180° in about a second, and the cause
+  was **not** in the flight code. Gazebo's `JointPositionController` had
+  hand-written gains of `p=60, d=1.0` against a gimbal ring of 8.5 × 10⁻⁵ kg·m²
+  at a 1 ms step, so the explicit damping update `ω ← ω(1 − d·dt/I)` ran at
+  `d·dt/I = 11.8` and diverged. The joint chattered against its ±5 N·m clamp
+  and the reaction tumbled the airframe. It reproduced with the **controller not
+  running at all** and the gimbal commanded to exactly zero, which is what made
+  it attributable. The gains are now derived per ring from that ring's own
+  inertia, and `tests/test_gazebo_servo.py` asserts the stability condition
+  against the world files' actual step.
+
+- **The ROS 2 stack runs, and the two SIL paths disagree in exactly one
+  channel.** `ros2 launch tvc_control gazebo.launch.py` brings up all five
+  processes, messages cross the `ros_gz_bridge` in both directions, and the
+  vehicle holds 2.000 m with pitch and yaw inside ±0.01°. But the thrust-axis
+  channel sits in a persistent **1.5–2.5° limit cycle** that the direct
+  gz-transport path does not have (it settles to 1 × 10⁻⁴°). One channel differs
+  and it is the one with 11.5× less inertia and a ~3× slower actuator — the one
+  where the bridge's added transport delay actually costs phase margin. Bounded,
+  attributable, and unresolved.
+
+  Getting there needed two fixes, both of which had survived a clean
+  `colcon build`: the YAML source of truth was installed to `share/` where
+  nothing reads it, so every node died on startup; and the retired-parameter
+  guard was written as `declare_parameter(name, Parameter.Type.NOT_SET)`, which
+  rclpy on Jazzy rejects outright, so the guard killed every node whether a
+  retired parameter was set or not. **A package that builds is not a package
+  that runs**, and only `ros2 launch` distinguishes them.
+
+- **Above ~17.0 N of thrust the vehicle cannot command zero roll torque.** The
+  feasible τ_P interval stops containing zero — at 17.4 N it is
+  `[+0.0090, +0.0301] N·m` — because both props are near their stops and the
+  coax asymmetry no longer cancels. The allocator clamps to the nearest
+  reachable value, so a full-throttle climb applies a forced positive roll
+  torque on a 0.00196 kg·m² axis: **53° of thrust-axis roll** before the
+  throttle comes off the stop, recovered by 3 s. This is real airframe
+  behaviour, correctly modelled, and it has an operational consequence — the
+  vehicle cannot hold roll attitude during a maximum-rate climb.
+
+  `roll_headroom()` used to report `min(|lo|,|hi|)` there, which reads as
+  authority in both directions where there is none in either. It returns zero
+  now. Nothing had noticed because `validate` printed only final values; the
+  scenario plots are what made it visible.
+
+- **Gazebo's gimbal servo is fast, but not by much.** It is squeezed from below
+  by the 30 ms transport delay the *plant* models — Gazebo must not add a second
+  lag on top — and from above by `2ζωₙ·dt < 1` at the 1 ms step. Those meet near
+  ωₙ = 400 rad/s: 12.5 ms of settling against 30 ms, and `d·dt/I = 0.64`. There
+  is roughly a factor of two of room. A coarser physics step would spend it.
+
 - No result from this simulator has yet been used for a design decision that was
   subsequently checked against hardware.
 

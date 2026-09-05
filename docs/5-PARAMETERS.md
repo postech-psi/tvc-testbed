@@ -1,4 +1,4 @@
-# 4 — Parameters
+# 5 — Parameters
 
 Every number the simulator uses, what it is, and **how much of a claim it is**.
 

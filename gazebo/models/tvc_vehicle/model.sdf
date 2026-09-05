@@ -186,7 +186,7 @@
       </axis>
     </joint>
 
-    <!-- ================= plugins (constants from vehicle_params.yaml) ===== -->
+    <!-- ============ plugins (constants from vehicle_params.yaml) ========= -->
     <plugin filename="gz-sim-multicopter-motor-model-system"
             name="gz::sim::systems::MulticopterMotorModel">
       <robotNamespace>tvc_vehicle</robotNamespace>
@@ -197,7 +197,7 @@
            (tvc_control/plant/actuators.py::MotorLag), in ONE place, so both
            plants agree. It cannot live here anyway: this filters the rotor
            VELOCITY reference, and since T ~ omega^2 a first-order lag in omega
-           is not a first-order lag in thrust -- it is faster near hover and
+           is not a first-order lag in thrust - it is faster near hover and
            asymmetric between spin-up and spin-down. -->
       <timeConstantUp>0.0010</timeConstantUp>
       <timeConstantDown>0.0010</timeConstantDown>
@@ -221,7 +221,7 @@
            (tvc_control/plant/actuators.py::MotorLag), in ONE place, so both
            plants agree. It cannot live here anyway: this filters the rotor
            VELOCITY reference, and since T ~ omega^2 a first-order lag in omega
-           is not a first-order lag in thrust -- it is faster near hover and
+           is not a first-order lag in thrust - it is faster near hover and
            asymmetric between spin-up and spin-down. -->
       <timeConstantUp>0.0010</timeConstantUp>
       <timeConstantDown>0.0010</timeConstantDown>
@@ -239,15 +239,17 @@
             name="gz::sim::systems::JointPositionController">
       <joint_name>gimbal_inner_joint</joint_name>
       <topic>/tvc_vehicle/gimbal_inner_cmd</topic>
-      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
-           Gazebo its own gimbal lag and slew, on top of the plant model's --
-           double-counting, and with a single symmetric rate where the bench
-           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
-           have one owner (plant/actuators.py::GimbalActuator), so this
-           controller is asked only to track its command as fast as it can. -->
-      <p_gain>60.0</p_gain>
+      <!-- DERIVED, not chosen. The inner ring swings 7.500e-05 kg.m^2 about its
+           own axis, and these are the critically-damped gains for that inertia
+           at wn=400 rad/s, zeta=0.8. The explicit integrator needs
+           d*dt/I = 0.64 to stay below 1; at p=60, d=1.0 it was 11.8
+           and the joint chattered hard enough to tumble the airframe. The real
+           gimbal dynamics live in plant/actuators.py, not here - this servo
+           only has to be quick enough to disappear next to them.
+           See gen_model_sdf.py's SERVO_* block. -->
+      <p_gain>12.0000</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>1.0</d_gain>
+      <d_gain>0.04800</d_gain>
       <cmd_max>5.0</cmd_max>
       <cmd_min>-5.0</cmd_min>
     </plugin>
@@ -255,15 +257,17 @@
             name="gz::sim::systems::JointPositionController">
       <joint_name>gimbal_outer_joint</joint_name>
       <topic>/tvc_vehicle/gimbal_outer_cmd</topic>
-      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
-           Gazebo its own gimbal lag and slew, on top of the plant model's --
-           double-counting, and with a single symmetric rate where the bench
-           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
-           have one owner (plant/actuators.py::GimbalActuator), so this
-           controller is asked only to track its command as fast as it can. -->
-      <p_gain>60.0</p_gain>
+      <!-- DERIVED, not chosen. The outer ring swings 8.500e-05 kg.m^2 about its
+           own axis, and these are the critically-damped gains for that inertia
+           at wn=400 rad/s, zeta=0.8. The explicit integrator needs
+           d*dt/I = 0.64 to stay below 1; at p=60, d=1.0 it was 11.8
+           and the joint chattered hard enough to tumble the airframe. The real
+           gimbal dynamics live in plant/actuators.py, not here - this servo
+           only has to be quick enough to disappear next to them.
+           See gen_model_sdf.py's SERVO_* block. -->
+      <p_gain>13.6000</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>1.0</d_gain>
+      <d_gain>0.05440</d_gain>
       <cmd_max>5.0</cmd_max>
       <cmd_min>-5.0</cmd_min>
     </plugin>

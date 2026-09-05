@@ -35,6 +35,27 @@ def quat_to_rotmat(q):
     )
 
 
+def quat_rotate(q, v):
+    """Rotate v from BODY into INERTIAL: returns R(q) @ v.
+
+    The same rotation quat_to_rotmat builds, applied without building the
+    matrix, because the callers that need it are outside the integrator and may
+    not use numpy. It exists because two frames meet at the transport boundary:
+    nav_msgs/Odometry and gz.msgs.Odometry both report the twist in the CHILD
+    (body) frame per REP-105, while EstimatedState.vel_i is inertial by
+    definition. Feeding one as the other is exact only while the vehicle is
+    level, which is the one condition a TVC test never holds.
+    """
+    r = quat_to_rotmat(q)
+    return tuple(r[i][0]*v[0] + r[i][1]*v[1] + r[i][2]*v[2] for i in range(3))
+
+
+def quat_rotate_inv(q, v):
+    """Rotate v from INERTIAL into BODY: returns R(q).T @ v."""
+    r = quat_to_rotmat(q)
+    return tuple(r[0][i]*v[0] + r[1][i]*v[1] + r[2][i]*v[2] for i in range(3))
+
+
 def quat_to_euler(q):
     """ZYX (roll-yaw-pitch) Euler angles, for readout/plotting ONLY -- never
     used internally for kinematics propagation (that would reintroduce gimbal lock)."""

@@ -88,3 +88,62 @@ def test_euler_readout_round_trips():
     for ang in ((0.0, 0.0, 0.0), (0.1, -0.2, 0.3), (-0.4, 0.15, -0.25)):
         out = quat_to_euler(euler_to_quat(*ang))
         assert out == pytest.approx(ang, abs=1e-12)
+
+
+# --- the body/inertial boundary ----------------------------------------------
+# nav_msgs/Odometry and gz.msgs.Odometry both report the twist in the CHILD
+# (body) frame, per REP-105. EstimatedState.vel_i is inertial. Three call sites
+# now convert -- harness/gz.py, nodes/controller.py, nodes/simulator.py -- and
+# for a long time none of them did, which is exact only while the vehicle is
+# level. A TVC test is never level.
+
+def test_rotating_body_to_inertial_and_back_is_the_identity():
+    import math
+    from tvc_control.gnc.mathx import euler_to_quat, quat_rotate, quat_rotate_inv
+    q = euler_to_quat(math.radians(10), math.radians(-7), math.radians(35))
+    for v in ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0),
+              (0.3, -1.7, 4.2)):
+        back = quat_rotate_inv(q, quat_rotate(q, v))
+        for a, b in zip(v, back):
+            assert abs(a - b) < 1e-12
+
+
+def test_rotation_agrees_with_the_matrix_the_plant_integrates():
+    """quat_rotate must be R(q) @ v and not something merely similar.
+
+    The plant builds the matrix and multiplies with numpy; flight code cannot.
+    Two implementations of one rotation is exactly the kind of thing that forks
+    by a transpose, so they are compared rather than trusted.
+    """
+    import math
+    import numpy as np
+    from tvc_control.gnc.mathx import euler_to_quat, quat_rotate, quat_to_rotmat
+    q = euler_to_quat(math.radians(12), math.radians(-25), math.radians(3))
+    R = np.array(quat_to_rotmat(q))
+    v = np.array([0.3, -1.7, 4.2])
+    assert np.allclose(np.array(quat_rotate(q, tuple(v))), R @ v, atol=1e-12)
+
+
+def test_a_free_falling_tilted_vehicle_shows_the_frames_are_different():
+    """The measurement that found the bug, as an assertion.
+
+    In free fall from the world's 10/-7 deg spawn the INERTIAL velocity is
+    purely vertical, while the body-frame velocity Gazebo actually reports has
+    a lateral component of |v|*sin(tilt). Reading one as the other is a silent
+    lateral velocity error of 21% of the descent rate at this attitude.
+    """
+    import math
+    from tvc_control.gnc.mathx import euler_to_quat, quat_rotate_inv
+    from tvc_control.gnc.mathx import quat_to_rotmat
+    q = euler_to_quat(math.radians(10.0), math.radians(-7.0), 0.0)
+    speed = 3.295
+    vx, vy, vz = quat_rotate_inv(q, (0.0, 0.0, -speed))
+
+    # Exact, not hypot(10, 7): two Euler rotations do not add as a right
+    # triangle. The true tilt is acos(R_zz), and hypot only happens to be close.
+    tilt = math.acos(quat_to_rotmat(q)[2][2])
+    assert abs(math.hypot(vx, vy) - speed * math.sin(tilt)) < 1e-9
+    assert abs(abs(vz) - speed * math.cos(tilt)) < 1e-9
+    # 0.696 m/s of lateral velocity that is not there -- 21% of the descent
+    # rate, and exactly what Gazebo reported in the free-fall probe.
+    assert math.hypot(vx, vy) > 0.6

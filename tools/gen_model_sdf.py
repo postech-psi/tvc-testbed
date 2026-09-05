@@ -24,6 +24,7 @@ Run:
 """
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -45,6 +46,70 @@ TOKEN_LINKS = [
     ("rotor_a",      0.010,  0.030, (9.0e-6, 9.0e-6, 1.7e-5)),
     ("rotor_b",      0.010,  0.060, (9.0e-6, 9.0e-6, 1.7e-5)),
 ]
+
+
+# --- Gazebo's own gimbal servo -----------------------------------------------
+# The physics step of every world that loads this model. The servo gains below
+# are only stable BECAUSE of it, so the value is asserted against the world
+# files in tests/test_consistency.py rather than assumed here.
+WORLD_STEP_S = 0.001
+
+# What the JointPositionController is for, and what it is not.
+#
+# Gazebo needs SOME servo or the gimbal rings hang free. But the gimbal's real
+# dynamics -- the 30 ms transport delay and the 403/235 deg/s per-ring slew --
+# are owned by plant/actuators.py::GimbalActuator, in one place, so both plants
+# agree. So this servo must be fast enough to be invisible next to those, and
+# nothing more.
+#
+# "Fast" has a hard ceiling, and missing it is what broke the Gazebo flight.
+# JointPositionController is an explicit PID writing a joint force each step:
+#     omega <- omega * (1 - d*dt/I)
+# so d*dt/I >= 2 diverges and >= 1 rings. The gains this file used to emit,
+# p=60 and d=1.0, gave d*dt/I = 11.8 on the outer ring's 8.5e-5 kg.m^2. The
+# joint chattered against its +/-5 N.m clamp, the reaction went into the
+# airframe, and the vehicle tumbled to 180 deg in about a second -- with the
+# gimbal commanded to exactly zero and the controller not running at all.
+# Measured, not argued: docs/7-CREDIBILITY.md.
+#
+# So the gains are DERIVED from each ring's own reflected inertia, for a
+# critically-ish damped servo at a frequency the step can carry:
+#     p = I * wn^2      d = 2 * zeta * I * wn
+# with wn chosen so d*dt/I = 2*zeta*wn*dt stays below 0.5.
+# wn is set by a two-sided squeeze, and it is worth seeing both sides:
+#   from below, the servo has to disappear next to the gimbal dynamics the
+#     PLANT models -- a 30 ms transport delay -- or Gazebo is adding a second
+#     lag on top and the two plants no longer model the same actuator;
+#   from above, 2*zeta*wn*dt must stay under 1 or the explicit damping rings.
+# At dt = 1 ms those meet at roughly 400 rad/s: settling 4/(zeta*wn) = 12.5 ms,
+# comfortably under half the 30 ms it stands next to, and 2*zeta*wn*dt = 0.64,
+# comfortably inside 1. There is not a lot of room between them, which is worth
+# knowing before anyone proposes a coarser physics step.
+SERVO_WN_RAD_S = 400.0      # 64 Hz; settles in 12.5 ms vs the modelled 30 ms
+SERVO_ZETA = 0.8            # 2*zeta*wn*dt = 0.64, inside 1
+SERVO_CMD_MAX_NM = 5.0      # matches the joint effort limit; never reached now
+
+
+def ring_inertia(axis, ring):
+    """Inertia [kg.m^2] the named gimbal ring must swing, about its own axis.
+
+    Every token link outboard of the joint, each with its parallel-axis term.
+    Both joint axes pass through z=0, so the offset is the link's own z.
+    """
+    outboard = {"outer": ("outer_gimbal", "inner_gimbal", "rotor_a", "rotor_b"),
+                "inner": ("inner_gimbal", "rotor_a", "rotor_b")}[ring]
+    i = 0.0
+    for name, mass, z, (ixx, iyy, izz) in TOKEN_LINKS:
+        if name in outboard:
+            i += (ixx if axis == "x" else iyy) + mass * z * z
+    return i
+
+
+def servo_gains(ring):
+    """(p_gain, d_gain) for one ring: critically-ish damped, step-stable."""
+    inertia = ring_inertia("x" if ring == "outer" else "y", ring)
+    return (inertia * SERVO_WN_RAD_S ** 2,
+            2.0 * SERVO_ZETA * inertia * SERVO_WN_RAD_S)
 
 
 def _parallel(m, r):
@@ -94,6 +159,35 @@ def composite_check(v, base_mass, base_pos, I_base_own):
     for m, p, Iown in links:
         I += Iown + _parallel(m, p - C)
     return M, C, I
+
+
+def _xml_safe(text):
+    """Make the document well-formed, then prove it.
+
+    XML forbids `--` inside a comment. This project writes `--` as an em dash
+    in prose, the prose goes into SDF comments, and gz-sim's parser (TinyXML2)
+    accepts it -- so the model loaded fine while being invalid XML that
+    ElementTree refuses outright. That is a trap for every future tool that
+    wants to read the SDF as XML rather than by regex, which is how the existing
+    checks read it and how they missed this.
+
+    Authors keep writing `--`; this collapses it to a single dash inside
+    comments only, and parses the result so the artefact can never ship broken.
+    """
+    out, i = [], 0
+    while True:
+        a = text.find("<!--", i)
+        if a < 0:
+            out.append(text[i:])
+            break
+        b = text.index("-->", a)
+        out.append(text[i:a + 4])
+        out.append(text[a + 4:b].replace("--", "-"))
+        out.append("-->")
+        i = b + 3
+    doc = "".join(out)
+    ET.fromstring(doc)          # raises if anything else is malformed too
+    return doc
 
 
 def render(v, base_mass, base_pos, I_base_own):
@@ -156,22 +250,26 @@ def render(v, base_mass, base_pos, I_base_own):
       <motorType>velocity</motorType>
     </plugin>"""
 
-    def servo_plugin(joint, topic):
+    def servo_plugin(joint, topic, ring):
+        kp, kd = servo_gains(ring)
+        inertia = ring_inertia("x" if ring == "outer" else "y", ring)
         return f"""    <plugin filename="gz-sim-joint-position-controller-system"
             name="gz::sim::systems::JointPositionController">
       <joint_name>{joint}</joint_name>
       <topic>{topic}</topic>
-      <!-- NEUTRALISED. These gains plus the joint velocity limit used to give
-           Gazebo its own gimbal lag and slew, on top of the plant model's --
-           double-counting, and with a single symmetric rate where the bench
-           measured 403 (inner) and 235 (outer) deg/s. The actuator dynamics now
-           have one owner (plant/actuators.py::GimbalActuator), so this
-           controller is asked only to track its command as fast as it can. -->
-      <p_gain>60.0</p_gain>
+      <!-- DERIVED, not chosen. The {ring} ring swings {inertia:.3e} kg.m^2 about its
+           own axis, and these are the critically-damped gains for that inertia
+           at wn={SERVO_WN_RAD_S:.0f} rad/s, zeta={SERVO_ZETA}. The explicit integrator needs
+           d*dt/I = {kd / inertia * WORLD_STEP_S:.2f} to stay below 1; at p=60, d=1.0 it was 11.8
+           and the joint chattered hard enough to tumble the airframe. The real
+           gimbal dynamics live in plant/actuators.py, not here -- this servo
+           only has to be quick enough to disappear next to them.
+           See gen_model_sdf.py's SERVO_* block. -->
+      <p_gain>{kp:.4f}</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>1.0</d_gain>
-      <cmd_max>5.0</cmd_max>
-      <cmd_min>-5.0</cmd_min>
+      <d_gain>{kd:.5f}</d_gain>
+      <cmd_max>{SERVO_CMD_MAX_NM:.1f}</cmd_max>
+      <cmd_min>-{SERVO_CMD_MAX_NM:.1f}</cmd_min>
     </plugin>"""
 
     return f"""<?xml version="1.0"?>
@@ -360,8 +458,8 @@ def render(v, base_mass, base_pos, I_base_own):
 
 {motor_plugin('rotor_b_joint', 'rotor_b', 'cw', 1)}
 
-{servo_plugin('gimbal_inner_joint', '/tvc_vehicle/gimbal_inner_cmd')}
-{servo_plugin('gimbal_outer_joint', '/tvc_vehicle/gimbal_outer_cmd')}
+{servo_plugin('gimbal_inner_joint', '/tvc_vehicle/gimbal_inner_cmd', 'inner')}
+{servo_plugin('gimbal_outer_joint', '/tvc_vehicle/gimbal_outer_cmd', 'outer')}
 
     <plugin filename="gz-sim-odometry-publisher-system"
             name="gz::sim::systems::OdometryPublisher">
@@ -403,7 +501,7 @@ def main(argv=None):
         return 0
 
     with open(OUT_PATH, "w", encoding="utf-8") as f:
-        f.write(render(v, base_mass, base_pos, I_base_own))
+        f.write(_xml_safe(render(v, base_mass, base_pos, I_base_own)))
     print("Wrote %s" % os.path.relpath(OUT_PATH, REPO))
     return 0
 

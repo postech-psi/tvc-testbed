@@ -1,4 +1,4 @@
-# 2 — Theory
+# 3 — Theory
 
 Every equation the simulator implements, where it comes from, and which file
 contains it. Axis names and signs follow [4-CONVENTIONS.md](4-CONVENTIONS.md)

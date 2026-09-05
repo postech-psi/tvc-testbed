@@ -349,7 +349,12 @@ class View3DWindow(tk.Toplevel):
         k = int(np.clip(k, 0, self.n - 1))
         self.frame = k
 
-        R_bi = quat_to_rotmat(self.quat[k])          # body -> inertial
+        # np.asarray, not the bare return: quat_to_rotmat is FLIGHT code and
+        # returns a tuple of rows, because gnc/ may not import numpy. This
+        # line used to take the tuple and ask it for .T, so `tvc.py view3d`
+        # and the GUI's 3D button both raised AttributeError on the first
+        # frame -- they have not opened since the math moved into gnc/.
+        R_bi = np.asarray(quat_to_rotmat(self.quat[k]))   # body -> inertial
 
         verts = self.faces_body @ R_bi.T             # rotate every face's vertices
         self.body.set_verts(verts)

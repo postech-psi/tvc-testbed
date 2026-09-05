@@ -27,11 +27,16 @@ from scipy.integrate import solve_ivp
 
 from tvc_msgs.msg import ActuatorCommand
 from tvc_control.config import load_vehicle_params, load
-from tvc_control.gnc.mathx import euler_to_quat, quat_normalize
+from tvc_control.gnc.mathx import euler_to_quat, quat_normalize, quat_rotate_inv
 from tvc_control.plant.actuators import ActuatorChain
 from tvc_control.plant.rigidbody import dynamics
+from tvc_control.nodes import reject_retired_parameters
 
-RETIRED_PARAMS = ('gimbal_rate_max_deg',)
+RETIRED_PARAMS = {
+    'gimbal_rate_max_deg': "the gimbal has two rings with different measured "
+                           "slew rates (403 and 235 deg/s). Set "
+                           "gimbal.axes.*.rate_max_deg in vehicle_params.yaml.",
+}
 
 
 class SimulatorNode(Node):
@@ -42,14 +47,7 @@ class SimulatorNode(Node):
     def __init__(self):
         super().__init__('simulator_node')
 
-        for name in RETIRED_PARAMS:
-            self.declare_parameter(name, rclpy.Parameter.Type.NOT_SET)
-            if self.get_parameter(name).type_ != rclpy.Parameter.Type.NOT_SET:
-                raise SystemExit(
-                    "parameter '%s' was retired: the gimbal has two rings with "
-                    "different measured slew rates (403 and 235 deg/s). Edit "
-                    "gimbal.axes.*.rate_max_deg in vehicle_params.yaml. "
-                    "See docs/4-CONVENTIONS.md." % name)
+        reject_retired_parameters(self, RETIRED_PARAMS)
 
         self.declare_parameter('dt', 0.004)
         self.declare_parameter('init_att_pitch_deg', 3.0)
@@ -132,7 +130,14 @@ class SimulatorNode(Node):
         p.orientation.w, p.orientation.x = float(qw), float(qx)
         p.orientation.y, p.orientation.z = float(qy), float(qz)
         t = msg.twist.twist
-        t.linear.x, t.linear.y, t.linear.z = (float(v) for v in self.x[3:6])
+        # twist goes in child_frame_id -- the BODY frame, per REP-105. The plant
+        # integrates velocity in the INERTIAL frame, so it is rotated on the way
+        # out. This used to publish the inertial vector unrotated, which made
+        # this node and gz-sim's OdometryPublisher disagree about what the same
+        # message meant: the one thing two plants sharing one controller may not
+        # do. It is only visible while tilted, which is the whole test.
+        v_body = quat_rotate_inv((qw, qx, qy, qz), self.x[3:6])
+        t.linear.x, t.linear.y, t.linear.z = (float(v) for v in v_body)
         t.angular.x, t.angular.y, t.angular.z = (float(v) for v in self.x[10:13])
         self.odom_pub.publish(msg)
 

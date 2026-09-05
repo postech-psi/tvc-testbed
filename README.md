@@ -70,7 +70,7 @@ Full detail, including what each output means: [docs/6-RUNNING.md](docs/6-RUNNIN
 
 ```
 tvc.py                 the entry point. --help lists everything.
-docs/                  seven numbered documents; read them in order.
+docs/                  eight numbered documents; read them in order.
 src/
   tvc_control/         the ROS 2 python package -- ALL the code lives here
     tvc_control/
@@ -137,15 +137,18 @@ headline, repeated wherever results are shown:
 
 Two specific things to know:
 
-- **The Gazebo flight does not recover.** From the world's deliberate 10°/−7°
-  spawn the vehicle diverges to 180° tilt in about a second, gimbal saturated
-  throughout, while the analytic plant recovers the same upset with 1%
-  saturation. Two plants running the same flight code disagree, and the Gazebo
-  one is wrong in a way that cannot be gravity. See
+- **The two software-in-the-loop paths disagree in one channel.** Both fly, both
+  hold altitude and lateral attitude, and both run byte-identical control code —
+  but under ROS 2 the thrust axis holds a 1.5–2.5° limit cycle that the direct
+  gz-transport path settles out of entirely. That is the channel with 11.5× less
+  inertia and the slowest actuator, so the bridge's transport delay lands
+  exactly where there is least margin. Bounded, attributable, unexplained. See
   [docs/7-CREDIBILITY.md](docs/7-CREDIBILITY.md).
-- **The ROS 2 packages build, but nothing has flown under ROS 2.** `colcon
-  build` succeeds and the nodes import; no message has yet crossed the
-  `ros_gz_bridge`. See [docs/6-RUNNING.md](docs/6-RUNNING.md).
+- **The vehicle cannot hold roll attitude at full throttle.** Above ~17.0 N of
+  the 17.79 N ceiling the reachable propeller-torque interval no longer contains
+  zero, so a climb at maximum thrust is *forced* to apply roll torque and the
+  thrust axis takes 53° before the throttle comes off the stop. Real behaviour,
+  correctly modelled, and nothing yet stops a climb profile from doing it.
 - **The highest-value measurement outstanding** is whether the bench's 100 ms
   motor response is a transport delay or a first-order lag. Modelled both ways:
   as a lag the roll channel recovers cleanly; as a delay it winds up to ~72° and

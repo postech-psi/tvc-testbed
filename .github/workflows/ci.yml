@@ -76,9 +76,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Placeholder
         run: |
-          echo "SITL job not yet implemented."
-          echo "It needs a ROS 2 Jazzy + gz Harmonic container, then:"
-          echo "  colcon build --packages-select tvc_msgs"
-          echo "  colcon build --packages-select tvc_control"
+          echo "SITL job not yet implemented. All of this has been run by hand"
+          echo "in the devcontainer and passes; what is missing is the CI image."
+          echo "  colcon build --packages-select tvc_msgs tvc_control"
           echo "  ros2 launch tvc_control gazebo.launch.py gui:=false"
-          echo "See docs/7-CREDIBILITY.md -- the ROS2 path builds, but has never run."
+          echo "  bash gazebo/run_hover.sh --duration 30"
+          echo "  python tvc.py hover --check-golden --unpause tvc_flight"
+          echo ""
+          echo "The last one is the point: it compares 14 metrics against"
+          echo "reference/golden/hover_baseline.json. Until this job exists, a"
+          echo "change that breaks the Gazebo flight is caught by a human"
+          echo "remembering to fly it -- and the servo-gain bug that tumbled the"
+          echo "vehicle survived a clean unit run, a clean colcon build and a"
+          echo "review. See docs/7-CREDIBILITY.md."

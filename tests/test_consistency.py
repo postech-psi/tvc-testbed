@@ -277,3 +277,63 @@ def test_the_two_worlds_agree_on_physics_and_plugins(repo):
         "tvc.sdf loads system plugins tvc_flight.sdf does not: %s" % sorted(only_ground)
     assert only_flight <= {"gz-sim-sensors-system"}, \
         "unexpected extra system plugins in tvc_flight.sdf: %s" % sorted(only_flight)
+
+
+# --- the documentation set ---------------------------------------------------
+
+def test_every_numbered_doc_says_its_own_number(repo):
+    """docs/N-NAME.md must open with `# N`.
+
+    Six of the eight had drifted -- 3-THEORY.md called itself "2 - Theory" and
+    every file after it was off by one -- because 2-WALKTHROUGH.md was inserted
+    later and the headings were never renumbered. Cross-references say "see 6"
+    and the reader opens 7.
+    """
+    d = os.path.join(repo, "docs")
+    checked = 0
+    for name in sorted(os.listdir(d)):
+        m = re.match(r"^(\d+)-.*\.md$", name)
+        if not m:
+            continue
+        first = open(os.path.join(d, name), encoding="utf-8").readline()
+        assert first.startswith("# %s " % m.group(1)), (
+            "%s opens with %r" % (name, first.strip()))
+        checked += 1
+    assert checked >= 8, "only found %d numbered docs" % checked
+
+
+def test_the_gazebo_golden_is_where_the_harness_looks_for_it(repo):
+    """GOLDEN_PATH walks five directories up from harness/gz.py.
+
+    A count of dirname() calls is wrong by one until someone runs it, and the
+    someone was a devcontainer-only code path that a Windows host never
+    exercises. The file is here, so the walk is checked here.
+    """
+    import importlib.util
+    src = os.path.join(repo, "src", "tvc_control")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    # Imported by path: the module's own `from gz.transport13 import ...` is
+    # inside a function, so it imports fine on a host with no Gazebo.
+    spec = importlib.util.spec_from_file_location(
+        "tvc_control.harness.gz",
+        os.path.join(src, "tvc_control", "harness", "gz.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert os.path.isfile(mod.GOLDEN_PATH), mod.GOLDEN_PATH
+    assert os.path.dirname(mod.GOLDEN_PATH) == os.path.join(
+        repo, "reference", "golden")
+
+
+def test_every_gazebo_golden_metric_has_a_tolerance(repo):
+    """A metric with no tolerance is a metric nothing compares."""
+    import json
+    path = os.path.join(repo, "reference", "golden", "hover_baseline.json")
+    doc = json.load(open(path, encoding="utf-8"))
+    # Bookkeeping fields are deliberately not compared: the sample count and
+    # the rejected-message count describe the transport, not the flight.
+    bookkeeping = {"samples", "duration_s", "rejected_odometry"}
+    missing = set(doc["metrics"]) - set(doc["tolerance"]) - bookkeeping
+    assert not missing, "no tolerance for: %s" % ", ".join(sorted(missing))
+    extra = set(doc["tolerance"]) - set(doc["metrics"])
+    assert not extra, "tolerance for a metric that is not recorded: %s" % extra

@@ -173,6 +173,9 @@ def main(argv=None):
     ap.add_argument("--gains", default=None,
                     help="gain profile from control_gains.yaml "
                          "(default: the file's own default_profile)")
+    ap.add_argument("--plot", metavar="DIR", default=None,
+                    help="also write one four-panel PNG per scenario into DIR "
+                         "(needs matplotlib)")
     args = ap.parse_args(argv)
 
     vp = load_vehicle_params()
@@ -210,11 +213,32 @@ def main(argv=None):
             print("       actuator is ~3x slower (motor ~100 ms vs gimbal ~30 ms).")
         print()
 
+    # Imported here, not at module scope: this command is the fast inner loop
+    # and the CI gate, and it must keep running on a machine with no matplotlib.
+    if args.plot:
+        import os
+        from ..apps.plot import four_panel, series_from_run
+        os.makedirs(args.plot, exist_ok=True)
+
     failures = 0
     for name, fn in SCENARIOS:
-        ok, detail, _ = fn(vp, gains, args.verbose)
+        ok, detail, r = fn(vp, gains, args.verbose)
         failures += not ok
         print("[%s] %-36s %s" % (_fmt(ok), name, detail))
+        if args.plot:
+            slug = name.split(" (")[0].replace(" ", "_")
+            four_panel(series_from_run(r),
+                       os.path.join(args.plot, "%s.png" % slug),
+                       "Analytic plant - %s" % name,
+                       "same flight code as the Gazebo run; "
+                       "solve_ivp instead of gz-sim",
+                       # The altitude this run was supposed to hold: z_des when
+                       # the altitude loop is closed, the release height when it
+                       # is not. metrics carries both ends of that subtraction,
+                       # so the line is the scenario's own reference and not a
+                       # guess read back off the curve.
+                       target_m=(r["metrics"]["final_z_m"]
+                                 - r["metrics"]["altitude_error_m"]))
 
     print()
     print("%d/%d scenarios passed" % (len(SCENARIOS) - failures, len(SCENARIOS)))

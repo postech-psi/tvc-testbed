@@ -138,3 +138,35 @@ def test_the_feasible_roll_interval_is_asymmetric(vp):
     assert lo < 0.0 < hi
     assert abs(hi) > 1.3 * abs(lo), \
         "expected a materially asymmetric interval, got [%.4f, %.4f]" % (lo, hi)
+
+
+def test_headroom_is_zero_once_the_feasible_set_stops_containing_zero(vp):
+    """Above ~17 N the reachable tau_P interval is entirely POSITIVE.
+
+    Both props are near their stops and the coax asymmetry means every
+    reachable torque is a positive bias the vehicle has to wear. There is then
+    no authority in either direction, and the old min(|lo|,|hi|) reported the
+    smaller end of that interval as if it were headroom -- 0.0090 N.m at 17.4 N,
+    which reads as authority and is the exact opposite of the truth.
+
+    This is not academic. The climb scenario commands full thrust, the allocator
+    clamps tau_P to the nearest feasible value, and the vehicle takes 53 deg of
+    thrust-axis roll before the throttle comes off the stop. See
+    docs/7-CREDIBILITY.md.
+    """
+    from tvc_control.gnc.allocation import roll_headroom, roll_limits
+    saw_excluded = False
+    for i in range(101):
+        T = vp.T_max * i / 100.0
+        lo, hi = roll_limits(T, vp)
+        cap = roll_headroom(T, vp)
+        if lo > 0.0 or hi < 0.0:
+            saw_excluded = True
+            assert cap == 0.0, (
+                "at T = %.2f N the interval is [%+.4f, %+.4f], which excludes "
+                "zero, but headroom reports %.4f" % (T, lo, hi, cap))
+        else:
+            assert cap <= min(abs(lo), abs(hi)) + 1e-12
+    assert saw_excluded, ("no thrust in the envelope had a one-sided feasible "
+                          "set -- either the surface changed or this test is "
+                          "no longer scanning it")

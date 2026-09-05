@@ -75,6 +75,20 @@ SIM_FIELDS = [
 ]
 
 
+def _fmt_field(value):
+    """Format a parameter for an entry box without the float-repr noise.
+
+    str(0.2111) is fine, but the roll lever arm arrives as a computed quantity
+    and str() renders it 0.21109999999999998 -- seventeen digits of binary
+    representation shown to a person reading a form. %.10g keeps ten significant
+    digits, which round-trips every parameter in this vehicle exactly and shows
+    none of them a digit they did not measure.
+    """
+    if isinstance(value, float):
+        return "%.10g" % value
+    return str(value)
+
+
 class LabeledEntryGroup(ttk.LabelFrame):
     """A titled group of label+entry rows bound to attributes of a dataclass instance.
 
@@ -90,7 +104,7 @@ class LabeledEntryGroup(ttk.LabelFrame):
             ttk.Label(self, text=label, font=("TkDefaultFont", 9)).grid(
                 row=2 * row, column=0, sticky="w", padx=2, pady=(4, 0)
             )
-            var = tk.StringVar(value=str(getattr(dataclass_instance, attr)))
+            var = tk.StringVar(value=_fmt_field(getattr(dataclass_instance, attr)))
             entry = ttk.Entry(self, textvariable=var, width=16, justify="left")
             entry.grid(row=2 * row + 1, column=0, sticky="ew", padx=2, pady=(0, 4))
             self.vars[attr] = var
@@ -231,10 +245,15 @@ class TVCSimulatorApp(tk.Tk):
         self.fig.subplots_adjust(hspace=0.35, left=0.10, right=0.97, top=0.95, bottom=0.08)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
-        toolbar = NavigationToolbar2Tk(self.canvas, parent)
+        # Toolbar FIRST, and packed to the bottom. Packed after the canvas it
+        # got nothing: the canvas claims every pixel with expand=True, so the
+        # pan/zoom/save controls existed but were never on screen -- and "save
+        # this plot" is the thing people reach for after a run.
+        toolbar = NavigationToolbar2Tk(self.canvas, parent, pack_toolbar=False)
         toolbar.update()
+        toolbar.pack(side="bottom", fill="x")
+        self.canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
 
     # ------------------------------------------------------------------
     def reset_defaults(self):
@@ -251,7 +270,7 @@ class TVCSimulatorApp(tk.Tk):
         ]:
             group.instance = instance
             for attr, var in group.vars.items():
-                var.set(str(getattr(instance, attr)))
+                var.set(_fmt_field(getattr(instance, attr)))
 
         self.run_simulation()
 
