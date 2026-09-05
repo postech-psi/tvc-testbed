@@ -121,6 +121,12 @@ RUN rosdep init 2>/dev/null || true && rosdep update
 # ROS2 Jazzy officially pairs with, used here for SIL (Software-In-the-Loop)
 # testing — running the control nodes against simulated vehicle physics
 # before any real hardware exists to test them on.
+#
+# ros-jazzy-actuator-msgs is listed explicitly even though ros_gz_bridge
+# happens to pull it in. tvc_control <depend>s on it directly, so relying on
+# another package's dependency graph to supply it is luck, not a dependency.
+# nav_msgs, rosgraph_msgs and the other common_interfaces are NOT listed:
+# ros:jazzy ships them (verified with `ros2 pkg prefix` in the base image).
 # ------------------------------------------------------------------------------
 RUN mkdir -p /usr/share/keyrings && \
     curl -sSL https://packages.osrfoundation.org/gazebo.gpg -o /usr/share/keyrings/gazebo-keyring.gpg && \
@@ -130,6 +136,7 @@ RUN mkdir -p /usr/share/keyrings && \
     gz-harmonic \
     ros-jazzy-ros-gz ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge \
     ros-jazzy-ros2-control ros-jazzy-ros2-controllers \
+    ros-jazzy-actuator-msgs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------------------
@@ -170,15 +177,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends libssl-dev \
 # purpose, so overriding the guard is the accepted practice here — it would
 # NOT be the right call on your actual laptop's system Python.
 #
-# numpy/scipy/matplotlib: the same stack this project's simulator already
-#   uses, so results are identical whether run on your host machine or in
-#   this container.
-# jinja2/empy/pyyaml: PX4's own build system (not this project's code)
-#   depends on these when building PX4 from source — without them, that
-#   build fails on a missing Python dependency, not a C++ one.
+# The project's own dependencies come from requirements.txt rather than being
+# listed again here. They were listed twice once, and the copies drifted: the
+# image was missing pillow (tvc.py record) and pytest (tests/), so the
+# container could not run the test suite the repo gates every change on.
+# COPY before RUN so a requirements.txt edit invalidates this layer and only
+# this layer — the apt and Micro-XRCE layers above are untouched.
+#
+# jinja2/empy are NOT ours: PX4's own build system needs them when building
+# PX4 from source, so they belong to the image, not to requirements.txt.
 # ------------------------------------------------------------------------------
+COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --break-system-packages --no-cache-dir \
-    numpy scipy matplotlib pyyaml jinja2 empy
+        -r /tmp/requirements.txt \
+    && pip3 install --break-system-packages --no-cache-dir jinja2 empy \
+    && rm /tmp/requirements.txt
 
 # ------------------------------------------------------------------------------
 # Non-root user
@@ -210,13 +223,25 @@ USER ros
 # interactive bash shell starts, so these exports are how "ROS2 is just
 # available" every time you open a terminal in this container, instead of
 # something you'd type by hand each session.
+#
+# GZ_SIM_RESOURCE_PATH: the Gazebo assets live at gazebo/models. This has
+# pointed at a non-existent directory twice; when it does, every run silently
+# depends on run_hover.sh or the launch file overriding it, and a bare
+# `gz sim` fails to find the mesh.
+#
+# It PREPENDS. ros_gz_sim puts /opt/ros/jazzy/share on this variable from the
+# image entrypoint, and .bashrc runs after that, so a bare assignment here
+# silently deletes every resource ROS ships -- leaving a container that finds
+# our model and nothing else. gazebo.launch.py already appends for the same
+# reason; all three places that touch this variable must agree.
+#
+# Keep the whole RUN one unbroken backslash-continued chain. A `#` comment
+# cannot sit inside it: the Dockerfile parser deletes comment LINES but leaves
+# the trailing `&&` behind, so the shell receives `... &&` and dies with
+# "syntax error: unexpected end of file".
 RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc \
     && echo "export ROS_DOMAIN_ID=0" >> ~/.bashrc \
-    && # The Gazebo assets live at gazebo/models. This has pointed at a
-    # non-existent directory twice; when it does, every run silently depends on
-    # run_hover.sh or the launch file overriding it, and a bare `gz sim` fails
-    # to find the mesh.
-    && echo "export GZ_SIM_RESOURCE_PATH=/workspace/gazebo/models" >> ~/.bashrc
+    && echo 'export GZ_SIM_RESOURCE_PATH="/workspace/gazebo/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"' >> ~/.bashrc
 
 # WORKDIR <path> — sets the working directory for the remaining build
 # instructions and, importantly, the directory a container starts in when

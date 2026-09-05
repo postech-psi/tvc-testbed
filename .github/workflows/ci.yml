@@ -3,7 +3,7 @@ name: ci
 # Two jobs, deliberately unequal in status.
 #
 # `unit` is the merge gate. Pure Python -- no ROS, no Gazebo, no display -- so it
-# runs in seconds and is never flaky. It guards the four things this project
+# runs in seconds and is never flaky. It guards the five things this project
 # cannot check by eye, all of which fail SILENTLY otherwise:
 #
 #   the flight code's porting discipline   a numpy import sneaking into gnc/
@@ -16,6 +16,11 @@ name: ci
 #                                          has drifted from vehicle_params.yaml
 #   the frozen baseline                    a refactor that claimed to move no
 #                                          numbers and moved some
+#   the container definition               a `#` comment written inside a RUN,
+#                                          or a package.xml <depend> nothing
+#                                          installs -- neither is executed by
+#                                          anything here, so both surface only
+#                                          when a human opens the container
 #
 # `sitl` is not a gate. Gazebo in CI is slow and flaky, and making it blocking
 # before it has been green for a while trains people to ignore red.
@@ -76,4 +81,4 @@ jobs:
           echo "  colcon build --packages-select tvc_msgs"
           echo "  colcon build --packages-select tvc_control"
           echo "  ros2 launch tvc_control gazebo.launch.py gui:=false"
-          echo "See docs/7-CREDIBILITY.md -- the ROS2 path has never been built."
+          echo "See docs/7-CREDIBILITY.md -- the ROS2 path builds, but has never run."

@@ -6,7 +6,7 @@
   "remoteUser": "ros",
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
-  "postCreateCommand": "bash -c 'sudo chown -R ros:ros /workspace && rosdep install --from-paths /workspace/src -i -y --rosdistro jazzy 2>/dev/null || echo \"No src/ directory yet (normal before Phase 4)\"'",
+  "postCreateCommand": "bash -c 'sudo chown -R ros:ros /workspace && sudo apt-get update -qq && rosdep install --from-paths /workspace/src -i -y --rosdistro jazzy'",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {}
   },

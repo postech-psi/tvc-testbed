@@ -45,16 +45,33 @@ measurement; mixing predictions into it destroys its only advantage.
   code isolated and its porting discipline enforced by test.
 - **Gazebo reproducing the measured surface exactly** via the command-side
   inversion, including its sign asymmetry.
-- **A Gazebo hover.** Spawns tilted, recovers level in ~2 s, holds 2.00 m with no
-  drift — flown before the restructure, with the gains that are now the default
-  profile.
+- **A Gazebo hover** — *before the restructure only.* The standalone demo
+  spawned tilted, recovered level in ~2 s and held 2.00 m with no drift, using
+  the gains that are now the default profile. It carried its own duplicate
+  controller. The rewritten harness calls the shared flight code and does not
+  reproduce this; see below.
+- **The ROS 2 build.** Both packages compile in the devcontainer, all four entry
+  points install, the three node modules import from the installed package, and
+  `gazebo.launch.py` produces a valid launch description.
+
+### The open question
+
+- **The Gazebo flight diverges.** First run of the rewritten harness: from the
+  world's 10°/−7° spawn the vehicle reaches 180° of tilt in ~1.1 s, gimbal
+  pinned at 6.9° of 7.0 for the entire run, ending at 0.25 m with 1.42 m of
+  drift. The analytic plant recovers the comparable upset with 1% saturation.
+  A free-flying vehicle feels no gravity moment about its CG, so nothing tips it
+  but its own control action: the divergence is being *commanded*. The SDF
+  servos are already neutralised, which leaves the sign of the chain between
+  `ActuatorSetpoint` and the Gazebo joint and rotor topics as the next suspect.
+  This is the highest-value open item in the repository — it is two plants
+  running one controller and disagreeing, which is precisely the failure that
+  cross-plant validation exists to expose.
 
 ### Written but never run
 
-- **The ROS 2 packages.** `colcon build` has not been executed against them.
-- **The Gazebo hover, since the restructure.** The standalone demo used to carry
-  its own controller and now calls the shared flight code. The gains are the
-  same; that it still flies is an argument, not a measurement.
+- **`ros2 launch`.** The packages build and the nodes import, but no message has
+  yet crossed the `ros_gz_bridge`, so its type strings are unverified.
 - **The PX4 airframe config** (`reference/px4/4600_tvc_coax`). PX4 is not
   installed.
 

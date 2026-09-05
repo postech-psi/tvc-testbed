@@ -19,7 +19,9 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORLD="${REPO}/gazebo/worlds/tvc_flight.sdf"
 WORLD_NAME="tvc_flight"
-export GZ_SIM_RESOURCE_PATH="${REPO}/gazebo/models"
+# Prepend, never assign: ros_gz_sim puts /opt/ros/<distro>/share on this
+# variable, and overwriting it hides every resource ROS ships.
+export GZ_SIM_RESOURCE_PATH="${REPO}/gazebo/models${GZ_SIM_RESOURCE_PATH:+:${GZ_SIM_RESOURCE_PATH}}"
 
 GUI=0
 DURATION=30

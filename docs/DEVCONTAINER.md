@@ -32,9 +32,14 @@ a small Dockerfile edit only redoes the layers after the change.
 *inside* the container:
 
 ```bash
-ros2 --version      # -> ROS 2 release 'jazzy'
-gz sim --version    # -> Gazebo Sim, version 8.x
+printenv ROS_DISTRO              # -> jazzy
+gz sim --version                 # -> Gazebo Sim, version 8.11.0
+ros2 pkg prefix actuator_msgs    # -> /opt/ros/jazzy
+python3 -m pytest tests/ -q      # -> the same suite that passes on the host
 ```
+
+(`ros2 --version` is not a command — `ros2` rejects it. `printenv ROS_DISTRO`
+is the check that actually answers the question.)
 
 **4. Build the workspace.** This has **never been done**; expect friction.
 
@@ -79,7 +84,7 @@ Full detail: [6-RUNNING.md](6-RUNNING.md).
 | ROS 2 Jazzy | the node/topic middleware the shipping architecture uses |
 | Gazebo Harmonic | the physics engine for software-in-the-loop testing |
 | Micro-XRCE-DDS-Agent | translates between ROS 2's messaging and PX4's uXRCE-DDS, so a ROS 2 node can command a Pixhawk |
-| numpy / scipy / matplotlib / pyyaml / pillow | the same stack the host-side tools use, so results are identical either way |
+| the Python stack from `requirements.txt` | installed from the same file the host uses, so a result cannot differ because of a package version |
 
 **Deliberately excluded: the ARM cross-compiler** (`arm-none-eabi-gcc`). That
 toolchain compiles PX4 *firmware* for the Pixhawk's microcontroller — a different
@@ -93,20 +98,39 @@ separate, smaller deployment image once there is a Pixhawk to talk to.
 
 ## Adding a library
 
-Edit the Dockerfile, then rebuild (`Ctrl+Shift+P` → "Dev Containers: Rebuild
-Container"). Docker reuses every layer before your edit, so this is usually one
-to two minutes.
+**A Python package: add it to `requirements.txt`, not to the Dockerfile.** The
+image installs that file (`pip install -r`), so the host and the container get
+the same version from one line in one place. They were two lists once; the
+copies drifted and the image lost `pillow` and `pytest`, which meant the
+container could not run the test suite.
+
+```
+pillow     # tvc.py record assembles the Gazebo flight GIF
+```
+
+**A system or ROS 2 package: edit the Dockerfile**, since apt has no equivalent
+of requirements.txt.
 
 ```dockerfile
-# a system or ROS 2 package
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-cv-bridge \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# a Python package
-RUN pip3 install --break-system-packages --no-cache-dir \
-    numpy scipy matplotlib pyyaml pillow pytest
 ```
+
+If a ROS 2 package also belongs in a `package.xml`, put it in both:
+`tests/test_container.py` fails on a `<depend>` that nothing installs, because
+that only shows up as a `colcon build` failure on a machine that is otherwise
+correct.
+
+**Never write a `#` comment inside a `RUN`.** Docker's parser deletes comment
+*lines* but keeps the `&&` in front of them, so the shell gets a command with
+nothing after the operator and the build dies with `syntax error: unexpected end
+of file` — pointing at a line several below the real one. Put the prose above
+the `RUN`. `tests/test_container.py` now fails on this.
+
+Then rebuild (`Ctrl+Shift+P` → "Dev Containers: Rebuild Container"). Docker
+reuses every layer before your edit, so a `requirements.txt` change is seconds
+and an apt change is a couple of minutes.
 
 To try something before committing to it, install it directly in the running
 container (`sudo apt-get install …`). It works immediately and disappears on the

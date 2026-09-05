@@ -62,11 +62,12 @@ uncertainty.
 | `test_attitude_error.py` | 5 | The quaternion attitude error, and why it replaced the Euler difference. |
 | `test_axis_convention.py` | 11 | The axis convention, asserted rather than documented. |
 | `test_consistency.py` | 13 | The numbers that live in two places must agree. |
+| `test_container.py` | 7 | The Dockerfile must build, and it must not be a second copy of requirements.txt. |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gnc_purity.py` | 6 | Enforce the porting discipline on the flight code. |
 | `test_scenarios.py` | 2 | The five closed-loop scenarios, run as tests. |
-| | **58** | |
+| | **65** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -208,17 +209,32 @@ inertia when `Iyz/Izz = 27.3%` (fixed by carrying the full tensor).
 
 ### Use History · level 1
 
-- **One Gazebo hover demo**, used repeatedly during tuning: spawns tilted,
-  recovers level in ~2 s, holds 2.00 m with no drift.
+- **One Gazebo hover demo**, used repeatedly during tuning: spawned tilted,
+  recovered level in ~2 s, held 2.00 m with no drift. That demo carried its own
+  duplicate controller. The rewritten harness calls the shared flight code
+  instead, and does *not* reproduce the result — see the next bullet. The old
+  behaviour is therefore use history for code that no longer exists.
 - The analytic simulator drives the GUI and the 3D viewer, and is exercised on
   every commit by CI.
-- **The ROS 2 path has never been built or run.** `colcon build` has not been
-  executed against these packages.
-- **The Gazebo hover has not been re-flown since the restructure.** The
-  standalone demo used to carry its own controller; it now calls the shared
-  flight code with the same gains, but that is an argument, not a measurement.
-  The largest gap in the frozen baseline is that there is no Gazebo golden —
-  see [reference/golden/README.md](../reference/golden/README.md).
+- **The ROS 2 path builds but has never been run.** `colcon build` now succeeds
+  for both packages in the devcontainer, all three node modules import from the
+  installed package, and `gazebo.launch.py` produces a valid launch description.
+  No ROS 2 message has yet crossed the `ros_gz_bridge`, so the type strings
+  remain unverified.
+- **The Gazebo hover has been re-flown, and it does not recover.** First run of
+  the rewritten `harness/gz.py`: from the world's deliberate 10°/−7° spawn the
+  vehicle diverges to 180° tilt in ~1.1 s with the gimbal pinned at 6.9° of 7.0
+  for the whole run, landing at 0.25 m with 1.42 m of drift. The analytic plant
+  recovers the comparable upset with 1% saturation. **That is a MIL/SIL
+  disagreement, not a tuning problem** — a free-flying vehicle feels no gravity
+  moment about its CG, so nothing tips it but its own control action. It is the
+  single most informative open result in this document, and it is exactly what
+  cross-plant validation exists to find. The SDF servos are already neutralised,
+  so the next suspect is the sign of the actuator chain between
+  `ActuatorSetpoint` and the Gazebo joint and rotor topics.
+- **There is still no Gazebo golden**, and there should not be one until the
+  above is understood — freezing a divergence as a reference makes it permanent.
+  See [reference/golden/README.md](../reference/golden/README.md).
 - No result from this simulator has yet been used for a design decision that was
   subsequently checked against hardware.
 

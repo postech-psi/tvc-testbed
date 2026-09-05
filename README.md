@@ -137,9 +137,15 @@ headline, repeated wherever results are shown:
 
 Two specific things to know:
 
-- **The ROS 2 packages have never been built.** `colcon build` has not run
-  against them. See [docs/6-RUNNING.md](docs/6-RUNNING.md) for the first-build
-  procedure and what to expect.
+- **The Gazebo flight does not recover.** From the world's deliberate 10°/−7°
+  spawn the vehicle diverges to 180° tilt in about a second, gimbal saturated
+  throughout, while the analytic plant recovers the same upset with 1%
+  saturation. Two plants running the same flight code disagree, and the Gazebo
+  one is wrong in a way that cannot be gravity. See
+  [docs/7-CREDIBILITY.md](docs/7-CREDIBILITY.md).
+- **The ROS 2 packages build, but nothing has flown under ROS 2.** `colcon
+  build` succeeds and the nodes import; no message has yet crossed the
+  `ros_gz_bridge`. See [docs/6-RUNNING.md](docs/6-RUNNING.md).
 - **The highest-value measurement outstanding** is whether the bench's 100 ms
   motor response is a transport delay or a first-order lag. Modelled both ways:
   as a lag the roll channel recovers cleanly; as a delay it winds up to ~72° and

@@ -152,9 +152,13 @@ ros2 launch tvc_control gazebo.launch.py gui:=false    # headless (Windows/macOS
 ros2 launch tvc_control analytic.launch.py             # same nodes, analytic plant
 ```
 
-> ⚠ **These packages have never been built.** `colcon build` has not run against
-> them. Expect to resolve `ros-jazzy-actuator-msgs`, and expect to iterate on the
-> `ros_gz_bridge` type strings. See [7-CREDIBILITY.md](7-CREDIBILITY.md).
+> ⚠ **Both packages build, and the nodes import. Nothing has flown under ROS 2
+> yet.** The first `colcon build` succeeded in the devcontainer: `tvc_msgs` in
+> 69 s, `tvc_control` in 19 s, no stderr, all four entry points installed, and
+> `tvc_control.nodes.{controller,simulator,gazebo_bridge}` import from the
+> *installed* package. `gazebo.launch.py` produces a valid launch description.
+> What remains untested is `ros2 launch` itself -- the bridge type strings have
+> still never carried a message. See [7-CREDIBILITY.md](7-CREDIBILITY.md).
 
 Five processes:
 

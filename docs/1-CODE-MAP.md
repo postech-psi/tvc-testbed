@@ -38,9 +38,8 @@ src/tvc_control/tvc_control/gnc/allocation.py
 
 **This is ROS 2's convention, not a mistake.** `colcon` builds every package
 under `src/`, and an `ament_python` package directory contains a Python package
-of the same name. Flattening it would break `colcon build`, which is the one
-thing in this repository that has never been run and therefore has the least
-margin for surprises.
+of the same name. Flattening it would break `colcon build`, which now runs
+clean for both packages but has the shortest history of anything here.
 
 There are two packages: `tvc_control` (all the code) and `tvc_msgs` (one message
 definition, which must be a separate CMake package because ROS 2 generates

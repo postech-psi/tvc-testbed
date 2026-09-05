@@ -30,7 +30,7 @@ Bare Gazebo, no controller — the quickest check that the model loads and stand
 on its legs:
 
 ```bash
-GZ_SIM_RESOURCE_PATH=$PWD/gazebo/models gz sim -r gazebo/worlds/tvc.sdf
+GZ_SIM_RESOURCE_PATH="$PWD/gazebo/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}" gz sim -r gazebo/worlds/tvc.sdf
 ```
 
 The full ROS 2 stack: `ros2 launch tvc_control gazebo.launch.py` — see
