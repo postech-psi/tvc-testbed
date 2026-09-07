@@ -131,7 +131,6 @@ def test_the_servo_never_needs_its_torque_clamp(servos, vp):
     that tumbled the vehicle, so the check is that the worst legitimate demand
     -- full travel plus full slew -- stays inside the clamp.
     """
-    from gen_model_sdf import ring_inertia
     import math
     for ring, (p_gain, d_gain, cmd_max) in servos.items():
         i = 0 if ring == "inner" else 1

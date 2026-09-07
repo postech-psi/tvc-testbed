@@ -41,7 +41,8 @@ python3 -m pytest tests/ -q      # -> the same suite that passes on the host
 (`ros2 --version` is not a command — `ros2` rejects it. `printenv ROS_DISTRO`
 is the check that actually answers the question.)
 
-**4. Build the workspace.** This has **never been done**; expect friction.
+**4. Build the workspace.** This has been completed with the current image; run
+it again after changing ROS messages, package metadata, or installed files.
 
 ```bash
 colcon build --packages-select tvc_msgs
@@ -117,16 +118,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 ```
 
-If a ROS 2 package also belongs in a `package.xml`, put it in both:
-`tests/test_container.py` fails on a `<depend>` that nothing installs, because
-that only shows up as a `colcon build` failure on a machine that is otherwise
-correct.
+If a ROS 2 package also belongs in a `package.xml`, put it in both. Then rebuild
+the image and run `rosdep`/`colcon`; text inspection is not a substitute for the
+actual package resolver.
 
 **Never write a `#` comment inside a `RUN`.** Docker's parser deletes comment
 *lines* but keeps the `&&` in front of them, so the shell gets a command with
 nothing after the operator and the build dies with `syntax error: unexpected end
 of file` — pointing at a line several below the real one. Put the prose above
-the `RUN`. `tests/test_container.py` now fails on this.
+the `RUN`. Rebuilding the image is the authoritative check.
 
 Then rebuild (`Ctrl+Shift+P` → "Dev Containers: Rebuild Container"). Docker
 reuses every layer before your edit, so a `requirements.txt` change is seconds

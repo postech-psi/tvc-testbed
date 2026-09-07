@@ -32,7 +32,7 @@ import math
 from dataclasses import dataclass, field
 
 from .params import VehicleParams
-from .mathx import thrust_axis, clamp, isclose
+from .mathx import clamp, isclose
 
 
 @dataclass
@@ -51,7 +51,7 @@ class Allocation:
     T2: float = 0.0                 # per-rotor thrust, N (lower prop)
     # Normalized [0,1] motor commands against the measured surface's own
     # pwm_min/pwm_max. THESE are what a HAL sends; T1/T2 are a derived split
-    # kept for logging and for Gazebo's two-rotor plugin. Zero when no surface
+    # kept for diagnostic logging. Zero when no surface
     # is loaded (the analytic fallback has no command coordinate to normalize).
     u_a: float = 0.0
     u_b: float = 0.0
@@ -114,7 +114,7 @@ def motor_setpoint(T, tau_p, params: VehicleParams):
     per-prop thrust split derived from them.
 
     Callers want the COMMANDS. T1/T2 are derived from them and are used only
-    for logging and for Gazebo's two-rotor plugin; nothing in the moment model
+    for diagnostic logging; nothing in the moment model
     depends on the individual values, because the load cell measured the pair.
     """
     if params.surface is not None:
@@ -129,7 +129,7 @@ def motor_setpoint(T, tau_p, params: VehicleParams):
         u_b = (pwm_b - params.surface.pwm_min) / span
         # Per-prop thrust is not separately measured (the load cell reads the
         # pair), so split the ACHIEVED total by the commands' share of it. This
-        # is only used for logging and for Gazebo's two-rotor plugin; nothing in
+        # is only used for diagnostic logging; nothing in
         # the moment model depends on the individual values.
         share = (pwm_b - params.surface.pwm_min) + 1e-9
         share_a = (pwm_a - params.surface.pwm_min) + 1e-9

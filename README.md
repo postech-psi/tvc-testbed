@@ -34,33 +34,33 @@ Then read, in order:
 | [docs/3-THEORY.md](docs/3-THEORY.md) | every equation the simulator implements, derived, with references |
 | [docs/4-CONVENTIONS.md](docs/4-CONVENTIONS.md) | frames, axis names, signs, units — the single source |
 | [docs/5-PARAMETERS.md](docs/5-PARAMETERS.md) | every number, where it came from, how much to trust it |
-| [docs/6-RUNNING.md](docs/6-RUNNING.md) | the four pipelines, what each is for, what its output means |
+| [docs/6-RUNNING.md](docs/6-RUNNING.md) | the four execution paths, what each is for, what its output means |
 | [docs/7-CREDIBILITY.md](docs/7-CREDIBILITY.md) | **read before believing any result.** Validation is level 0 |
 | [docs/8-ROADMAP.md](docs/8-ROADMAP.md) | what is next, what is deferred, what is genuinely unknown |
 
 Supporting: [docs/MASS-BUDGET.md](docs/MASS-BUDGET.md) (where the mass and
 inertia come from) and [docs/DEVCONTAINER.md](docs/DEVCONTAINER.md) (the Docker
-environment, needed only for ROS 2 and Gazebo).
+environment, needed only for ROS 2 and Gazebo). Before editing, read
+[CONTRIBUTING.md](CONTRIBUTING.md) for the source-to-generated-file map and the
+complete check list.
 
 ---
 
-## The four pipelines
+## The four execution paths
 
-One controller, four ways to run it. The flight code in `gnc/` is **identical**
-in all four — only the plant and the transport change, which is what makes a
-result obtained in one of them evidence about the others.
+One controller, two plants, with and without ROS 2. The flight code in `gnc/`
+is **identical** in all four paths — only the plant and transport change. That
+controlled variation is what lets you attribute a disagreement.
 
 | pipeline | command | plant | needs |
 |---|---|---|---|
 | **MIL** — analytic, fixed-step, deterministic | `python tvc.py validate` | `plant/` | Python |
-| **Interactive** — same plant, with a form and a 3D view | `python tvc.py gui` | `plant/` | + a display |
+| **ROS analytic** — ROS 2 nodes against the analytic plant | `ros2 launch tvc_control analytic.launch.py` | `plant/` | devcontainer + `colcon build` |
 | **SIL, no ROS** — gz-sim over gz-transport | `bash gazebo/run_hover.sh` | Gazebo | devcontainer |
-| **SIL, full stack** — gz-sim + ROS 2 nodes | `ros2 launch tvc_control gazebo.launch.py` | Gazebo | devcontainer + `colcon build` |
+| **ROS SIL** — gz-sim + ROS 2 nodes | `ros2 launch tvc_control gazebo.launch.py` | Gazebo | devcontainer + `colcon build` |
 
-A fifth, `ros2 launch tvc_control analytic.launch.py`, runs the ROS 2 nodes
-against the analytic plant. It differs from the line above it only in which
-plant process starts, which is how a failure gets attributed to the control code
-or to the physics engine.
+`python tvc.py gui` and `python tvc.py view3d` are views over the MIL path, not
+additional controller or plant implementations.
 
 Full detail, including what each output means: [docs/6-RUNNING.md](docs/6-RUNNING.md).
 
@@ -95,12 +95,12 @@ reference/             frozen baselines, the PX4 airframe, a servo sketch.
 The double `src/tvc_control/tvc_control/` is ROS 2's convention, not a mistake:
 a colcon package directory contains a Python package of the same name.
 
-### Three rules the tests enforce
+### Three design rules
 
 1. **`gnc/` imports only `math`, `dataclasses` and `typing`.** No numpy, no
-   scipy, no file I/O, no `while` loops, no reach into `plant/`. That is what
-   makes the eventual PX4 C++ module a port rather than a rewrite, and
-   `tests/test_gnc_purity.py` parses the source to enforce it.
+   scipy, no file I/O, no unbounded work, no reach into `plant/`. That keeps an
+   eventual PX4 C++ module a port rather than a rewrite. Review this boundary
+   directly when changing `gnc/`; it is intentionally not hidden in meta-tests.
 2. **Numbers live in one place.** `vehicle_params.yaml` is the source of truth;
    `model.sdf` and `docs/5-PARAMETERS.md` are generated from it and CI fails if
    either has drifted. There is no fallback constant anywhere — a missing YAML

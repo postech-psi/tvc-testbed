@@ -23,14 +23,12 @@ they can be committed.
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-import numpy as np
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
 from ..config import load_gains, load_vehicle_params
-from ..gnc.params import ControlGains, VehicleParams
 from ..harness.mil import SimConfig, simulate
 from .view3d import View3DWindow
 
@@ -70,8 +68,10 @@ SIM_FIELDS = [
     ("Control period  dt  [s]", "dt_ctrl"),
     ("Target pitch  [deg]", "att_pitch_des_deg"),
     ("Target yaw  [deg]", "att_yaw_des_deg"),
+    ("Target roll  [deg]", "att_roll_des_deg"),
     ("Initial pitch disturbance  [deg]", "init_att_pitch_deg"),
     ("Initial yaw disturbance  [deg]", "init_att_yaw_deg"),
+    ("Initial roll disturbance  [deg]", "init_att_roll_deg"),
 ]
 
 

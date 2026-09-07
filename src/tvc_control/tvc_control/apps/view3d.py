@@ -18,7 +18,6 @@ through the +/-90 deg attitudes where Euler angles would go singular.
 """
 
 import os
-import sys
 import time
 
 import numpy as np

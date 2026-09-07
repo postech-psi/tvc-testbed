@@ -44,15 +44,9 @@ float64 motor_b
 float64 thrust_n
 float64 tau_p_nm
 
-# Rotor speeds for gz-sim's MulticopterMotorModel. A CONTROL ALLOCATION
-# VARIABLE, NOT A PHYSICAL RPM -- the Gazebo HAL inverts the plugin's own
-# algebra so it reproduces the measured surface exactly, which makes
-# momentConstant a solver scaling and maxRotVelocity solver headroom. See
-# tvc_control/hal/gazebo.py. Zero on any non-Gazebo transport.
-float64 rotor_a_speed_rads
-float64 rotor_b_speed_rads
-
-# --- saturation, for the subscriber's own anti-windup ------------------------
+# --- saturation diagnostics --------------------------------------------------
+# The controller already applies anti-windup internally. These flags tell logs,
+# monitors, and future hardware safety logic which authority limit was active.
 bool sat_gimbal
 bool sat_roll
 bool sat_thrust

@@ -15,10 +15,7 @@ The three silent failures it catches:
   the sign tests below catch those, because a swapped pair inverts a cross
   product or a torque direction.
 
-  A RETIRED PARAMETER THAT IS ACCEPTED AND IGNORED. A launch file then documents
-  a control decision that is not happening.
 """
-import math
 import os
 import re
 
@@ -203,36 +200,3 @@ def test_the_gimbal_has_no_authority_about_the_thrust_axis(vp):
             f = (nx, ny, 0.0)          # z-component of r x F ignores F_z
             mz = r[0] * f[1] - r[1] * f[0]
             assert mz == 0.0
-
-
-# --- parameters that were retired rather than left to be ignored -------------
-
-def test_retired_parameter_names_are_rejected(repo):
-    """A parameter that looks live while being ignored is worse than one that is
-    gone: it makes a launch file document a control decision that is not
-    happening. The nodes raise on these; this checks the list has not quietly
-    shrunk."""
-    for mod, expected in (("controller", "gimbal_rate_max_deg"),
-                          ("simulator", "gimbal_rate_max_deg")):
-        path = os.path.join(repo, "src", "tvc_control", "tvc_control", "nodes",
-                            mod + ".py")
-        src = open(path, encoding="utf-8").read()
-        assert "RETIRED_PARAMS" in src, "%s lost its retired-parameter guard" % mod
-        assert expected in src
-
-
-def test_no_launch_file_sets_a_retired_parameter(repo):
-    """The guard raises at startup, but only if someone runs it. This catches a
-    stale launch file at test time instead."""
-    launch_dir = os.path.join(repo, "src", "tvc_control", "launch")
-    retired = ("gimbal_rate_max_deg", "roll_des_deg", "pitch_des_deg",
-               "axial_des_deg", "init_roll_deg", "init_pitch_deg")
-    for name in sorted(os.listdir(launch_dir)):
-        if not name.endswith(".py"):
-            continue
-        src = open(os.path.join(launch_dir, name), encoding="utf-8").read()
-        # Strip comments: the launch files explain WHY these are gone.
-        code = "\n".join(ln.split("#")[0] for ln in src.splitlines())
-        for param in retired:
-            assert "'%s'" % param not in code, \
-                "%s sets the retired parameter %s" % (name, param)

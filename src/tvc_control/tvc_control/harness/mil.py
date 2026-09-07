@@ -17,7 +17,7 @@ never read.
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..gnc.params import VehicleParams, ControlGains
 from ..gnc.mathx import quat_normalize, quat_to_euler, euler_to_quat
@@ -104,8 +104,6 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
                        np.deg2rad(cfg.init_att_roll_deg))
     x = np.concatenate([[0, 0, cfg.init_z], [0, 0, 0], q0, [0, 0, 0]])
 
-    T_hover = vparams.m * vparams.g
-
     n_steps = int(np.ceil(cfg.t_final / cfg.dt_ctrl))
     t_arr = np.zeros(n_steps)
     euler_arr = np.zeros((n_steps, 3))
@@ -152,6 +150,9 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
         sol = solve_ivp(dynamics, [t, t + cfg.dt_ctrl], x,
                          args=(T_ach, delta, vparams, tau_p_ach),
                          method='RK45', max_step=cfg.dt_ctrl / 4)
+        if not sol.success:
+            raise RuntimeError("rigid-body integration failed at t=%.6f s: %s"
+                               % (t, sol.message))
         x = sol.y[:, -1]
         x[6:10] = quat_normalize(x[6:10])
 

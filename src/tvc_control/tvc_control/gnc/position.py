@@ -2,8 +2,8 @@
 Position hold: horizontal position error -> attitude setpoint.
 ================================================================================
 It outputs an ATTITUDE setpoint rather than a torque, so it stacks outboard of
-the attitude cascade without touching it. The gains come from the Gazebo hover
-demo, the only controller in this project that has ever flown.
+the attitude cascade without touching it. The gains come from the direct Gazebo
+hover and are shared by the ROS 2 paths.
 
 WHY THIS LOOP MUST BE MUCH SLOWER THAN THE ATTITUDE LOOP
     What diverges on this vehicle is position, not attitude. With the gimbal

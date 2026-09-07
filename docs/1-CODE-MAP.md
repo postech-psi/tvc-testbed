@@ -66,10 +66,9 @@ message code with CMake).
 ```
 
 **The dependency is one-way and `gnc/` is at the bottom of it.** A controller
-that reaches into the plant is a controller that cannot fly, so this is
-enforced by test rather than by review convention:
-`tests/test_gnc_purity.py` parses `gnc/` and fails on a forbidden import, a
-`while` loop, module-level mutable state, or the string `tvc_control.plant`.
+that reaches into the plant is a controller that cannot fly. Review this
+boundary directly when `gnc/` changes: no forbidden dependency, unbounded loop,
+module-level mutable state, or reach into `tvc_control.plant`.
 
 That rule is what makes one specific claim checkable rather than hopeful:
 **the code we test is the code that flies.**
@@ -267,7 +266,7 @@ SIMULATION ONLY -- none of this ever flies.
 | class `MotorLag` | Command -> achieved (thrust, roll torque), with the measured lag. |
 | &nbsp;&nbsp;&nbsp;`.reset()` | Un-initialise the lag: the next command starts settled. |
 | &nbsp;&nbsp;&nbsp;`.update(T_cmd, tau_p_cmd, dt)` | Commanded (thrust, roll torque) -> what the motors actually produce. |
-| class `ActuatorChain` | Every actuator dynamic, in one object, so no harness can forget a stage. |
+| class `ActuatorChain` | Every analytic actuator dynamic in one object, so analytic paths agree. |
 | &nbsp;&nbsp;&nbsp;`.reset()` | Reset both stages -- gimbal FIFO and motor lag. |
 | &nbsp;&nbsp;&nbsp;`.update(delta_cmd, T_cmd, tau_p_cmd, dt)` | -> (achieved delta, achieved T, achieved tau_P). |
 

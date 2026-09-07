@@ -4,12 +4,12 @@ The full software-in-the-loop stack: gz-sim plant + ROS 2 + the flight code.
     ros2 launch tvc_control gazebo.launch.py            # with the Gazebo window
     ros2 launch tvc_control gazebo.launch.py gui:=false # headless (Windows/macOS)
 
-Five processes:
+Four long-running processes plus one launch timer action:
     gz sim                world + vehicle SDF, the physics
     ros_gz_bridge         gz topics <-> ROS topics, including /clock
     gazebo_bridge_node    ActuatorCommand -> the three gz plugin topics
     controller_node       odometry -> TvcController -> ActuatorCommand
-    (a timer)             unpauses the world once the nodes have discovered
+    launch timer          unpauses the world once the nodes have discovered
                           each other
 
 FOUR THINGS THAT LOOK LIKE CONTROL BUGS AND ARE NOT, EACH HANDLED HERE
@@ -76,6 +76,9 @@ def generate_launch_description():
         DeclareLaunchArgument('altitude_hold', default_value='true'),
         DeclareLaunchArgument('position_hold', default_value='true'),
         DeclareLaunchArgument('z_des', default_value='2.0'),
+        DeclareLaunchArgument('att_pitch_des_deg', default_value='0.0'),
+        DeclareLaunchArgument('att_yaw_des_deg', default_value='0.0'),
+        DeclareLaunchArgument('att_roll_des_deg', default_value='0.0'),
     ]
 
     # Append rather than overwrite: a user may already have models on the path,
@@ -118,8 +121,9 @@ def generate_launch_description():
             **common,
             'rate_hz': 250.0,          # matches the odometry publisher
             'gain_profile': profile,
-            'att_pitch_des_deg': 0.0,
-            'att_yaw_des_deg': 0.0,
+            'att_pitch_des_deg': LaunchConfiguration('att_pitch_des_deg'),
+            'att_yaw_des_deg': LaunchConfiguration('att_yaw_des_deg'),
+            'att_roll_des_deg': LaunchConfiguration('att_roll_des_deg'),
             'altitude_hold': LaunchConfiguration('altitude_hold'),
             'position_hold': LaunchConfiguration('position_hold'),
             'z_des': LaunchConfiguration('z_des'),

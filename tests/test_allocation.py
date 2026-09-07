@@ -20,7 +20,6 @@ Three claims are checked:
 import math
 
 import numpy as np
-import pytest
 
 
 def realized_moment(alloc, T, vp):

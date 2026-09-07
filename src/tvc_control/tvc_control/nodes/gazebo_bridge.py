@@ -28,8 +28,9 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float64
 
 from tvc_msgs.msg import ActuatorCommand
-from tvc_control.config import load_vehicle_params
+from tvc_control.config import load, load_vehicle_params
 from tvc_control.gnc.mathx import clamp
+from tvc_control.hal.gazebo import rotor_speeds
 
 
 class GazeboBridgeNode(Node):
@@ -41,6 +42,10 @@ class GazeboBridgeNode(Node):
         super().__init__('gazebo_bridge_node')
 
         self.params = load_vehicle_params()
+        rotors = load().raw['rotors']
+        self.motor_constant = rotors['motor_constant']
+        self.moment_constant = rotors['moment_constant']
+        self.max_rot_velocity = rotors['max_rot_velocity']
         self.lo = self.params.delta_min
         self.hi = self.params.delta_max
 
@@ -82,8 +87,10 @@ class GazeboBridgeNode(Node):
 
         act = Actuators()
         act.header.stamp = msg.header.stamp
-        act.velocity = [float(msg.rotor_a_speed_rads),
-                        float(msg.rotor_b_speed_rads)]
+        wa, wb = rotor_speeds(
+            msg.thrust_n, msg.tau_p_nm, self.motor_constant,
+            self.moment_constant, self.max_rot_velocity)
+        act.velocity = [float(wa), float(wb)]
         self.motor_pub.publish(act)
 
 

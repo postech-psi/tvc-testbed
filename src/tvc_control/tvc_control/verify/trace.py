@@ -28,7 +28,7 @@ from ..gnc import allocation as alloc_mod
 from ..gnc.controller import TvcController
 from ..gnc.mathx import (attitude_error, euler_to_quat, quat_to_euler,
                          quat_to_rotmat, thrust_axis)
-from ..gnc.types import ControlMode, EstimatedState, Setpoint
+from ..gnc.types import ControlMode, Setpoint
 from ..hal.gazebo import rotor_speeds
 from ..plant.actuators import ActuatorChain
 from ..plant.rigidbody import dynamics
@@ -81,7 +81,7 @@ def trace_step(k, state, setpoint, controller, chain, vp, gains, mode, dt,
     p("   position   %s m       altitude %.4f m" % (_vec(state.pos_i, fmt="%+.4f"),
                                                     state.pos_i[2]))
     p("   velocity   %s m/s" % _vec(state.vel_i, fmt="%+.4f"))
-    p("   quaternion %s   (qw, qx, qy, qz), body <- inertial" % _vec(state.quat))
+    p("   quaternion %s   (qw, qx, qy, qz), inertial <- body" % _vec(state.quat))
     p("   euler      pitch %+.3f   yaw %+.3f   roll %+.3f  deg   [readout only]"
       % (D(pitch), D(yaw), D(roll)))
     p("   body rates %s rad/s" % _vec(state.omega_b))

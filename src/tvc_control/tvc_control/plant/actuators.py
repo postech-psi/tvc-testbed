@@ -17,8 +17,9 @@ Two stages, with different physics and different consequences:
                      whether the roll channel is controllable. See its docstring
                      and docs/3-THEORY.md section 7.
 
-ActuatorChain bundles them so no harness can model a different subset than
-another -- which would make every cross-plant comparison unattributable.
+ActuatorChain bundles them so the direct analytic harness and ROS analytic node
+cannot model different subsets. Gazebo implements the corresponding dynamics
+in its plugins; their known differences are recorded in docs/7-CREDIBILITY.md.
 """
 
 import numpy as np
@@ -142,13 +143,13 @@ class MotorLag:
 
 
 class ActuatorChain:
-    """Every actuator dynamic, in one object, so no harness can forget a stage.
+    """Every analytic actuator dynamic in one object, so analytic paths agree.
 
     The gimbal and the motors have different lags (30 ms transport on the
     servos, ~100 ms on thrust) and the difference is the reason the roll channel
     is authority-rich and bandwidth-poor despite its small inertia. Bundling
-    them means the analytic harness and the Gazebo harness cannot accidentally
-    model different subsets.
+    them means the direct analytic harness and ROS analytic node cannot
+    accidentally model different subsets.
     """
 
     def __init__(self, params, motor_model="first_order", motor_tau_s=0.10,

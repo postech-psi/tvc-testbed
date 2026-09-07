@@ -8,7 +8,7 @@ WHY THIS IS NOT IN gnc/
     Flight code does no file I/O. A parameter block is injected once at startup,
     never looked up during a control step. That is how PX4's parameter system
     works, and keeping the same shape is what makes the eventual C++ port a port
-    rather than a redesign. tests/test_gnc_purity.py enforces it.
+    rather than a redesign. Keep this boundary explicit in code review.
 
 WHY THERE IS NO FALLBACK
     Earlier versions carried literal default constants for the case where the
@@ -260,7 +260,6 @@ SOLVER = "solver"            # a constant that exists to make a numeric method w
 def parameter_rows(v=None):
     """-> [(section, name, value, unit, source, note)] for the whole vehicle."""
     v = v or load()
-    mp, gim, rot = v.raw["mass_properties"], v.raw["gimbal"], v.raw["rotors"]
     surf, md = v.raw.get("thrust_torque_surface") or {}, v.motor_dynamics
     fit = surf.get("fit") or {}
     R = []

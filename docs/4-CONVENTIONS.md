@@ -123,8 +123,9 @@ code's actuator boundary is shaped like it
 | normalized command | [0, 1] motors, [−1, 1] servos | against each actuator's own calibrated range |
 | time | s | |
 
-- Attitude is a unit quaternion **`(qw, qx, qy, qz)`, body ← inertial**. ROS
-  `geometry_msgs/Quaternion` is `(x, y, z, w)` — reorder at the boundary. Both
+- Attitude is a unit quaternion **`(qw, qx, qy, qz)`, inertial ← body**. In
+  other words, `quat_to_rotmat(q)` rotates a body-frame vector into the inertial
+  frame. ROS `geometry_msgs/Quaternion` is `(x, y, z, w)` — reorder at the boundary. Both
   ROS nodes do; `gz.msgs.Odometry` uses named fields so no reorder is needed.
 - **Euler angles are readout only.** Never propagate kinematics through them.
   `quat_to_euler` returns `(pitch, yaw, roll)` — ZYX, in that order.
@@ -133,8 +134,10 @@ code's actuator boundary is shaped like it
   Gazebo's `τ = momentConstant·(T_b − T_a)`. Three independent choices agree here
   **by coincidence**, so `tests/test_consistency.py` asserts the chain end to end
   rather than trusting it.
-- **Positive δ₂ (outer ring, pitch plane) produces positive `M_pitch`.** Asserted,
-  not assumed — both position-loop signs were wrong once.
+- **Positive δ₂ (outer ring, pitch plane) tilts thrust toward body −y and
+  produces negative instantaneous `M_pitch = M_x`** because thrust is applied
+  below the CM. The allocator therefore commands negative δ₂ to create a
+  positive pitch angular acceleration.
 - Rotor A is the CCW rotor, `motorNumber 0`; rotor B is CW.
 
 ---

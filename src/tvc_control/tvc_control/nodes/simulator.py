@@ -112,6 +112,9 @@ class SimulatorNode(Node):
         sol = solve_ivp(dynamics, [self.t, self.t + self.dt], self.x,
                         args=(T, delta, self.params, tau_p),
                         method='RK45', max_step=self.dt / 4)
+        if not sol.success:
+            raise RuntimeError('rigid-body integration failed at t=%.6f s: %s'
+                               % (self.t, sol.message))
         self.x = sol.y[:, -1]
         self.x[6:10] = quat_normalize(self.x[6:10])
         self.t += self.dt

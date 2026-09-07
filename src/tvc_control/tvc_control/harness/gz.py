@@ -25,8 +25,8 @@ WHAT CHANGED, AND WHY IT MATTERS
     symmetric limit, and three Newton steps on the exact trigonometric map
     instead of the small-angle inverse alone.
 
-    Not yet re-flown -- gz-transport exists only in the devcontainer. See
-    docs/7-CREDIBILITY.md.
+    This shared path has since been re-flown and frozen as the Gazebo hover
+    baseline. See docs/7-CREDIBILITY.md.
 
 LOCKSTEP
     The loop steps on ODOMETRY ARRIVAL, not on a wall clock. Gazebo publishes

@@ -115,7 +115,7 @@ STEP 0      t = 0.000 s      dt = 10 ms
 ------------------------------------------------------------------------------
    position   (+0.0000, +0.0000, +2.0000) m       altitude 2.0000 m
    velocity   (+0.0000, +0.0000, +0.0000) m/s
-   quaternion (+0.995134, +0.069587, -0.069587, +0.004866)   (qw, qx, qy, qz), body <- inertial
+   quaternion (+0.995134, +0.069587, -0.069587, +0.004866)   (qw, qx, qy, qz), inertial <- body
    euler      pitch +8.000   yaw -8.000   roll +0.000  deg   [readout only]
    body rates (+0.000000, +0.000000, +0.000000) rad/s
 
@@ -336,8 +336,8 @@ more complicated than a multiply.
 | `effectiveness.torque_limits_at` | the feasible set | lookup in a 200-bin table, linearly interpolated | 2 mul |
 
 **Every iteration count is a fixed `range`.** There is no `while` anywhere in
-`gnc/`, and `tests/test_gnc_purity.py` fails the build if one appears — worst-case
-execution time has to be a number someone can write down.
+`gnc/`; review that boundary directly when it changes. Worst-case execution
+time has to be a number someone can write down.
 
 ### In the plant (`plant/`) — simulation only
 

@@ -20,9 +20,7 @@ WHY THE SEPARATION IS PHYSICAL AND NOT JUST TIDINESS
     else, and it means a test that exercises this directory is testing flight
     behaviour rather than a simulation-flavoured cousin of it.
 
-PORTING DISCIPLINE, enforced by tests/test_gnc_purity.py, which parses this
-directory rather than running it -- so a violation on a rarely-taken branch is
-caught too:
+PORTING DISCIPLINE, to review explicitly whenever this directory changes:
 
     imports          math, dataclasses and typing ONLY. No numpy, no scipy, no
                      yaml, no ROS. An ndarray has no fixed-size C++ counterpart,

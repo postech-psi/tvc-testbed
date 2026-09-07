@@ -42,7 +42,7 @@ measurement; mixing predictions into it destroys its only advantage.
   computed from the real mesh by tetrahedron decomposition. See
   [MASS-BUDGET.md](MASS-BUDGET.md).
 - **The flight-software structure.** One controller; four pipelines; the flight
-  code isolated and its porting discipline enforced by test.
+  code isolated behind a small, documented interface.
 - **Gazebo reproducing the measured surface exactly** via the command-side
   inversion, including its sign asymmetry.
 - **The Gazebo hover, under the shared flight code.** From the world's
@@ -51,8 +51,8 @@ measurement; mixing predictions into it destroys its only advantage.
   `reference/golden/hover_baseline.json` and checked by
   `tvc.py hover --check-golden`; the picture is
   [hover_baseline.png](../reference/golden/hover_baseline.png).
-- **The ROS 2 stack, running.** Both packages build, all five launch processes
-  come up, and messages cross the `ros_gz_bridge` in both directions with the
+- **The ROS 2 stack, running.** Both packages build, all four long-running
+  processes start, and messages cross `ros_gz_bridge` in both directions with the
   vehicle holding altitude and lateral attitude. Two startup bugs that a clean
   `colcon build` did not catch are fixed; see
   [7-CREDIBILITY.md](7-CREDIBILITY.md).
@@ -100,24 +100,20 @@ input.
 
 ### A — close the loop on what already exists
 
-1. **First colcon build**, in the devcontainer. Everything ROS is blocked behind
-   it, and it proves the toolchain before any of it can be blamed for a failure.
-   Expect to resolve `ros-jazzy-actuator-msgs` and to iterate on the
-   `ros_gz_bridge` type strings.
-2. **Re-fly the Gazebo hover** and capture it as a golden
-   (`bash gazebo/run_hover.sh --log reference/golden/hover_baseline.csv`). This
-   is the largest gap in the frozen baseline.
-3. **Cross-plant validation.** Run the same scenarios on the analytic plant and
-   on Gazebo and compare. The machinery exists — one controller, one gain file,
-   one actuator chain, two launch files differing only in the plant — but it has
-   never been executed, so agreement is still an architectural claim.
-
-   Proposed tolerances, to be ratified against the first run rather than
-   defended in advance: attitude peak difference < 1.0° and RMS < 0.3°, settling
-   time within 15%, peak |τ_P| within 5%, altitude within 0.05 m, final position
-   within 0.10 m. They must be **larger than the divergences we know we are
-   leaving in** — Gazebo's gimbal-ring and rotor gyroscopic terms, ground
-   contact, bridge latency — or they are not defensible.
+1. **Explain and remove the ROS 2 thrust-axis limit cycle.** Reproduce Pipeline
+   2 and Pipeline 4 with timestamped command/state logs, then separate bridge
+   latency, sample timing, and actuator-model differences one at a time. The
+   exit condition is either agreement with the direct path or a measured,
+   documented transport requirement.
+2. **Automate matched analytic-versus-Gazebo scenarios.** Replay the same
+   initial states and setpoints on both plants and compare attitude peak/RMS,
+   settling time, peak |τ_P|, altitude, and final position. Ratify tolerances
+   from repeated runs; they must cover the known Gazebo gyroscopic, contact, and
+   timing effects without hiding a sign, frame, or allocation error.
+3. **Protect the roll-authority envelope.** Add a command governor or climb
+   profile constraint that preserves a feasible τ_P interval around zero. The
+   full-throttle scenario should fail explicitly instead of silently accepting
+   a forced roll torque.
 
 ### B — the measurements that would change conclusions
 
@@ -147,7 +143,13 @@ input.
 
 ### D — the flight stack
 
-11. **PX4 SITL.** PX4 does state estimation, arming, failsafes and logging; the
+11. **Define stale-data behaviour before any hardware-in-the-loop run.** The
+    current ROS controller is SIL-only: it has no odometry-age check, and the
+    actuator interface has no command timeout. Specify the maximum state age,
+    the transport watchdog, and the disarmed output, then verify that dropping
+    either odometry or commands removes thrust instead of holding the last
+    command.
+12. **PX4 SITL.** PX4 does state estimation, arming, failsafes and logging; the
     attitude loop stays external via offboard actuator control. PX4's stock
     allocator **cannot express this vehicle** — pitch and yaw come from *tilting
     one thrust vector*, not from thrust differences across fixed-direction
@@ -157,17 +159,17 @@ input.
     This is where [4-CONVENTIONS.md §4](4-CONVENTIONS.md), the FRD translation
     table, becomes load-bearing. Without it, two axes out of three silently
     invert.
-12. **HITL.** Real Pixhawk, simulated vehicle. Catches the timing, latency and
+13. **HITL.** Real Pixhawk, simulated vehicle. Catches the timing, latency and
     serial-link problems SITL hides.
-13. **The PX4 module.** The port of `gnc/` to C++, which the porting discipline
+14. **The PX4 module.** The port of `gnc/` to C++, which the porting discipline
     exists to make mechanical.
 
 ### E — real flight
 
-14. **Tethered hover.** Non-negotiable first flight. A tether that constrains
+15. **Tethered hover.** Non-negotiable first flight. A tether that constrains
     translation but not attitude proves the attitude loop without risking the
     airframe.
-15. Free hover, then translation, then landing.
+16. Free hover, then translation, then landing.
 
 ---
 

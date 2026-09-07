@@ -32,7 +32,7 @@ uncertainty.
 | M&S Operations | Input Pedigree | **3** | actuators bench-measured with stated fit error; mass properties are CAD plus assumptions |
 | M&S Operations | Results Uncertainty | **0** | measurement uncertainty is recorded and never propagated |
 | M&S Operations | Results Robustness | **2** | divergences enumerated, one quantified; no sensitivity study |
-| Supporting Evidence | Use History | **1** | one Gazebo hover demo; the ROS 2 path has never run |
+| Supporting Evidence | Use History | **2** | analytic scenarios, direct Gazebo hover, and both ROS plant paths have run; repetition is not automated |
 | Supporting Evidence | M&S Management | **4** | single source of truth, three generated artefacts, all `--check`ed in CI |
 | Supporting Evidence | People Qualifications | — | not assessed |
 
@@ -60,15 +60,12 @@ uncertainty.
 |---|---|---|
 | `test_allocation.py` | 7 | Control allocation: does it realize the moment it was asked for? |
 | `test_attitude_error.py` | 8 | The quaternion attitude error, and why it replaced the Euler difference. |
-| `test_axis_convention.py` | 11 | The axis convention, asserted rather than documented. |
-| `test_consistency.py` | 16 | The numbers that live in two places must agree. |
-| `test_container.py` | 7 | The Dockerfile must build, and it must not be a second copy of requirements.txt. |
+| `test_axis_convention.py` | 9 | The axis convention, asserted rather than documented. |
+| `test_consistency.py` | 8 | The numbers that live in two places must agree. |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gazebo_servo.py` | 6 | The Gazebo gimbal servo must be stable at the world's physics step. |
-| `test_gnc_purity.py` | 6 | Enforce the porting discipline on the flight code. |
-| `test_scenarios.py` | 2 | The five closed-loop scenarios, run as tests. |
-| | **78** | |
+| | **53** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -88,14 +85,21 @@ ceiling, which no scenario exercised because no scenario flies at 100% throttle.
 
 **Still missing, and this is what keeps it at 3 rather than 4:**
 
-- **Integrator convergence has never been checked.** No step-size refinement
-  study exists. `max_step = dt/4` is a plausible choice, not a justified one.
-- **No cross-plant comparison has been RUN.** The machinery now exists — both
-  plants share one controller, one gain file and one actuator chain, and the two
-  launch files differ only in which plant process starts — but the first colcon
-  build has not happened, so analytic-versus-Gazebo agreement remains **a claim
-  about the architecture rather than a measurement**.
-- **No conservation check** (energy and momentum with control off).
+- **Only one exploratory time-step refinement has been checked.** On the
+  nominal lateral case, reducing the control step from 10 ms to 5 ms changed
+  settling time by 5 ms and peak outer-ring deflection by 0.013°. At 20 ms,
+  delay quantization crossed a saturation boundary and changed settling by
+  0.215 s. This supports 10 ms for that case, but it is not a convergence study
+  across all scenarios, and `max_step = dt/4` remains an unqualified choice.
+- **No matched analytic-versus-Gazebo scenario suite exists.** Both plants and
+  both ROS launch paths have run, but only nominal hover behaviour has been
+  compared. The five analytic scenarios have not been replayed in Gazebo under
+  versioned tolerances, so broad cross-plant agreement is still unproved.
+- **Only one torque-free conservation check has been run.** Over 20 s with
+  gravity and control disabled, relative kinetic-energy and inertial angular-
+  momentum drift were below `8.4e-15` under tight solver tolerances. This checks
+  the Newton-Euler/quaternion equations at one state, not conservation across a
+  sweep or under the production solver tolerances.
 
 ### Validation — "was the right model built?" · level 0
 
@@ -104,7 +108,9 @@ data. Specifically absent:
 
 - **No comparison of simulated vehicle motion against a real flight.** The
   vehicle has not flown.
-- **No cross-validation between the two plants.** See above.
+- **No matched scenario comparison between the analytic and Gazebo models.**
+  See above; agreement between two simulators would strengthen verification,
+  but would not replace flight validation.
 - **No back-check of the fitted surface against held-out bench points.** The fit
   used 119 of 121 measured points and none were reserved.
 
@@ -191,6 +197,7 @@ introduced.
 | gimbal hysteresis | up to 0.65°, ~9% of the outer ring's travel | measured, not modelled |
 | no aerodynamics at all | no drag, no ground effect, no wind, no blade flapping | accepted at this stage |
 | no sensor model | state feedback is perfect; real noise, bias and latency absent | deferred — **Seam A already exists**, so this drops in without touching the controller |
+| **the ROS controller has no state-age or command-timeout failsafe** | a dropped odometry stream stops new control updates, while a transport or actuator may continue applying its last command; a delayed stream can also make the controller act on stale state | **acceptable only for SIL. Add explicit stale-state disarm and actuator-command timeout semantics before HITL or hardware.** |
 | the analytic plant has no gimbal-ring or rotor gyroscopic terms and no ground contact | limits analytic↔Gazebo agreement | accepted; keep every scenario airborne |
 | Gazebo rotor speed is not a physical RPM | `momentConstant` is a solver scaling and `maxRotVelocity` is solver headroom; the plugin no longer enforces the real 17.79 N ceiling | **accepted deliberately** — it is the price of reproducing the measured surface exactly. The allocator enforces the ceiling instead, and `tests/test_allocation.py` asserts it. |
 | **the ROS 2 path holds a 1.5-2.5 deg roll limit cycle the direct path does not** | the two SIL pipelines run identical control code and agree on every channel except the thrust axis; the bridge's transport delay costs phase margin exactly where the vehicle has least inertia and the slowest actuator | **OPEN — measured, bounded, not explained in detail** |
@@ -233,7 +240,7 @@ numbers:
 
 ## Supporting Evidence
 
-### Use History · level 1
+### Use History · level 2
 
 - **The Gazebo hover, re-flown under the shared flight code**: spawned tilted,
   level in 1.03 s, 2.000 m held with no drift, frozen as

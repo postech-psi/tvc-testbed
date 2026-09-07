@@ -18,9 +18,8 @@ Three things this node used to get wrong, all fixed here:
 
   IT LISTENED TO THE WRONG SENSOR. It subscribed to the IMU, which carries no
   position and no velocity, so altitude and position control were not merely
-  unimplemented but impossible. Odometry is the single state source now, which
-  is what the Gazebo hover demo -- the only thing that has ever flown here --
-  always used.
+  unimplemented but impossible. Odometry is the single state source now, shared
+  by the direct Gazebo harness and both ROS plant paths.
 
   IT LIED ABOUT dt. It ran off IMU callbacks at 250 Hz while passing a hardcoded
   dt = 0.01 into the PIDs, a 2.5x error in every integral and derivative term.
@@ -34,11 +33,10 @@ from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
 from tvc_msgs.msg import ActuatorCommand
-from tvc_control.config import load_gains, load_vehicle_params, load
+from tvc_control.config import load_gains, load_vehicle_params
 from tvc_control.gnc.controller import TvcController
 from tvc_control.gnc.mathx import quat_rotate
 from tvc_control.gnc.types import ControlMode, EstimatedState, Setpoint
-from tvc_control.hal.gazebo import rotor_speeds
 from tvc_control.nodes import reject_retired_parameters
 
 # Retired parameter names. Each one either changed meaning or stopped doing
@@ -71,6 +69,7 @@ class ControllerNode(Node):
         self.declare_parameter('gain_profile', '')
         self.declare_parameter('att_pitch_des_deg', 0.0)
         self.declare_parameter('att_yaw_des_deg', 0.0)
+        self.declare_parameter('att_roll_des_deg', 0.0)
         self.declare_parameter('altitude_hold', False)
         self.declare_parameter('position_hold', False)
         self.declare_parameter('z_des', 2.0)
@@ -81,7 +80,6 @@ class ControllerNode(Node):
         profile = self.get_parameter('gain_profile').value or None
 
         self.params = load_vehicle_params()
-        self.vehicle = load()
         gains = load_gains(profile)
         self.controller = TvcController(self.params, gains, ControlMode(
             altitude_hold=bool(self.get_parameter('altitude_hold').value),
@@ -90,15 +88,11 @@ class ControllerNode(Node):
         self.setpoint = Setpoint(
             pitch_des=np.deg2rad(self.get_parameter('att_pitch_des_deg').value),
             yaw_des=np.deg2rad(self.get_parameter('att_yaw_des_deg').value),
+            roll_des=np.deg2rad(self.get_parameter('att_roll_des_deg').value),
             z_des=float(self.get_parameter('z_des').value),
             pos_des=(float(self.get_parameter('x_des').value),
                      float(self.get_parameter('y_des').value), 0.0),
         )
-
-        rot = self.vehicle.raw['rotors']
-        self._motor_k = rot['motor_constant']
-        self._moment_c = rot['moment_constant']
-        self._omega_max = rot['max_rot_velocity']
 
         qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE,
                          history=HistoryPolicy.KEEP_LAST, depth=1)
@@ -151,9 +145,6 @@ class ControllerNode(Node):
 
         cmd = self.controller.update(self._state, self.setpoint, dt)
 
-        wa, wb = rotor_speeds(cmd.thrust_n, cmd.tau_p_nm, self._motor_k,
-                             self._moment_c, self._omega_max)
-
         msg = ActuatorCommand()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'body'
@@ -164,8 +155,6 @@ class ControllerNode(Node):
         msg.motor_b = float(cmd.motor_b)
         msg.thrust_n = float(cmd.thrust_n)
         msg.tau_p_nm = float(cmd.tau_p_nm)
-        msg.rotor_a_speed_rads = float(wa)
-        msg.rotor_b_speed_rads = float(wb)
         msg.sat_gimbal = bool(cmd.sat_gimbal)
         msg.sat_roll = bool(cmd.sat_roll)
         msg.sat_thrust = bool(cmd.sat_thrust)

@@ -208,7 +208,7 @@ def main(argv=None):
 
     # The measured residual is expected to wobble in its last digits; only its
     # bound is a golden. Compare the bound, report the value.
-    stored_meas = stored.get("allocation_roundtrip", {}).pop(
+    stored.get("allocation_roundtrip", {}).pop(
         "worst_moment_error_Nm_measured", None)
     cur_meas = current["allocation_roundtrip"].pop(
         "worst_moment_error_Nm_measured", None)

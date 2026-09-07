@@ -192,7 +192,7 @@ def _xml_safe(text):
 
 def render(v, base_mass, base_pos, I_base_own):
     r = v.raw
-    rot, gim = r["rotors"], v
+    rot = r["rotors"]
     gmax = np.deg2rad(v.gimbal_max_deg)
     # The joint velocity limit is deliberately far above the measured slew: the
     # plant model owns the rate limit (and does it per ring). Leaving the SDF's

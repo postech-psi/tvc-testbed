@@ -51,7 +51,7 @@ class EstimatedState:
     """Vehicle state as the controller believes it to be.
 
     Frames per docs/4-CONVENTIONS.md: body +z is the thrust axis; the quaternion
-    is (qw, qx, qy, qz), body <- inertial; rates are body-frame.
+    is (qw, qx, qy, qz), inertial <- body; rates are body-frame.
     """
 
     pos_i: tuple = field(default_factory=_v3)      # m, inertial

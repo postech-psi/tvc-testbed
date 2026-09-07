@@ -44,7 +44,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(REPO, "src", "tvc_control"))
 
-from tvc_control.config import (format_parameter_table, load,  # noqa: E402
+from tvc_control.config import (format_parameter_table,  # noqa: E402
                                 parameter_rows)
 
 

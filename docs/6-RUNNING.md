@@ -87,7 +87,10 @@ control authority at hover (T = 13.03 N, 73% of the 17.79 N ceiling):
 
 ---
 
-## Pipeline 2 — the desktop tools
+## Desktop tools — views over Pipeline 1
+
+These tools do not add another controller or plant. They display the MIL result
+and call the same `harness/mil.py` path as `validate`.
 
 ```bash
 python tvc.py gui        # form on the left, four plots on the right
@@ -107,7 +110,7 @@ caches the result next to the STL.
 
 ---
 
-## Pipeline 3 — SIL without ROS
+## Pipeline 2 — SIL without ROS
 
 **The quickest way to get real physics under the controller.** No colcon build:
 it drives gz-sim directly over gz-transport.
@@ -154,9 +157,14 @@ Pass/fail: altitude error < 0.30 m, tilt < 15°, drift < 1.00 m. Loose on purpos
 
 ---
 
-## Pipeline 4 — SIL with ROS 2
+## Pipelines 3 and 4 — ROS 2 with interchangeable plants
 
 The architecture that ships.
+
+| pipeline | launch file | plant |
+|---|---|---|
+| **3 — ROS analytic** | `analytic.launch.py` | `plant/rigidbody.py` through `simulator_node` |
+| **4 — ROS SIL** | `gazebo.launch.py` | gz-sim through `ros_gz_bridge` |
 
 ```bash
 # first time only
@@ -173,7 +181,7 @@ ros2 launch tvc_control analytic.launch.py             # same nodes, analytic pl
 Both launch files run. The vehicle holds 2.000 m with pitch and yaw inside
 ±0.01°, and messages cross the `ros_gz_bridge` in both directions.
 
-> ⚠ **The thrust-axis channel holds a 1.5–2.5° limit cycle here that Pipeline 3
+> ⚠ **The thrust-axis channel holds a 1.5–2.5° limit cycle in Pipeline 4 that Pipeline 2
 > does not have** — same control code, same gains, same plant. It is the channel
 > with 11.5× less inertia and the slowest actuator, so the bridge's transport
 > delay costs margin exactly where there is least. Bounded and attributable, not
@@ -183,7 +191,7 @@ Both launch files run. The vehicle holds 2.000 m with pitch and yaw inside
 and altitude exactly and translates away at a constant velocity imparted by the
 world's initial tilt. That is the launch file doing what it says, not drift.
 
-Five processes:
+Four long-running processes plus one launch timer action:
 
 ```mermaid
 flowchart LR
@@ -228,8 +236,10 @@ from different control steps and quietly fly a different vehicle.
 | `gui` | `true` | `false` runs the server only — **required on Windows and macOS hosts**, where the container has no display |
 | `world` | `gazebo/worlds/tvc_flight.sdf` | airborne and deliberately tilted |
 | `gain_profile` | `''` | a profile name from `control_gains.yaml`; empty uses the file default |
-| `altitude_hold` / `position_hold` | `true` / `true` | which outer loops are closed |
+| `altitude_hold` | `true` | close the altitude loop |
+| `position_hold` | Pipeline 3: `false`; Pipeline 4: `true` | close the horizontal position loop |
 | `z_des` | `2.0` | target altitude, m |
+| `att_pitch_des_deg` / `att_yaw_des_deg` / `att_roll_des_deg` | `0.0` | attitude targets in degrees about body x / y / z |
 
 ---
 

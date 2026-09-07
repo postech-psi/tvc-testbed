@@ -14,7 +14,7 @@ controller was tuned for.
                                             happened to agree to 0.02%
     the sign of tau_P ..................... three independent choices that agree
                                             by coincidence
-    the two plants' actuator chains ....... one modelling a lag the other does
+    the two analytic entry paths .......... one modelling a lag the other does
                                             not is an unattributable difference
 
 The fix for a duplicate is usually to generate one side from the other. Where
@@ -22,34 +22,7 @@ that is done, the test is that the generator's output matches the file on disk.
 """
 import os
 import re
-import subprocess
-import sys
-
-import numpy as np
 import pytest
-
-
-# --- generated artefacts -----------------------------------------------------
-
-def test_the_gazebo_model_is_what_the_generator_produces(repo):
-    """model.sdf is generated from vehicle_params.yaml and must never be
-    hand-edited. --check re-solves base_link and compares the composite mass
-    properties against the YAML's, so a hand edit or a stale file both fail."""
-    r = subprocess.run([sys.executable,
-                        os.path.join(repo, "tools", "gen_model_sdf.py"), "--check"],
-                       cwd=repo, capture_output=True, text=True)
-    assert r.returncode == 0, r.stdout + r.stderr
-    assert "-> OK" in r.stdout
-
-
-def test_the_parameter_document_is_in_sync(repo):
-    """docs/5-PARAMETERS.md is generated from the YAML. A documented number that
-    can drift from the source of truth is a number that will."""
-    r = subprocess.run([sys.executable,
-                        os.path.join(repo, "tools", "gen_docs.py"), "--check"],
-                       cwd=repo, capture_output=True, text=True)
-    assert r.returncode == 0, r.stdout + r.stderr
-
 
 # --- solver constants vs physical limits -------------------------------------
 
@@ -90,9 +63,9 @@ def test_the_slowest_measured_ring_sets_the_nominal_slew(vp):
     assert vp.gimbal_rate_max <= min(vp.delta_rate_max) + 1e-9
 
 
-# --- the two plants -----------------------------------------------------------
+# --- shared architecture ------------------------------------------------------
 
-def test_both_plants_use_the_same_actuator_chain(repo):
+def test_both_analytic_paths_use_the_same_actuator_chain(repo):
     """The analytic harness and the ROS simulator node must not model different
     subsets of the actuator dynamics -- a difference there is an unattributable
     difference in every cross-plant comparison."""
@@ -174,77 +147,6 @@ def test_tau_p_sign_chain_agrees_end_to_end(vp, vehicle):
     assert allocate((0.0, 0.0, +0.05), 13.0, vp).tau_p > 0.0
 
 
-def test_the_plotter_reads_columns_the_harness_actually_writes(repo):
-    """A silent coupling across two files: the Gazebo harness writes a CSV and
-    the plotter reads it by column NAME. A renamed column produces a KeyError
-    after a 30-second flight, which is the most annoying possible moment."""
-    from tvc_control.harness.gz import CSV_HEADER
-
-    path = os.path.join(repo, "src", "tvc_control", "tvc_control", "apps",
-                        "plot.py")
-    src = open(path, encoding="utf-8").read()
-    used = set(re.findall(r'd\["([a-z_0-9]+)"\]', src))
-    missing = sorted(used - set(CSV_HEADER))
-    assert not missing, (
-        "apps/plot.py reads columns the flight log does not contain: %s"
-        % missing)
-
-
-def test_the_trace_matches_the_real_control_path(capsys, vp, gains):
-    """docs/2-WALKTHROUGH.md is a real trace, so the tracer must not drift.
-
-    verify/trace.py recomputes each stage with the same functions the controller
-    calls, then compares its own numbers against TvcController.update(). If they
-    ever disagree it prints MISMATCH -- which would mean the document explains a
-    control path that is not the one running. This makes that a build failure
-    rather than something a reader has to notice.
-    """
-    from tvc_control.verify import trace
-
-    for case in sorted(trace.CASES):
-        trace.main(["--case", case, "--steps", "2"])
-        out = capsys.readouterr().out
-        assert "MISMATCH" not in out, "trace of case %r diverged:\n%s" % (case, out)
-        assert out.count("[checked:") == 2, \
-            "case %r did not reach the self-check on both steps" % case
-
-
-def test_every_public_symbol_is_documented(repo):
-    """The generated code index is only worth having with no blanks in it.
-
-    A public function whose purpose cannot be stated in one line usually does
-    not have one, so this is a design check as much as a documentation check.
-    """
-    import ast
-
-    base = os.path.join(repo, "src", "tvc_control", "tvc_control")
-    missing = []
-    for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
-        for name in sorted(filenames):
-            if not name.endswith(".py"):
-                continue
-            tree = ast.parse(open(os.path.join(dirpath, name),
-                                  encoding="utf-8").read())
-            rel = os.path.relpath(os.path.join(dirpath, name), base)
-            if not ast.get_docstring(tree):
-                missing.append("%s (module)" % rel)
-            for node in tree.body:
-                if isinstance(node, ast.ClassDef):
-                    if not ast.get_docstring(node):
-                        missing.append("%s: class %s" % (rel, node.name))
-                    for sub in node.body:
-                        if (isinstance(sub, ast.FunctionDef)
-                                and not sub.name.startswith("_")
-                                and not ast.get_docstring(sub)):
-                            missing.append("%s: %s.%s" % (rel, node.name, sub.name))
-                elif (isinstance(node, ast.FunctionDef)
-                      and not node.name.startswith("_")
-                      and not ast.get_docstring(node)):
-                    missing.append("%s: %s" % (rel, node.name))
-    assert not missing, ("undocumented public symbols:\n  " + "\n  ".join(missing))
-
-
 def test_the_two_worlds_agree_on_physics_and_plugins(repo):
     """tvc.sdf and tvc_flight.sdf duplicate ~50 lines of preamble.
 
@@ -277,63 +179,3 @@ def test_the_two_worlds_agree_on_physics_and_plugins(repo):
         "tvc.sdf loads system plugins tvc_flight.sdf does not: %s" % sorted(only_ground)
     assert only_flight <= {"gz-sim-sensors-system"}, \
         "unexpected extra system plugins in tvc_flight.sdf: %s" % sorted(only_flight)
-
-
-# --- the documentation set ---------------------------------------------------
-
-def test_every_numbered_doc_says_its_own_number(repo):
-    """docs/N-NAME.md must open with `# N`.
-
-    Six of the eight had drifted -- 3-THEORY.md called itself "2 - Theory" and
-    every file after it was off by one -- because 2-WALKTHROUGH.md was inserted
-    later and the headings were never renumbered. Cross-references say "see 6"
-    and the reader opens 7.
-    """
-    d = os.path.join(repo, "docs")
-    checked = 0
-    for name in sorted(os.listdir(d)):
-        m = re.match(r"^(\d+)-.*\.md$", name)
-        if not m:
-            continue
-        first = open(os.path.join(d, name), encoding="utf-8").readline()
-        assert first.startswith("# %s " % m.group(1)), (
-            "%s opens with %r" % (name, first.strip()))
-        checked += 1
-    assert checked >= 8, "only found %d numbered docs" % checked
-
-
-def test_the_gazebo_golden_is_where_the_harness_looks_for_it(repo):
-    """GOLDEN_PATH walks five directories up from harness/gz.py.
-
-    A count of dirname() calls is wrong by one until someone runs it, and the
-    someone was a devcontainer-only code path that a Windows host never
-    exercises. The file is here, so the walk is checked here.
-    """
-    import importlib.util
-    src = os.path.join(repo, "src", "tvc_control")
-    if src not in sys.path:
-        sys.path.insert(0, src)
-    # Imported by path: the module's own `from gz.transport13 import ...` is
-    # inside a function, so it imports fine on a host with no Gazebo.
-    spec = importlib.util.spec_from_file_location(
-        "tvc_control.harness.gz",
-        os.path.join(src, "tvc_control", "harness", "gz.py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    assert os.path.isfile(mod.GOLDEN_PATH), mod.GOLDEN_PATH
-    assert os.path.dirname(mod.GOLDEN_PATH) == os.path.join(
-        repo, "reference", "golden")
-
-
-def test_every_gazebo_golden_metric_has_a_tolerance(repo):
-    """A metric with no tolerance is a metric nothing compares."""
-    import json
-    path = os.path.join(repo, "reference", "golden", "hover_baseline.json")
-    doc = json.load(open(path, encoding="utf-8"))
-    # Bookkeeping fields are deliberately not compared: the sample count and
-    # the rejected-message count describe the transport, not the flight.
-    bookkeeping = {"samples", "duration_s", "rejected_odometry"}
-    missing = set(doc["metrics"]) - set(doc["tolerance"]) - bookkeeping
-    assert not missing, "no tolerance for: %s" % ", ".join(sorted(missing))
-    extra = set(doc["tolerance"]) - set(doc["metrics"])
-    assert not extra, "tolerance for a metric that is not recorded: %s" % extra

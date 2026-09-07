@@ -5,7 +5,7 @@ Shared by the controller and the plant. Math is neither -- putting it in `gnc`
 rather than duplicating it keeps one definition of the quaternion convention,
 which is the kind of thing that silently forks and then disagrees by a sign.
 
-Convention: quaternions are (qw, qx, qy, qz), body <- inertial, unit norm.
+Convention: quaternions are (qw, qx, qy, qz), inertial <- body, unit norm.
 Euler angles are READOUT ONLY -- kinematics are never propagated through them,
 which is what keeps the +/-90 deg singularity out of the state.
 """

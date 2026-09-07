@@ -34,6 +34,9 @@ def generate_launch_description():
                         "file's default_profile."),
         DeclareLaunchArgument('altitude_hold', default_value='true'),
         DeclareLaunchArgument('position_hold', default_value='false'),
+        DeclareLaunchArgument('att_pitch_des_deg', default_value='0.0'),
+        DeclareLaunchArgument('att_yaw_des_deg', default_value='0.0'),
+        DeclareLaunchArgument('att_roll_des_deg', default_value='0.0'),
 
         Node(
             package='tvc_control', executable='simulator_node',
@@ -58,8 +61,9 @@ def generate_launch_description():
             parameters=[{
                 'rate_hz': 250.0,
                 'gain_profile': profile,
-                'att_pitch_des_deg': 0.0,
-                'att_yaw_des_deg': 0.0,
+                'att_pitch_des_deg': LaunchConfiguration('att_pitch_des_deg'),
+                'att_yaw_des_deg': LaunchConfiguration('att_yaw_des_deg'),
+                'att_roll_des_deg': LaunchConfiguration('att_roll_des_deg'),
                 'altitude_hold': LaunchConfiguration('altitude_hold'),
                 'position_hold': LaunchConfiguration('position_hold'),
                 'z_des': 2.0,
