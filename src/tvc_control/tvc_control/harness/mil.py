@@ -72,6 +72,12 @@ class SimConfig:
     motor_tau_s: float = 0.10
     motor_deadtime_s: float = 0.0
 
+    # Battery sag. OFF by default: with it off the actuator chain is bit-identical
+    # to before and every frozen baseline reproduces. On, the thrust surface's
+    # fresh-pack authority derates as the pack drains (plant/battery.py); the
+    # numbers come from vehicle_params.yaml's motor_dynamics.battery block.
+    battery_sag: bool = False
+
 
 def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     """
@@ -84,10 +90,26 @@ def simulate(vparams: VehicleParams, gains: ControlGains, cfg: SimConfig):
     Returns a dict of numpy arrays: t, euler_deg, delta_deg, omega_deg, quat,
     pos, thrust_N, tau_p_Nm, motor_N, plus scalar metrics under 'metrics'.
     """
+    battery, current_per_n = None, 0.0
+    if cfg.battery_sag:
+        # Reading the YAML here (not in gnc/) is fine: this is the harness, and
+        # the battery block lives with the rest of the measured vehicle data.
+        from ..config import load
+        from ..plant.battery import BatteryState
+        md = load().motor_dynamics
+        bc = md["battery"]
+        battery = BatteryState(
+            v_full=bc["v_full_v"], v_per_mah=bc["v_per_mah"],
+            capacity_mah=bc["capacity_mah"],
+            thrust_sensitivity_n_per_v=bc["thrust_sensitivity_n_per_v"])
+        # Approximate pack current from thrust: linear, peak_current_a at T_max.
+        current_per_n = md.get("peak_current_a", 34.7) / vparams.T_max
+
     chain = ActuatorChain(vparams,
                           motor_model=cfg.motor_model,
                           motor_tau_s=cfg.motor_tau_s,
-                          motor_deadtime_s=cfg.motor_deadtime_s)
+                          motor_deadtime_s=cfg.motor_deadtime_s,
+                          battery=battery, current_per_n=current_per_n)
     estimator = PerfectEstimator()
     controller = TvcController(vparams, gains, ControlMode(
         altitude_hold=cfg.altitude_hold,

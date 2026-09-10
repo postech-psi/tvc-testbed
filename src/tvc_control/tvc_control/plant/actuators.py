@@ -153,17 +153,33 @@ class ActuatorChain:
     """
 
     def __init__(self, params, motor_model="first_order", motor_tau_s=0.10,
-                 motor_deadtime_s=0.0):
+                 motor_deadtime_s=0.0, battery=None, current_per_n=0.0):
         self.gimbal = GimbalActuator(params)
         self.motor = MotorLag(motor_model, motor_tau_s, motor_deadtime_s)
+        # OPTIONAL battery-sag stage. None (the default) leaves update() doing
+        # exactly what it did before, so the toggle-off path is bit-identical.
+        # current_per_n turns achieved thrust into an approximate pack current
+        # (linear: peak_current_a / T_max) for the coulomb count.
+        self.battery = battery
+        self.current_per_n = float(current_per_n)
 
     def reset(self):
-        """Reset both stages -- gimbal FIFO and motor lag."""
+        """Reset every stage -- gimbal FIFO, motor lag, and the battery if present."""
         self.gimbal.reset()
         self.motor.reset()
+        if self.battery is not None:
+            self.battery.reset()
 
     def update(self, delta_cmd, T_cmd, tau_p_cmd, dt):
-        """-> (achieved delta, achieved T, achieved tau_P)."""
+        """-> (achieved delta, achieved T, achieved tau_P).
+
+        With a battery attached, the achieved thrust is derated for the pack's
+        state of charge: the motor produces its commanded thrust, then a sagged
+        pack cannot sustain it. tau_P is left as the motor produced it -- the
+        sag model is a thrust-only derate (see plant/battery.py)."""
         delta = self.gimbal.update(delta_cmd, dt)
         T, tau_p = self.motor.update(T_cmd, tau_p_cmd, dt)
+        if self.battery is not None:
+            self.battery.update(self.current_per_n * T, dt)
+            T = self.battery.derate(T)
         return delta, T, tau_p
