@@ -35,8 +35,21 @@ from ..gnc.effectiveness import ThrustTorqueSurface
 
 # Estimated relative 1-sigma on the CAD mass properties. Documented assumptions,
 # not measurements -- the vehicle has never been weighed or balanced.
+#
+# INERTIA IS DELIBERATELY WIDE. The inertia tensor is CAD design intent and the
+# built vehicle has NEVER been measured -- 748 g of electronics sit at *assumed*
+# positions (docs/8-ROADMAP.md ranks this #2 of what is genuinely uncertain).
+# So we keep the CAD values as the mean (we still believe them as the best
+# estimate) but spread widely around them: sigma 0.25 puts +/-1 sigma at 25% and
+# the bulk of the mass within the +/-20-30% the roadmap flags as the real range.
+# Narrow it only once the assembled vehicle's inertia has actually been measured.
 _MASS_REL_SIGMA = 0.05
-_INERTIA_REL_SIGMA = 0.10
+_INERTIA_REL_SIGMA = 0.25
+
+# Clamp each inertia scale factor to stay physical (no zero/negative inertia) at
+# the far tail of a wide Gaussian, while leaving the +/-2 sigma body untouched.
+_INERTIA_FACTOR_MIN = 0.4
+_INERTIA_FACTOR_MAX = 1.6
 
 
 @dataclass
@@ -97,9 +110,13 @@ def perturb_params(vp, spec, rng):
     dQ = spec.torque_surface_sigma_nm * rng.standard_normal()
 
     m = vp.m * (1.0 + spec.mass_rel_sigma * m_z)
-    fx = 1.0 + spec.inertia_rel_sigma * ix_z
-    fy = 1.0 + spec.inertia_rel_sigma * iy_z
-    fz = 1.0 + spec.inertia_rel_sigma * iz_z
+
+    def _ifac(z):
+        # Wide, but clamped off the nonphysical tail (see _INERTIA_FACTOR_*).
+        f = 1.0 + spec.inertia_rel_sigma * z
+        return min(max(f, _INERTIA_FACTOR_MIN), _INERTIA_FACTOR_MAX)
+
+    fx, fy, fz = _ifac(ix_z), _ifac(iy_z), _ifac(iz_z)
     # Products of inertia scale with the geometric mean of their two axes' factors
     # so the tensor stays a plausible tensor rather than drifting off on its own.
     fxy = (fx * fy) ** 0.5
