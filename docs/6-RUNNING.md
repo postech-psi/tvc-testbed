@@ -10,7 +10,8 @@ python tvc.py --help
 
 | command | what it does | needs |
 |---|---|---|
-| `validate` | the five closed-loop scenarios | Python |
+| `validate` | the five closed-loop scenarios (+ `--uncertainty`, `--battery-sag`, `--aero`, `--fidelity-all`) | Python |
+| `cross-plant` | compare the analytic hover against the frozen Gazebo golden | Python |
 | `trace` | every computation in one control step, with the numbers | Python |
 | `golden` | capture or `--check` the frozen numerical baseline | Python |
 | `params` | every vehicle number with its provenance | Python |
@@ -85,6 +86,54 @@ control authority at hover (T = 13.03 N, 73% of the 17.79 N ceiling):
 - **`AS A DELAY: peak roll 72.5 deg, 97% saturated`** — the open question. See
   [3-THEORY.md §7](3-THEORY.md).
 
+### Uncertainty and the fidelity toggles
+
+The scenarios run at the nominal vehicle by default. Three switches add the
+measured (and estimated) fidelity effects, and one propagates the input
+uncertainty into the metrics. **All are off by default**, so the frozen baselines
+are untouched unless you ask.
+
+```bash
+python tvc.py validate --uncertainty              # error bars on every metric
+python tvc.py validate --uncertainty --samples 100 --seed 0
+python tvc.py validate --battery-sag              # measured pack-sag derate
+python tvc.py validate --aero                     # ESTIMATED drag + ground effect
+python tvc.py validate --fidelity-all             # all of the above at once
+```
+
+- **`--uncertainty`** reruns each scenario under a seeded Monte-Carlo
+  perturbation of the lever arm `L`, mass, inertia and the measured
+  thrust/torque surface, and prints each metric as `mean ± std [p5, p95]`. It is
+  what turns "settling time = 0.64 s" into a spread, and it is the difference
+  between Results Uncertainty level 0 and 2 in [7-CREDIBILITY.md](7-CREDIBILITY.md).
+  **Inertia is deliberately spread wide (σ = 25%)**: the built vehicle's inertia
+  has never been measured, so the distribution is broad even though its mean is
+  the CAD value we still believe. Two margins move under it — the lateral gimbal
+  peak reaches its stop at p95, and climb settling ranges 0–2.9 s.
+- **`--battery-sag`** applies the measured discharge derate
+  (`tvc-data/motor/identify_battery.py`); over a hold the altitude loop commands
+  more thrust to compensate.
+- **`--aero`** enables a **parametric, estimated** drag + ground-effect model
+  (no aero bench data exists) — results with it on are provisional, and the run
+  prints that reminder.
+
+All five scenarios still PASS with `--fidelity-all`, which is the point: the
+added physics is small enough that the structural thresholds hold.
+
+### `cross-plant` — analytic vs Gazebo
+
+```bash
+python tvc.py cross-plant
+```
+
+Replays the matched 10°/−7° hover on the analytic plant and compares
+plant-agnostic metrics against the frozen Gazebo golden under versioned
+tolerances. **9/9 gated metrics agree**; peak thrust is reported but not gated,
+because it is dominated by Gazebo's spawn transient (the vehicle drops ~13 cm
+before control engages) that the analytic plant's perfect state cannot
+reproduce. This is the cheapest cross-check short of flight data; see
+[7-CREDIBILITY.md](7-CREDIBILITY.md).
+
 ---
 
 ## Desktop tools — views over Pipeline 1
@@ -122,7 +171,17 @@ bash gazebo/run_hover.sh --duration 60 --altitude 3.0
 bash gazebo/run_hover.sh --log flight.csv
 python tvc.py plot flight.csv                      # then plot it
 bash gazebo/run_hover.sh --record flight.gif       # chase camera to a GIF
+
+# The whole pipeline in one command: log AND video, then render the graph.
+bash gazebo/run_hover.sh --duration 30 --altitude 2.0 \
+     --log out/hover_run.csv --record out/hover.gif
+python tvc.py plot out/hover_run.csv out/hover_run.png
 ```
+
+> On a Windows host driving the container, shell scripts must have LF line
+> endings (`.gitattributes` enforces `eol=lf`); if an editor rewrote
+> `run_hover.sh` with CRLF, bash reports `set: pipefail: invalid option name`.
+> Fix with `sed -i 's/\r$//' gazebo/run_hover.sh`.
 
 The script starts the world **paused** and the *controller* unpauses it, from
 inside `harness/gz.py`, once it has subscribed. Both halves of that matter:
@@ -260,6 +319,14 @@ python tools/gen_docs.py --check
 | `golden --check` | that a change claiming to move no numbers moved none. It names every drifted field with its old and new value. |
 | `gen_model_sdf --check` | that the Gazebo model still reproduces the YAML's mass properties (and that nobody hand-edited a generated file) |
 | `gen_docs --check` | that the documented numbers still match the YAML |
+
+Two more verifications are runnable but **not** CI gates, because they surface
+attributable model differences rather than pass/fail regressions:
+
+```bash
+python tvc.py cross-plant                 # analytic hover vs the Gazebo golden
+python tvc.py validate --uncertainty      # metric spreads under input uncertainty
+```
 
 **Never regenerate the golden to make a failing check pass.** A legitimate
 physics or parameter change gets its own commit saying which numbers moved and
