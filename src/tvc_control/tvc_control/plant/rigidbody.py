@@ -18,6 +18,7 @@ import numpy as np
 
 from ..gnc.params import VehicleParams
 from ..gnc.mathx import quat_normalize, quat_to_rotmat, thrust_axis
+from .aero import drag_force_inertial, ground_effect_factor
 
 
 def quat_kinematics(q, omega):
@@ -57,7 +58,18 @@ def dynamics(t, x, T, delta, params: VehicleParams, tau_p=0.0):
     f_body = T * n_hat
 
     R = np.asarray(quat_to_rotmat(q), dtype=float)
-    a_inertial = (R @ f_body) / params.m + np.array([0, 0, -params.g])
+    # AERODYNAMICS (opt-in, ESTIMATED -- see plant/aero.py). Off by default, in
+    # which case this branch is skipped and the acceleration is exactly what it
+    # was before. Ground effect boosts only the TRANSLATIONAL thrust (not the
+    # moment: f_body above, used in tau below, stays the commanded thrust); drag
+    # opposes the inertial velocity.
+    if getattr(params, "aero_enabled", False):
+        ge = ground_effect_factor(x[2], params.rotor_radius)
+        drag = drag_force_inertial(v, params.cd, params.ref_area, params.rho)
+        a_inertial = ((R @ (ge * f_body)) + drag) / params.m \
+            + np.array([0, 0, -params.g])
+    else:
+        a_inertial = (R @ f_body) / params.m + np.array([0, 0, -params.g])
 
     # ROLL lever arm (gimbal pivot -> CM along body z), plus optional lateral
     # misalignment disturbance terms dx, dy (normally ~0 for a balanced vehicle).

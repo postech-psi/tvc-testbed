@@ -175,10 +175,17 @@ def load_vehicle_params(path=None):
         a.get("rate_max_deg", 180.0), a.get("bandwidth_hz", 0.0),
     ) for k, a in (v.gimbal_axes or {}).items()} or None
 
+    aero = v.raw.get("aero") or {}
+
     return VehicleParams(
         m=v.mass, Ix=v.Ix, Iy=v.Iy, Iz=v.Iz,
         Ixy=v.Ixy, Ixz=v.Ixz, Iyz=v.Iyz,
         L=v.L,
+        aero_enabled=bool(aero.get("enabled", False)),
+        cd=float(aero.get("cd", 0.0)),
+        ref_area=float(aero.get("ref_area_m2", 0.0)),
+        rho=float(aero.get("air_density", 1.225)),
+        rotor_radius=float(aero.get("rotor_radius_m", 0.0)),
         # dx/dy stay 0 by design: they are OPT-IN CM-misalignment disturbance
         # terms, not the vehicle's nominal state. The real <2 mm lateral CG
         # offset lives in the SDF (link pose + products of inertia); forcing it

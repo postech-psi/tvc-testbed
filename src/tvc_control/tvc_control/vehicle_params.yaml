@@ -274,6 +274,21 @@ motor_dynamics:
     capacity_mah: 4200
     thrust_sensitivity_n_per_v: 1.90
 
+# --- aerodynamics: ESTIMATED, no bench data ----------------------------------
+# There is no wind-tunnel or drag measurement for this vehicle. Every number
+# here is design intent, tagged estimated, and any result that depends on it is
+# provisional. Consumed by plant/aero.py only when enabled is true; default OFF
+# so the plant and the frozen baselines are unchanged.
+#   cd            slender-body drag coefficient, order-of-magnitude estimate
+#   ref_area_m2   reference frontal area, from the rough envelope diameter
+#   rotor_radius_m coax rotor radius, for the ground-effect image model
+aero:
+  enabled: false
+  cd: 0.8
+  ref_area_m2: 0.03
+  air_density: 1.225
+  rotor_radius_m: 0.12
+
 # --- environment -------------------------------------------------------------
 env:
   gravity: 9.81

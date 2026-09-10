@@ -58,16 +58,17 @@ uncertainty.
 <!-- <<<EMIT:tests -->
 | file | test functions | what it guards |
 |---|---|---|
+| `test_aero.py` | 8 | Tests for the parametric aero model (plant/aero.py) and its integration into the |
 | `test_allocation.py` | 7 | Control allocation: does it realize the moment it was asked for? |
 | `test_attitude_error.py` | 8 | The quaternion attitude error, and why it replaced the Euler difference. |
 | `test_axis_convention.py` | 9 | The axis convention, asserted rather than documented. |
-| `test_battery.py` | 5 | Tests for the battery-sag model (plant/battery.py) and its wiring into the |
+| `test_battery.py` | 8 | Tests for the battery-sag model (plant/battery.py) and its wiring into the |
 | `test_consistency.py` | 8 | The numbers that live in two places must agree. |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gazebo_servo.py` | 6 | The Gazebo gimbal servo must be stable at the world's physics step. |
 | `test_uncertainty.py` | 8 | Tests for uncertainty propagation (verify/uncertainty.py). |
-| | **66** | |
+| | **77** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the

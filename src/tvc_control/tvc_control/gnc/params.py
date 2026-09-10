@@ -70,6 +70,17 @@ class VehicleParams:
 
     T_min: float = 5.0              # N, idle floor; must stay > 0 for allocation
 
+    # --- aerodynamics (ESTIMATED, opt-in) ------------------------------------
+    # There is NO aero bench data. These are design-intent estimates so a
+    # scenario can ask "does plausible drag change a conclusion?"; conclusions
+    # resting on them are provisional. Default OFF so the plant is unchanged and
+    # the frozen baselines reproduce. See plant/aero.py.
+    aero_enabled: bool = False
+    cd: float = 0.0                 # drag coefficient (dimensionless)
+    ref_area: float = 0.0           # m^2, reference frontal area
+    rho: float = 1.225              # kg/m^3, air density
+    rotor_radius: float = 0.0       # m, for the ground-effect model
+
     # Roll (thrust-axis) reaction torque authority. tau_p_max is an optional
     # measured hard cap; when None the allocator reads the feasible set off the
     # measured surface instead.

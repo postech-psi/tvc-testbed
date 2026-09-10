@@ -267,8 +267,15 @@ SIMULATION ONLY -- none of this ever flies.
 | &nbsp;&nbsp;&nbsp;`.reset()` | Un-initialise the lag: the next command starts settled. |
 | &nbsp;&nbsp;&nbsp;`.update(T_cmd, tau_p_cmd, dt)` | Commanded (thrust, roll torque) -> what the motors actually produce. |
 | class `ActuatorChain` | Every analytic actuator dynamic in one object, so analytic paths agree. |
-| &nbsp;&nbsp;&nbsp;`.reset()` | Reset both stages -- gimbal FIFO and motor lag. |
+| &nbsp;&nbsp;&nbsp;`.reset()` | Reset every stage -- gimbal FIFO, motor lag, and the battery if present. |
 | &nbsp;&nbsp;&nbsp;`.update(delta_cmd, T_cmd, tau_p_cmd, dt)` | -> (achieved delta, achieved T, achieved tau_P). |
+
+**`aero.py`** — Aerodynamics -- simulation only, and ESTIMATED rather than measured.
+
+| | |
+|---|---|
+| `drag_force_inertial(v_inertial, cd, ref_area, rho)` | Quadratic drag opposing the inertial velocity, in newtons (inertial frame). |
+| `ground_effect_factor(z, rotor_radius)` | Thrust multiplier from rotor-in-ground-effect, >= 1, bounded. |
 
 **`battery.py`** — Battery-sag model -- simulation only.
 
