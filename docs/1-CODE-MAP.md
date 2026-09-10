@@ -420,6 +420,19 @@ Desktop tools. They read the simulator; they are not part of it.
 
 Verification: the scenarios, the frozen baseline, the tracer.
 
+**`cross_plant.py`** — Cross-plant validation: does the analytic plant agree with Gazebo?
+
+| | |
+|---|---|
+| class `ScenarioSpec` | An initial state + setpoints both plants can run identically. |
+| &nbsp;&nbsp;&nbsp;`.to_simconfig()` |  |
+| class `Discrepancy` |  |
+| `run_analytic(spec, vp, gains)` | Run one ScenarioSpec on the analytic plant; return plant-agnostic metrics named to match the Gazebo golden. |
+| `compare(metrics_a, metrics_b, tolerances)` | One Discrepancy per shared metric that has a tolerance. |
+| `run_gazebo(spec)` | Live Gazebo replay. Needs gz-sim from the devcontainer; wired there. |
+| `load_gazebo_golden(path=)` | The frozen Gazebo hover metrics (reference/golden/hover_baseline.json). |
+| `main(argv=)` | Compare the analytic hover against the frozen Gazebo golden. |
+
 **`golden.py`** — The frozen numerical baseline: what this simulator produced, written down.
 
 | | |

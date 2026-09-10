@@ -64,11 +64,12 @@ uncertainty.
 | `test_axis_convention.py` | 9 | The axis convention, asserted rather than documented. |
 | `test_battery.py` | 8 | Tests for the battery-sag model (plant/battery.py) and its wiring into the |
 | `test_consistency.py` | 8 | The numbers that live in two places must agree. |
+| `test_cross_plant.py` | 5 | Tests for the cross-plant validation harness. The comparator is tested |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gazebo_servo.py` | 6 | The Gazebo gimbal servo must be stable at the world's physics step. |
 | `test_uncertainty.py` | 8 | Tests for uncertainty propagation (verify/uncertainty.py). |
-| | **77** | |
+| | **82** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -94,10 +95,18 @@ ceiling, which no scenario exercised because no scenario flies at 100% throttle.
   delay quantization crossed a saturation boundary and changed settling by
   0.215 s. This supports 10 ms for that case, but it is not a convergence study
   across all scenarios, and `max_step = dt/4` remains an unqualified choice.
-- **No matched analytic-versus-Gazebo scenario suite exists.** Both plants and
-  both ROS launch paths have run, but only nominal hover behaviour has been
-  compared. The five analytic scenarios have not been replayed in Gazebo under
-  versioned tolerances, so broad cross-plant agreement is still unproved.
+- **A matched analytic-versus-Gazebo *hover* comparison now exists**
+  (`verify/cross_plant.py`, `tvc.py cross-plant`), run against the frozen Gazebo
+  golden under versioned cross-plant tolerances. The analytic hover agrees with
+  Gazebo on **8 of 10** plant-agnostic metrics (final altitude, final/peak tilt,
+  final roll, both gimbal peaks, min thrust, peak drift). The two that diverge are
+  attributable, not errors: **peak thrust** (analytic 13.6 N vs Gazebo 17.3 N —
+  Gazebo's startup transient nearly saturates the ceiling while the analytic run
+  starts settled at 2 m, so it is an unmatched-startup artifact) and **tilt
+  settling** (2.55 s vs 1.03 s — a metric-definition gap plus the analytic
+  position loop re-tilting to null drift). Still missing: the *other four*
+  scenarios replayed on a live Gazebo under ratified tolerances, which needs the
+  devcontainer.
 - **Only one torque-free conservation check has been run.** Over 20 s with
   gravity and control disabled, relative kinetic-energy and inertial angular-
   momentum drift were below `8.4e-15` under tight solver tolerances. This checks
@@ -111,9 +120,10 @@ data. Specifically absent:
 
 - **No comparison of simulated vehicle motion against a real flight.** The
   vehicle has not flown.
-- **No matched scenario comparison between the analytic and Gazebo models.**
-  See above; agreement between two simulators would strengthen verification,
-  but would not replace flight validation.
+- **Only a hover comparison between the analytic and Gazebo models exists**
+  (see Verification); the other four scenarios are unmatched. In any case,
+  agreement between two simulators strengthens verification, not validation —
+  it would not replace flight data.
 - **No back-check of the fitted surface against held-out bench points.** The fit
   used 119 of 121 measured points and none were reserved.
 

@@ -45,6 +45,8 @@ COMMANDS = [
      "tvc_control.verify.scenarios:main"),
     ("golden", "capture (or --check) the frozen numerical baseline",
      "tvc_control.verify.golden:main"),
+    ("cross-plant", "compare the analytic hover against the frozen Gazebo golden",
+     "tvc_control.verify.cross_plant:main"),
     ("params", "print every vehicle parameter with its provenance",
      None),
     ("trace", "print every computation in one control step, with numbers",
