@@ -190,7 +190,7 @@ introduced.
 
 | divergence | effect | status |
 |---|---|---|
-| **the measured 100 ms motor response is not identified as a delay or a lag** | **decides whether the roll channel is controllable at all.** Same 20° upset: as a first-order lag it recovers cleanly and never saturates; as a pure transport delay it winds up to 72° and saturates 97% of the run. The lateral axes are unaffected either way. | **OPEN — one bench run resolves it. The highest-value measurement outstanding.** |
+| **the measured 100 ms motor response is not identified as a delay or a lag** | **decides whether the roll channel is controllable at all.** Same 20° upset: as a first-order lag it recovers cleanly and never saturates; as a pure transport delay it winds up to 72° and saturates 97% of the run. The lateral axes are unaffected either way. | **OPEN — and now shown to be *unanswerable from the existing bench data*.** `tvc-data/motor/identify_dynamics.py` establishes that (a) dead time is structurally unmeasurable on this rig — the command is host-clock-stamped while force is STM32-stamped, so an onset shift is algebraically identical to a dead time; and (b) at the near-hover SNR (~2.4) a synthetic-truth power check recovers a true 44 ms lag as ~0 ms, its p5–p95 interval reaching 0, so a pure delay cannot be rejected. The fix is a **logging change, not a new rig**: the load cell already averages ~20 raw samples into each 20 ms row, so logging at 500 Hz (or using ~6 N steps) resolves it; more repeats do not. |
 | motor lag modelled at all | the default is the optimistic reading | modelled; `tvc.py validate` prints the pessimistic number every run |
 | battery sag and thrust derate | −13% over a sustained run; the surface is a fresh-pack fit | measured, **not modelled** |
 | servo resonance (+11 dB inner, +5 dB outer) | a rate limit cannot represent a lightly damped peak; closed-loop margin near it is unmodelled | deferred |
@@ -351,6 +351,6 @@ which factor moved and why.
 
 | do this | cost | moves |
 |---|---|---|
-| one bench run distinguishing motor delay from lag | one session | Results Robustness, and possibly the roll gains |
+| re-log the motor step response at 500 Hz (not a new rig — the rig already samples ~1 kHz and discards it) to distinguish delay from lag | one session | Results Robustness, and possibly the roll gains |
 | knife-edge CG measurement of the assembled vehicle | hours | Input Pedigree |
 | perturb `L`, mass and the surface by their stated uncertainty; re-run the scenarios | a loop over existing code | Results Uncertainty 0 → 2 |
