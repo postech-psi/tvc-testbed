@@ -250,12 +250,29 @@ motor_dynamics:
   response_delay_s: 0.10       # as measured, kept for provenance
   peak_current_a: 34.7
   efficiency_g_per_w: 4.9
-  thrust_sensitivity_n_per_v: 1.46     # r = 0.981 over 11.2-12.5 V
+  thrust_sensitivity_n_per_v: 1.46     # r = 0.981 over 11.2-12.5 V (original slide
+                                       # figure; RE-DERIVED below over the full sag)
   sustained_load:
     voltage_start_v: 11.9
     voltage_end_v: 10.0
     thrust_start_n: 13.8
     thrust_end_n: 12.0
+
+  # --- battery-sag model (consumed by plant/battery.py when SimConfig.battery_sag)
+  # RE-DERIVED FROM DATA by tvc-data/motor/identify_battery.py over the seven
+  # back-to-back A1850/B1850 60 s runs (pack drained 11.2 -> 8.9 V). The slope
+  # here (1.90 N/V) is fit over the FULL observed sag, not the narrow 11.2-12.5 V
+  # band the 1.46 above came from, which is why the two differ; r = 0.77 pooled.
+  #   v_full_v   fresh-pack reference where derate is zero (surface is a fresh
+  #              fit, so this matches the sweep's ~11.9 V start).
+  #   v_per_mah  measured discharge slope (volts lost per mAh drawn).
+  #   capacity_mah  nominal 3S pack; charge is clamped here so voltage does not
+  #              run off the fitted line past empty.
+  battery:
+    v_full_v: 11.9
+    v_per_mah: -0.00035
+    capacity_mah: 4200
+    thrust_sensitivity_n_per_v: 1.90
 
 # --- environment -------------------------------------------------------------
 env:

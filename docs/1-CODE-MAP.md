@@ -270,6 +270,15 @@ SIMULATION ONLY -- none of this ever flies.
 | &nbsp;&nbsp;&nbsp;`.reset()` | Reset both stages -- gimbal FIFO and motor lag. |
 | &nbsp;&nbsp;&nbsp;`.update(delta_cmd, T_cmd, tau_p_cmd, dt)` | -> (achieved delta, achieved T, achieved tau_P). |
 
+**`battery.py`** — Battery-sag model -- simulation only.
+
+| | |
+|---|---|
+| class `BatteryState` | Pack state under coulomb counting; derates thrust as it drains. |
+| &nbsp;&nbsp;&nbsp;`.reset()` | Fresh pack: no charge drawn, voltage at v_full. |
+| &nbsp;&nbsp;&nbsp;`.update(current_a, dt)` | Draw `current_a` for `dt` seconds; return the resulting pack voltage. |
+| &nbsp;&nbsp;&nbsp;`.derate(thrust_n)` | Fresh-pack thrust command -> what the sagged pack can actually make. |
+
 **`rigidbody.py`** — 6-DOF rigid-body dynamics. Simulation only -- this never flies.
 
 | | |
@@ -428,6 +437,17 @@ Verification: the scenarios, the frozen baseline, the tracer.
 |---|---|
 | `trace_step(k, state, setpoint, controller, chain, vp, gains, mode, dt, vehicle, verbose=)` | One step, printed. Returns (actuator setpoint, achieved, xdot). |
 | `main(argv=)` | Trace --steps control steps from the --case starting condition. |
+
+**`uncertainty.py`** — Uncertainty propagation over the verification scenarios.
+
+| | |
+|---|---|
+| class `UncertaintySpec` | The perturbation distributions, in one auditable place. |
+| &nbsp;&nbsp;&nbsp;`.zero(L_nominal)` | No perturbation: perturb_params returns an equivalent vehicle. |
+| &nbsp;&nbsp;&nbsp;`.default(vehicle=)` | Build the spec from the YAML: measured surface RMSEs and the pivot/rotor_plane lever-arm span, plus the estimated mass/inertia sigmas. |
+| `perturb_params(vp, spec, rng)` | Return a VehicleParams copy with L, mass, inertia and the surface perturbed. |
+| `run_uncertainty(scenario_fn, vp, gains, spec, n_samples, seed)` | Rerun one scenario under n_samples perturbed vehicles; return metric spread. |
+| `format_spread(name, s)` | One line: 'metric   mean +/- std   [p5, p95]'. |
 
 ### `tvc_control/` — top level
 
