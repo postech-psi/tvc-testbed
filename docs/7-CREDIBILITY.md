@@ -64,12 +64,12 @@ uncertainty.
 | `test_axis_convention.py` | 9 | The axis convention, asserted rather than documented. |
 | `test_battery.py` | 8 | Tests for the battery-sag model (plant/battery.py) and its wiring into the |
 | `test_consistency.py` | 8 | The numbers that live in two places must agree. |
-| `test_cross_plant.py` | 5 | Tests for the cross-plant validation harness. The comparator is tested |
+| `test_cross_plant.py` | 7 | Tests for the cross-plant validation harness. The comparator is tested |
 | `test_effectiveness.py` | 12 | The bench-measured thrust/torque surface, and its inverse. |
 | `test_gazebo_mapping.py` | 3 | The Gazebo command-side inversion. |
 | `test_gazebo_servo.py` | 6 | The Gazebo gimbal servo must be stable at the world's physics step. |
 | `test_uncertainty.py` | 8 | Tests for uncertainty propagation (verify/uncertainty.py). |
-| | **82** | |
+| | **84** | |
 <!-- >>>EMIT:tests -->
 
 - **Allocation round-trip:** over 2000 randomized unsaturated commands the
@@ -98,15 +98,18 @@ ceiling, which no scenario exercised because no scenario flies at 100% throttle.
 - **A matched analytic-versus-Gazebo *hover* comparison now exists**
   (`verify/cross_plant.py`, `tvc.py cross-plant`), run against the frozen Gazebo
   golden under versioned cross-plant tolerances. The analytic hover agrees with
-  Gazebo on **8 of 10** plant-agnostic metrics (final altitude, final/peak tilt,
-  final roll, both gimbal peaks, min thrust, peak drift). The two that diverge are
-  attributable, not errors: **peak thrust** (analytic 13.6 N vs Gazebo 17.3 N —
-  Gazebo's startup transient nearly saturates the ceiling while the analytic run
-  starts settled at 2 m, so it is an unmatched-startup artifact) and **tilt
-  settling** (2.55 s vs 1.03 s — a metric-definition gap plus the analytic
-  position loop re-tilting to null drift). Still missing: the *other four*
-  scenarios replayed on a live Gazebo under ratified tolerances, which needs the
-  devcontainer.
+  Gazebo on **all 9 gated plant-agnostic metrics** (final altitude, final/peak
+  tilt, final roll, tilt settling, both gimbal peaks, min thrust, peak drift) —
+  after harmonising the tilt-settling definition to Gazebo's fixed 1° band
+  (1.21 s vs 1.03 s). One metric, **peak thrust** (analytic 13.6 N vs Gazebo
+  17.3 N), is reported but *not gated*: it is dominated by Gazebo's spawn
+  transient — gz-sim rejects the first two odometry messages, so the vehicle
+  drops ~13 cm before control engages and the altitude loop then commands
+  near-ceiling thrust, which the analytic plant's perfect instantaneous state
+  cannot reproduce. That is a harness-startup difference, not a physics
+  disagreement, and resolving it needs a matched-spawn live run. Still missing:
+  the *other four* scenarios replayed on a live Gazebo under ratified tolerances,
+  which needs the devcontainer.
 - **Only one torque-free conservation check has been run.** Over 20 s with
   gravity and control disabled, relative kinetic-energy and inertial angular-
   momentum drift were below `8.4e-15` under tight solver tolerances. This checks

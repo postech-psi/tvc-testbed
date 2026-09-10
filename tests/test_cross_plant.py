@@ -45,3 +45,21 @@ def test_run_gazebo_is_stubbed_outside_container():
 def test_golden_loads():
     g = X.load_gazebo_golden()
     assert "final_altitude_m" in g and "tilt_settling_time_s" in g
+
+
+def test_peak_thrust_is_informational_not_gated():
+    # max_thrust is a Gazebo startup-transient artifact -> reported, not gated.
+    assert "max_thrust_N" not in X.CROSS_PLANT_TOLERANCES
+    assert "max_thrust_N" in X.INFORMATIONAL_METRICS
+
+
+def test_tilt_settling_uses_one_degree_band():
+    """The analytic tilt-settling must use the SAME fixed 1 deg band as
+    GazeboHarness.metrics, so the two are comparable."""
+    from tvc_control.config import load_gains, load_vehicle_params
+    vp, gains = load_vehicle_params(), load_gains()
+    spec = X.ScenarioSpec(name="hover", init_pitch_deg=10.0, init_yaw_deg=-7.0,
+                          t_final=6.0, z_des=2.0, init_z=2.0)
+    m = X.run_analytic(spec, vp, gains)
+    # With a 1 deg band this settles ~1.2 s; the old 0.24 deg band gave ~2.5 s.
+    assert m["tilt_settling_time_s"] < 1.6
