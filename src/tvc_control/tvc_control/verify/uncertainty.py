@@ -130,17 +130,21 @@ def _numeric_metrics(metrics):
             if isinstance(v, (int, float)) and not isinstance(v, bool)}
 
 
-def run_uncertainty(scenario_fn, vp, gains, spec, n_samples, seed):
+def run_uncertainty(scenario_fn, vp, gains, spec, n_samples, seed,
+                    sim_overrides=None):
     """Rerun one scenario under n_samples perturbed vehicles; return metric spread.
 
     Returns {metric_name: {mean, std, p5, p95, min, max, n}}. Deterministic in
     (scenario, spec, n_samples, seed): the same seed yields the same spread.
+    sim_overrides is passed through to the scenario, so uncertainty can be
+    combined with the battery-sag / aero fidelity toggles.
     """
     rng = np.random.default_rng(seed)
     samples = {}
     for _ in range(n_samples):
         pvp = perturb_params(vp, spec, rng)
-        metrics = _numeric_metrics(scenario_fn(pvp, gains, False)[2]["metrics"])
+        metrics = _numeric_metrics(
+            scenario_fn(pvp, gains, False, sim_overrides=sim_overrides)[2]["metrics"])
         for k, val in metrics.items():
             samples.setdefault(k, []).append(val)
 

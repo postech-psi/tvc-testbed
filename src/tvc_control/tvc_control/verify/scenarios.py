@@ -41,11 +41,12 @@ def _fmt(ok):
     return "PASS" if ok else "FAIL"
 
 
-def scenario_lateral(vp, gains, verbose):
+def scenario_lateral(vp, gains, verbose, sim_overrides=None):
     """Lateral upset recovery: released at 8 deg on both lateral axes, hold 0."""
     cfg = SimConfig(t_final=6.0,
                     att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
-                    init_att_pitch_deg=8.0, init_att_yaw_deg=-8.0)
+                    init_att_pitch_deg=8.0, init_att_yaw_deg=-8.0,
+                    **(sim_overrides or {}))
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
     ok = abs(m["final_pitch_deg"]) < 1.0 and abs(m["final_yaw_deg"]) < 1.0
@@ -57,7 +58,7 @@ def scenario_lateral(vp, gains, verbose):
     return ok, detail, r
 
 
-def scenario_roll(vp, gains, verbose):
+def scenario_roll(vp, gains, verbose, sim_overrides=None):
     """Roll (thrust-axis) upset: released at 20 deg about body z, hold 0.
 
     This is the scenario that did not exist before tau_P became a control
@@ -67,7 +68,8 @@ def scenario_roll(vp, gains, verbose):
     cfg = SimConfig(t_final=6.0,
                     att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
                     init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
-                    init_att_roll_deg=20.0)
+                    init_att_roll_deg=20.0,
+                    **(sim_overrides or {}))
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
     ok = abs(m["final_roll_deg"]) < 2.0
@@ -80,12 +82,13 @@ def scenario_roll(vp, gains, verbose):
     return ok, detail, r
 
 
-def scenario_climb(vp, gains, verbose):
+def scenario_climb(vp, gains, verbose, sim_overrides=None):
     """Climb to 2 m and hold, starting from the ground, attitude level."""
     cfg = SimConfig(t_final=12.0,
                     att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
                     init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
-                    altitude_hold=True, z_des=2.0, init_z=0.0)
+                    altitude_hold=True, z_des=2.0, init_z=0.0,
+                    **(sim_overrides or {}))
     r = simulate(vp, gains, cfg)
     m = r["metrics"]
     ok = abs(m["altitude_error_m"]) < 0.10
@@ -97,12 +100,13 @@ def scenario_climb(vp, gains, verbose):
     return ok, detail, r
 
 
-def scenario_tilted_hover(vp, gains, verbose):
+def scenario_tilted_hover(vp, gains, verbose, sim_overrides=None):
     """Hold 2 m while commanded to a 6 deg lateral tilt, with and without the
     1/cos(theta) feedforward. The compensated run must sag less."""
     base = dict(t_final=12.0, att_pitch_des_deg=0.0, att_yaw_des_deg=6.0,
                 init_att_pitch_deg=0.0, init_att_yaw_deg=0.0,
-                altitude_hold=True, z_des=2.0, init_z=2.0)
+                altitude_hold=True, z_des=2.0, init_z=2.0,
+                **(sim_overrides or {}))
     on = simulate(vp, gains, SimConfig(tilt_compensation=True, **base))
     off = simulate(vp, gains, SimConfig(tilt_compensation=False, **base))
     sag_on = on["metrics"]["max_alt_sag_m"]
@@ -116,7 +120,7 @@ def scenario_tilted_hover(vp, gains, verbose):
     return ok, detail, on
 
 
-def scenario_motor_lag_model(vp, gains, verbose):
+def scenario_motor_lag_model(vp, gains, verbose, sim_overrides=None):
     """The roll channel under both readings of the measured 100 ms motor lag.
 
     THE OPEN QUESTION THIS GUARDS. The bench recorded "command -> thrust
@@ -137,7 +141,8 @@ def scenario_motor_lag_model(vp, gains, verbose):
     every run, so the risk cannot quietly stop being mentioned.
     """
     base = dict(t_final=6.0, att_pitch_des_deg=0.0, att_yaw_des_deg=0.0,
-                init_att_pitch_deg=0.0, init_att_yaw_deg=0.0, init_att_roll_deg=20.0)
+                init_att_pitch_deg=0.0, init_att_yaw_deg=0.0, init_att_roll_deg=20.0,
+                **(sim_overrides or {}))
     lag = simulate(vp, gains, SimConfig(motor_model="first_order",
                                         motor_tau_s=0.10, motor_deadtime_s=0.0,
                                         **base))
@@ -184,10 +189,34 @@ def main(argv=None):
                     help="Monte-Carlo samples per scenario for --uncertainty")
     ap.add_argument("--seed", type=int, default=0,
                     help="RNG seed for --uncertainty (reproducible spread)")
+    ap.add_argument("--battery-sag", action="store_true",
+                    help="enable the measured battery-sag derate in every scenario")
+    ap.add_argument("--aero", action="store_true",
+                    help="enable the (ESTIMATED) aero drag + ground-effect model")
+    ap.add_argument("--fidelity-all", action="store_true",
+                    help="enable EVERY added fidelity effect at once: uncertainty, "
+                         "battery sag, and aero")
     args = ap.parse_args(argv)
+
+    # --fidelity-all is the master switch: turn on every added effect.
+    if args.fidelity_all:
+        args.uncertainty = args.battery_sag = args.aero = True
 
     vp = load_vehicle_params()
     gains = load_gains(args.gains)
+
+    # Aero is a vehicle-parameter toggle (read from the YAML); enable it at
+    # runtime by overriding the loaded params. Battery sag is a per-run SimConfig
+    # choice, threaded into each scenario via sim_overrides.
+    if args.aero:
+        from dataclasses import replace
+        vp = replace(vp, aero_enabled=True)
+    sim_overrides = {"battery_sag": True} if args.battery_sag else None
+    if args.battery_sag or args.aero:
+        print("fidelity: %s%s%s"
+              % ("battery-sag " if args.battery_sag else "",
+                 "aero " if args.aero else "",
+                 "(estimated aero -- results provisional)" if args.aero else ""))
     T_hov = vp.m * vp.g
 
     if args.verbose:
@@ -240,11 +269,12 @@ def main(argv=None):
 
     failures = 0
     for name, fn in SCENARIOS:
-        ok, detail, r = fn(vp, gains, args.verbose)
+        ok, detail, r = fn(vp, gains, args.verbose, sim_overrides=sim_overrides)
         failures += not ok
         print("[%s] %-36s %s" % (_fmt(ok), name, detail))
         if args.uncertainty:
-            spread = run_uncertainty(fn, vp, gains, uspec, args.samples, args.seed)
+            spread = run_uncertainty(fn, vp, gains, uspec, args.samples, args.seed,
+                                     sim_overrides=sim_overrides)
             print("       uncertainty over %d samples (L, mass, inertia, surface):"
                   % args.samples)
             for key in _KEYS:

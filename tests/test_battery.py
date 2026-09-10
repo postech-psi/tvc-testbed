@@ -71,6 +71,18 @@ def test_chain_with_battery_derates_achieved_thrust_over_time():
     assert T_late < T_early                       # pack sag reduces achieved thrust
 
 
+def test_scenario_accepts_fidelity_overrides():
+    """Scenarios thread sim_overrides so `validate --battery-sag` reaches them,
+    and lateral recovery still succeeds with sag on."""
+    from tvc_control.config import load_gains, load_vehicle_params
+    from tvc_control.verify.scenarios import scenario_lateral
+    vp, gains = load_vehicle_params(), load_gains()
+    ok, _, r = scenario_lateral(vp, gains, False,
+                                sim_overrides={"battery_sag": True})
+    assert ok
+    assert "metrics" in r
+
+
 def test_closedloop_battery_raises_commanded_thrust():
     """Altitude hold compensates the sag, so ACHIEVED thrust stays ~mg but the
     COMMANDED per-rotor thrust must rise to overcome the derate."""

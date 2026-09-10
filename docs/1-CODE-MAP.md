@@ -444,11 +444,11 @@ Verification: the scenarios, the frozen baseline, the tracer.
 
 | | |
 |---|---|
-| `scenario_lateral(vp, gains, verbose)` | Lateral upset recovery: released at 8 deg on both lateral axes, hold 0. |
-| `scenario_roll(vp, gains, verbose)` | Roll (thrust-axis) upset: released at 20 deg about body z, hold 0. |
-| `scenario_climb(vp, gains, verbose)` | Climb to 2 m and hold, starting from the ground, attitude level. |
-| `scenario_tilted_hover(vp, gains, verbose)` | Hold 2 m while commanded to a 6 deg lateral tilt, with and without the 1/cos(theta) feedforward. |
-| `scenario_motor_lag_model(vp, gains, verbose)` | The roll channel under both readings of the measured 100 ms motor lag. |
+| `scenario_lateral(vp, gains, verbose, sim_overrides=)` | Lateral upset recovery: released at 8 deg on both lateral axes, hold 0. |
+| `scenario_roll(vp, gains, verbose, sim_overrides=)` | Roll (thrust-axis) upset: released at 20 deg about body z, hold 0. |
+| `scenario_climb(vp, gains, verbose, sim_overrides=)` | Climb to 2 m and hold, starting from the ground, attitude level. |
+| `scenario_tilted_hover(vp, gains, verbose, sim_overrides=)` | Hold 2 m while commanded to a 6 deg lateral tilt, with and without the 1/cos(theta) feedforward. |
+| `scenario_motor_lag_model(vp, gains, verbose, sim_overrides=)` | The roll channel under both readings of the measured 100 ms motor lag. |
 | `main(argv=)` | Run all five scenarios. Returns 1 if any failed, which is the CI gate. |
 
 **`trace.py`** — Trace one control step: every intermediate quantity, with its formula.
@@ -466,7 +466,7 @@ Verification: the scenarios, the frozen baseline, the tracer.
 | &nbsp;&nbsp;&nbsp;`.zero(L_nominal)` | No perturbation: perturb_params returns an equivalent vehicle. |
 | &nbsp;&nbsp;&nbsp;`.default(vehicle=)` | Build the spec from the YAML: measured surface RMSEs and the pivot/rotor_plane lever-arm span, plus the estimated mass/inertia sigmas. |
 | `perturb_params(vp, spec, rng)` | Return a VehicleParams copy with L, mass, inertia and the surface perturbed. |
-| `run_uncertainty(scenario_fn, vp, gains, spec, n_samples, seed)` | Rerun one scenario under n_samples perturbed vehicles; return metric spread. |
+| `run_uncertainty(scenario_fn, vp, gains, spec, n_samples, seed, sim_overrides=)` | Rerun one scenario under n_samples perturbed vehicles; return metric spread. |
 | `format_spread(name, s)` | One line: 'metric   mean +/- std   [p5, p95]'. |
 
 ### `tvc_control/` — top level
