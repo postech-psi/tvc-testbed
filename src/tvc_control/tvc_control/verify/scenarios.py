@@ -176,6 +176,14 @@ def main(argv=None):
     ap.add_argument("--plot", metavar="DIR", default=None,
                     help="also write one four-panel PNG per scenario into DIR "
                          "(needs matplotlib)")
+    ap.add_argument("--uncertainty", action="store_true",
+                    help="after each scenario, also report the metric spread over "
+                         "the stated input uncertainty (L, mass, inertia, "
+                         "surface); Monte-Carlo, seeded, OFF by default")
+    ap.add_argument("--samples", type=int, default=200,
+                    help="Monte-Carlo samples per scenario for --uncertainty")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="RNG seed for --uncertainty (reproducible spread)")
     args = ap.parse_args(argv)
 
     vp = load_vehicle_params()
@@ -220,11 +228,28 @@ def main(argv=None):
         from ..apps.plot import four_panel, series_from_run
         os.makedirs(args.plot, exist_ok=True)
 
+    # Uncertainty is opt-in and imported lazily: `validate` is the CI gate and
+    # must keep running (and running FAST) with the Monte-Carlo path untouched.
+    if args.uncertainty:
+        from .uncertainty import UncertaintySpec, run_uncertainty, format_spread
+        uspec = UncertaintySpec.default()
+        # The metrics worth an error bar, printed when a scenario produced them.
+        _KEYS = ("settling_time_s", "final_pitch_deg", "final_yaw_deg",
+                 "final_roll_deg", "max_gimbal_inner_deg", "max_gimbal_outer_deg",
+                 "max_tau_p_Nm", "max_alt_sag_m", "altitude_error_m")
+
     failures = 0
     for name, fn in SCENARIOS:
         ok, detail, r = fn(vp, gains, args.verbose)
         failures += not ok
         print("[%s] %-36s %s" % (_fmt(ok), name, detail))
+        if args.uncertainty:
+            spread = run_uncertainty(fn, vp, gains, uspec, args.samples, args.seed)
+            print("       uncertainty over %d samples (L, mass, inertia, surface):"
+                  % args.samples)
+            for key in _KEYS:
+                if key in spread:
+                    print(format_spread(key, spread[key]))
         if args.plot:
             slug = name.split(" (")[0].replace(" ", "_")
             four_panel(series_from_run(r),
