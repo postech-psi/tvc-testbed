@@ -1,93 +1,70 @@
-"""
-Phase 5: run the controller against Gazebo instead of simulator_node.
-
-simulator_node.py was written as a swappable seam -- it publishes attitude on
-/imu and subscribes to /gimbal_command. This launch file replaces it with
-Gazebo + ros_gz_bridge on the same topic names, so controller_node.py runs
-unchanged. That is the whole point of the seam: swapping the plant must not
-require touching the controller.
-"""
+"""Start one Gazebo/ROS simulation, using the current settings and final CAD visual."""
 import os
+from pathlib import Path
+import runpy
+import shutil
+import tempfile
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironmentVariable
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler,
+                            SetEnvironmentVariable, TimerAction)
+from launch.conditions import IfCondition, UnlessCondition
+from launch.event_handlers import OnShutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory("tvc_control")
-    # sim/ lives at the repo root, not inside the package -- the models are
-    # shared with bare `gz sim` runs that don't involve ROS at all.
-    repo_root = os.path.abspath(os.path.join(pkg_share, "..", "..", "..", ".."))
-    sim_dir = os.path.join(repo_root, "sim")
+    assets = Path(get_package_share_directory("tvc_control")) / "gazebo"
+    runtime = tempfile.TemporaryDirectory(prefix="tvc-gazebo-")
+    model_dir = Path(runtime.name) / "tvc_vehicle"
+    model_dir.mkdir()
+    mesh = assets / "models/tvc_vehicle/meshes/tvc_vehicle.stl"
+    generator = runpy.run_path(str(assets / "generate_model.py"))
+    (model_dir / "model.sdf").write_text(generator["model_xml"](mesh.as_uri()), encoding="utf-8")
+    shutil.copyfile(assets / "models/tvc_vehicle/model.config", model_dir / "model.config")
+    world = str(assets / "worlds/tvc_flight.sdf")
 
-    world = LaunchConfiguration("world")
+    def cleanup(event, context):
+        runtime.cleanup()
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            "world",
-            default_value=os.path.join(sim_dir, "worlds", "tvc.sdf"),
-            description="SDF world to load",
-        ),
-        DeclareLaunchArgument(
-            "gui", default_value="true",
-            description="false runs headless -- required on Windows/macOS hosts",
-        ),
-
-        SetEnvironmentVariable(
-            "GZ_SIM_RESOURCE_PATH", os.path.join(sim_dir, "models")),
-
-        ExecuteProcess(
-            cmd=["gz", "sim", "-r", world],
-            output="screen",
-        ),
-
-        # Gazebo <-> ROS2 topic bridge. The ROS-side names deliberately match
-        # what controller_node already uses.
-        Node(
-            package="ros_gz_bridge",
-            executable="parameter_bridge",
-            name="gz_bridge",
-            output="screen",
-            arguments=[
-                "/tvc_vehicle/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
-                "/tvc_vehicle/gimbal_pitch@std_msgs/msg/Float64]gz.msgs.Double",
-                "/tvc_vehicle/gimbal_roll@std_msgs/msg/Float64]gz.msgs.Double",
-                "/tvc_vehicle/command/motor_speed@actuator_msgs/msg/Actuators]gz.msgs.Actuators",
-                "/model/tvc_vehicle/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry",
-            ],
-            # controller_node subscribes to /sim/vehicle_attitude -- remap
-            # Gazebo's IMU onto it so the controller needs no changes.
-            remappings=[("/tvc_vehicle/imu", "/sim/vehicle_attitude")],
-        ),
-
-        # Translates the controller's GimbalCommand into the two Float64 joint
-        # topics Gazebo's JointPositionController expects, and holds the
-        # rotors at hover speed. Without this the controller's output has
-        # nowhere to go -- Gazebo does not speak tvc_msgs.
-        Node(
-            package="tvc_control",
-            executable="gazebo_bridge_node",
-            name="gazebo_bridge_node",
-            output="screen",
-        ),
-
-        Node(
-            package="tvc_control",
-            executable="controller_node",
-            name="controller_node",
-            output="screen",
-            parameters=[{
-                "dt": 0.01,
-                "roll_des_deg": 0.0,
-                "pitch_des_deg": 0.0,
-                "kp_angle": 4.0,
-                "kp_rate": 0.02,
-                "ki_rate": 0.002,
-                "kd_rate": 0.004,
-                "i_limit": 0.5,
-            }],
-        ),
+    resource_path = runtime.name
+    if os.environ.get("GZ_SIM_RESOURCE_PATH"):
+        resource_path += os.pathsep + os.environ["GZ_SIM_RESOURCE_PATH"]
+    gui = LaunchConfiguration("gui")
+    args = [
+        DeclareLaunchArgument("gui", default_value="true"),
+        DeclareLaunchArgument("z_des", default_value="2.0"),
+        DeclareLaunchArgument("log_path", default_value=str(Path.cwd() / "out/gazebo.csv")),
+    ]
+    gz_gui = ExecuteProcess(cmd=["gz", "sim", world], output="screen", condition=IfCondition(gui))
+    gz_server = ExecuteProcess(cmd=["gz", "sim", "-s", "--headless-rendering", world],
+                               output="screen", condition=UnlessCondition(gui))
+    bridge = Node(
+        package="ros_gz_bridge", executable="parameter_bridge", name="gz_bridge",
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/model/tvc_vehicle/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry",
+            "/tvc_vehicle/gimbal_inner_cmd@std_msgs/msg/Float64]gz.msgs.Double",
+            "/tvc_vehicle/gimbal_outer_cmd@std_msgs/msg/Float64]gz.msgs.Double",
+            "/tvc_vehicle/command/motor_speed@actuator_msgs/msg/Actuators]gz.msgs.Actuators",
+        ], parameters=[{"use_sim_time": True}], output="screen")
+    adapter = Node(package="tvc_control", executable="gazebo_bridge_node",
+                   parameters=[{"use_sim_time": True}], output="screen")
+    controller = Node(
+        package="tvc_control", executable="controller_node", output="screen",
+        parameters=[{"use_sim_time": True, "rate_hz": 250.0,
+                     "altitude_hold": True, "position_hold": True,
+                     "z_des": LaunchConfiguration("z_des"),
+                     "log_path": LaunchConfiguration("log_path")}])
+    # Start paused so the controller can connect before the airborne vehicle moves.
+    unpause = TimerAction(period=4.0, actions=[ExecuteProcess(
+        cmd=["gz", "service", "-s", "/world/tvc_flight/control", "--reqtype",
+             "gz.msgs.WorldControl", "--reptype", "gz.msgs.Boolean", "--timeout",
+             "3000", "--req", "pause: false"], output="screen")])
+    return LaunchDescription(args + [
+        SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
+        RegisterEventHandler(OnShutdown(on_shutdown=cleanup)),
+        gz_gui, gz_server, bridge, adapter, controller, unpause,
     ])

@@ -1,0 +1,1693 @@
+=== PDF PAGE 1 ===
+Dynamics, Guidance, and Control of a Low-Cost
+Quadcopter-Based Space Vehicle Testbed
+William J. Elke III∗ and Ryan J. Caverly†
+University of Minnesota, Minneapolis, MN, 55455
+This paper presents the dynamic modeling, trajectory optimization, and control of the Cost-
+and Risk-Reducing Quadcopter System (CRQS, pronounced “circus”). The CRQS is designed
+to mature novel guidance and control algorithms for launch vehicle and planetary landing
+systems. The components of the testbed—a quadcopter, a flexible inverted pendulum with an
+end mass, and a hanging pendulum—are modeled as separate bodies, then constrained together
+in the same manner as the physical prototype. An optimal trajectory is generated to softly
+land the CRQS at a desired location based on the booster soft-landing algorithm presented
+in existing literature. An inner-loop linear quadratic regulator with tracking is synthesized
+to stabilize the CRQS and have it track the trajectory. Four different configurations of the
+CRQS with progressively added features are numerically simulated. The results demonstrate
+the CRQS’s ability to capture the dynamic features of launch vehicles and landing systems that
+other platforms do not, which often need to be considered when synthesizing guidance and
+control strategies.
+I. Introduction
+T
+he National Aeronautics and Space Administration (NASA) and companies such as Space Exploration Technologies
+Corporation (SpaceX) are planning on sending humans to the Moon with the intent to send them to Mars
+thereafter [1,2]. Specialized vehicles including, launch vehicles, spacecraft, and landing systems will be required to
+carry the crew to their destinations. These mission vehicles are expensive, and since they will carry crew and critical
+payloads, any failures are unacceptable. The technologies that make up the mission vehicles will need to become more
+advanced in order to ensure crew and payload safety and mission success as the frequency and challenge of missions
+increase. Due to the costs and risks associated with the mission vehicles, novel technologies must be rigorously tested
+to prove that they will work without failure. Once the testing is complete, the technology will be considered “flight
+proven.”
+Consider the Technology Readiness Levels (TRLs) defined by NASA shown in Fig. 1. The TRLs are used as a
+metric to measure how close to flight proven a novel technology is. Generally, TRLs 1–3 are characterized by the theory
+and simulation to prove the concept of the technology. TRLs 4–6 are characterized by the low-cost and low-risk testing
+in relevant/laboratory environments to validate the technology. TRLs 7–9 are characterized by the final testing required
+to elevate the technology to flight proven. Although the TRLs were originally conceived for system-level technologies,
+its straightforward how they can be tweaked to fit other applications such as software development [3]. Therefore, we
+will use the TRL definitions here.
+The technologies of interest for this work are the guidance and control (G&C) algorithms that operate on launch
+and landing vehicles. These G&C algorithms are able to make it through TRLs 1–3, but often have to jump straight
+to TRL 7. This is because the environments that they operate in are difficult to replicate in a laboratory or analogous
+setting for TRLs 4–6 due to the inherent dynamics of the systems. These difficulties result in G&C algorithms with
+extensive flight history to be favored over novel algorithms. A survey of expendable launch vehicle failures performed
+in 2002 claimed that advanced G&C algorithms would have significantly reduce the failures and cost of failures of 2nd
+generation reusable launch vehicles [4]. Since the survey, the claim has been substantiated—advanced G&C algorithms
+have demonstrated their capacity to reduce the cost of failures and the cost of the overall mission. In August 2020,
+for example, Astra LV0006 experienced a propellant leak on the launch pad which caused a mission failure and the
+advanced G&C algorithm on board resulted in damage mitigation [5]. SpaceX has demonstrated the cost savings of the
+overall mission through the now-famous vertical propulsive landing and reuse of their orbital rocket boosters—such
+landings are impossible without advanced G&C algorithms [6].
+∗Graduate Student, Department of Aerospace Engineering and Mechanics, AIAA Student Member.
+†Assistant Professor, Department of Aerospace Engineering and Mechanics, AIAA Member.
+1
+
+=== PDF PAGE 2 ===
+Fig. 1 Definitions of the Technology Readiness Levels (TRLs).Image Credit: NASA.
+Therehasbeenanefforttocreatetestingenvironments,knownastestbeds,thatareconsideredrelevantforadvancing
+thesetechnologiesthroughTRLs4–6[ 7–9], butoverallthereisadearthofthesesortsoftestbeds[ 10]. Thetestbedsthat
+currently exist are typically accompanied by high-cost and high-risk experiments, such as NASA’s F/A-18 Full-Scale
+Advanced Systems Testbed that has been used to test launch vehicle controllers [11]. A number of relatively high-cost
+testbedshavealsobeendevelopedfortestingverticaltake-offandlandingsystems, includingNASA’sMightyEagle[ 12]
+and a series of vehicles developed by Masten Space Systems [13–15]. Although these testbeds have played an important
+role in the test and validation of newly-developed G&C algorithms, they are primarily designed to advance these
+algorithms through TRLs 7-9 and are accompanied by relatively high-cost testing. More recently, small-scale low-cost
+testbeds have been proposed to test G&C algorithms for the ascent and descent of launch vehicles [16–18]. The testbed
+designs in Ref. [16, 17] mimic the rigid-body dynamics of the first-stage of a launch vehicle using electric motors
+for propulsion and relatively inexpensive components. The design proposed in Ref. [18] follows suit for the descent
+problem, instead using actuated fins and solid-propellant, model rocketry engines for actuation. This allows for the
+low-cost testing and evaluation of advanced G&C algorithms.
+A novel testbed for maturing guidance, navigation, and control technologies through TRLs 4–6 was proposed by the
+authors in Ref. [10]. This testbed—known as the Cost- and Risk-Reducing Quadcopter System (CRQS, pronounced
+“circus”)—is inspired by initial testbed concepts in Ref. [7–9] and is made up of a quadcopter with a flexible inverted
+pendulumandahangingpendulum. Theinvertedpendulumallowsfortheaerodynamicinstabilityandthenon-minimum
+phase behavior of a landing system to be considered. The structural dynamics and propellant slosh must be considered
+in the control formulation for launch vehicles and landing systems, therefore, the testbed should include analogous
+featurestocreatearelevantenvironment. Thus,theinclusionofaflexibleinvertedpendulumandahangingpendulumto
+model the vehicle’s structural dynamics and fuel slosh is an important novel contribution of this testbed in comparison
+to those that only model the launch-vehicle’s rigid-body dynamics in Ref. [16–18]. An image of a prototype of the
+system that is currently being constructed at the University of Minnesota can be seen in Fig. 2.
+In this paper, the dynamic model of the CRQS is presented, where each of the components are modeled separately
+and then constrained together. The components include the quadcopter modeled as a rigid body, the flexible inverted
+pendulum modeled as a long, flexible cylinder, and two point masses, which will be constrained to serve as a mass at the
+end of the inverted pendulum and the hanging pendulum. The dynamic responses of the direct current (DC) motors that
+provide control actuation of the quadcopter are approximated as first-order systems. An optimal trajectory is presented
+thatisfoundbysolvingaversionoftheboostersoft-landingproblem[ 19]usingasimplifiedmodeloftheCRQS.Finally,
+2
+
+=== PDF PAGE 3 ===
+Fig.2 PrototypeoftheCost-andRisk-ReducingQuadcopterSystem(CRQS),aquadcopter-basedtestplatform
+withahangingpendlumandinvertedpendulumtocapturetherelevantdynamicsoflaunchvehiclesandplanetary
+landing systems. On the left is a version of the CRQS with a rigid inverted pendulum made of carbon fiber, and
+on the right is a version with a flexible inverted pendulum made of polycarbonate.
+a comparison of results of a linear quadratic regulator controlling the system with a rigid inverted pendulum, a rigid
+inverted pendulum and hanging pendulum, a flexible inverted pendulum, and a flexible inverted pendulum and hanging
+pendulum is presented. This is to demonstrate the CRQS’s ability to simulate the dynamics analogous to the vehicle of
+interest and the need to consider those dynamics in the synthesis of advanced G&C algorithms.
+The novel contributions of this paper include: 1) the formulation of a dynamic model and numerical simulation
+environment used to validate algorithms and inform the design of a physical testbed, and 2) the demonstration of the
+CRQS’s suitability as a testbed . One of the objectives of this paper is to help the interested reader validate their
+own algorithms and inform the design of their own CRQS. Therefore, the dynamic model in Sec. III is derived with
+modularity in mind, allowing anyone to create their own configuration of the CRQS. Also, the numerical simulation
+environment used for this paper can be found athttps://github.com/ARDCLab/CRQS-Simulation to support the
+interested reader in the implementation and validation of novel algorithms. The code is written in MATLAB, and the
+reader can recreate the figures presented in Sec. V by downloading and running the code.
+The remainder of this paper proceeds as follows. Section II contains the preliminary discussion on the use of
+reference frames, notations, and attitude parameterizations. Section III formulates the high-fidelity and simplified
+dynamic models of the CRQS. Section IV formulates trajectory generation using the booster soft-landing problem and
+presents the linear quadratic regulator (LQR) control law. Section V provides numerical results of the CRQS, and the
+paper finishes with concluding remarks in Sec. VI.
+II. Preliminaries
+This section presents an overview of the reference frames used in the dynamic modeling of CRQS, as well as
+important vector and matrix notation used throughout the paper, and includes a discussion on choice of attitude
+parameterizations used in this work.
+A. Frames
+Multiple reference frames are used to describe the attitude of the various bodies of the CRQS in the dynamic
+modeling, as seen in Fig. 3. Note only the 1-axis and 3-axis unit vectors are visible in the two-dimensional image. In the
+image, the 1-axis vectors for each axis generally point left, the 2-axis vectors point into the page, and the 3-axis vectors
+generally point down.F𝑖 is a ground-fixed inertial reference frame comprised of basis vectors𝑖− →
+1, 𝑖− →
+2, and 𝑖− →
+3. F𝑞 is
+3
+
+=== PDF PAGE 4 ===
+Fig. 3 Definition of the frames and bodies of the Cost- and Risk-Reducing Quadcopter System (CRQS) used
+throughout.
+a quadcopter-fixed reference frame comprised of basis vectors𝑞− →
+1, 𝑞− →
+2, and 𝑞− →
+3. F𝑏 is a reference frame fixed to the
+undeformed flexible inverted pendulum comprised of basis vectors𝑏− →
+1, 𝑏− →
+2, and 𝑏− →
+3 (𝑏 for “balanced” pendulum since𝑖
+is taken). Fℎ is a reference frame fixed to the hanging pendulum comprised of basis vectorsℎ− →
+1, ℎ− →
+2, and ℎ− →
+3. The basis
+vectors for each frame are orthonormal and dextral.
+B. Vector and matrix notations
+In general, matrices are expressed as bold-faced uppercase letters and column matrices are expressed as bold-faced
+lowercase letters—for exampleAis a matrix of size𝑚 × 𝑛 and ais a column matrix of size𝑚 × 1, where𝑚 is arbitrary
+and 𝑛 > 1. A physical vector is represented by a lowercase letter with an arrow underneath it—for example,𝑢− →. When
+a physical vector is resolved in a reference frame, it is written as a column matrix with a subscript of the reference
+frame—for example,u𝑎 is 𝑢− →resolved inF𝑎. A physical vector denoting the relative position of two points has a
+superscript containing the two points—for example,𝑢− →
+𝑝𝑞 represents the position of point𝑝 relative to point𝑞. The
+time derivative of a physical vector is expressed as a dot followed by the reference frame the derivative is taken with
+respect to at the end of the superscript—for example,𝑢− →
+𝑝𝑞·𝑎 is the time-derivative of𝑢− →
+𝑝𝑞 with respect toF𝑎. The time
+derivative of a matrix is expressed as a dot above the variable—for example,¤u is the time derivative ofu.
+The identity matrix is denoted1and the matrix of zeros is denoted0. When helpful, these matrices are followed by
+a subscript marking their dimensions—for example,1𝑚×𝑚 is the identity with dimension𝑚 × 𝑚 and 0𝑚×𝑛 is the matrix
+of zeros with size𝑚 × 𝑛. The cross operator is used throughout this paper and is defined as follows. The cross operator,
+(·)× : R3 → R3×3, is defined as
+u× = −u× T =
+
+0 −𝑢3 𝑢2
+𝑢3 0 −𝑢1
+−𝑢2 𝑢1 0
+
+, (1)
+where u = [𝑢1, 𝑢 2, 𝑢 3]T.
+Symmetricmatricesappearthroughoutthispaper. Asymmetricmatrixisamatrixthatcontainsinitslowerdiagonal
+the transpose of the terms in its upper diagonal. To indicate that a matrix is symmetric and to streamline the notation, a
+4
+
+=== PDF PAGE 5 ===
+bold-faced asterisk (∗) is placed on the lower diagonal of the matrix. For example,
+
+A1 A2 A3
+AT
+2 A4 A5
+AT
+3 AT
+5 A6
+
+=
+
+A1 A2 A3
+∗ A4 A5
+∗ ∗ A6
+
+, (2)
+where A1 ∈ R𝑚×𝑚, A2 ∈ R𝑚×𝑛, A3 ∈ R𝑚× 𝑝, A4 ∈ R𝑛×𝑛, A5 ∈ R𝑛× 𝑝, andA6 ∈ R 𝑝× 𝑝.
+C. Attitude parameterization
+The direction cosine matrix (DCM) is used to describe the attitude of one reference frame relative to another. It can
+also be used to change the frame of reference a physical vector is resolved in. For example, vector𝑣− →resolved inF𝑎 and
+F𝑏 is written asv𝑎 and v𝑏, respectively. These two descriptions are related through the DCM viav𝑏 = C𝑏𝑎 v𝑎, where
+C𝑏𝑎 isthematrixrepresentationoftheattitudeof F𝑏 relativeto F𝑎. TheDCMisofthespecialorthogonalgroup,SO(3),
+meaningitsatisfies C𝑏𝑎 ∈ R3×3, CT
+𝑏𝑎 C𝑏𝑎 = 1, anddet(C𝑏𝑎 ) = +1. TheCRQSmayundergoaggressivemaneuvers, and
+so the DCM is used as the attitude parameterization for the dynamic model formulation because it describes the attitude
+of reference frames globally and uniquely. For conciseness, the dynamic modeling section, Sec. III, does not consider a
+general attitude parameterization. The dynamic modeling section makes use of the column matrix of the entries of
+C𝑏𝑎, denoted asq𝑏𝑎
+𝑏 ∈ R9×1. The mapping matrices between¤q𝑏𝑎
+𝑏 and 𝝎𝑏𝑎
+𝑏 —the angular velocity ofF𝑏 relative toF𝑎
+resolved inF𝑏—are important to the derivation of the dynamics. These mapping matrices must satisfy¤q𝑏𝑎
+𝑏 = 𝚪𝑏𝑎
+𝑏 𝝎𝑏𝑎
+𝑏
+and 𝝎𝑏𝑎
+𝑏 = S𝑏𝑎
+𝑏 ¤q𝑏𝑎
+𝑏 , where𝚪𝑏𝑎
+𝑏 and S𝑏𝑎
+𝑏 are defined in Sec. 2 of Ref. [20].
+Euler angles are another way to parameterize the attitude of a reference frame relative to another reference frame.
+Consider the DCMC𝑏𝑎 = C1 (𝜙)C2(𝜃)C3 (𝜓), whereC𝑦 (𝑥) represents a principal rotation of𝑥 degrees about axis𝑦,
+and let𝜽 𝑏𝑎 = [𝜙 𝜃 𝜓 ]T. In this case,C𝑏𝑎 is made up of the 3-2-1 Euler angle sequence. The inner-loop control law
+presented in Sec. IV.B requires a linear dynamic model and the use of the DCM results in the presence of nonlinearlities.
+Toobtainthislinearmodel,theequationsofmotionderivedinSec.IIIarelinearizedaboutanequilibriumpointassuming
+small perturbations, and Sec. 4 of Ref. [20] proves that Euler angles may be used for a first-order representation of
+perturbations on SO(3). Therefore, Euler angles are employed as the attitude parameterization for control in Sec. IV.B.
+Euler angles are not a unique representation ofC𝑏𝑎—in the case of the 3-2-1 sequence,𝜙 and 𝜓 coalesce into a
+single degree of freedom as𝜃 → ± 90◦. This paper does not work with aggressive maneuvers of the CRQS, so the
+non-uniqueness of Euler angles will not be reached and the use of an Euler angle parameterization is justified.
+III. Dynamic Modeling
+The CRQS is modeled as separate (unconstrained) bodies representing the quadcopter, inverted pendulum, end mass
+on the inverted pendulum, and hanging pendulum. The separate bodies are then constrained in place to behave like the
+physical system using a multi-body modeling method that eliminates the Lagrange multipliers needed to enforce the
+constraints. This method is described in Sec. 3.5.3 of Ref. [21] and Sec. 11.2.5 of Ref. [22] as well as applied to a
+model of a kiteplane in Sec. III.D of Ref. [23]. In this method, the kinetic and potential energies of each body are first
+derived, followed by the derivations of the generalized forces and moments acting on each body, the constraints, and the
+equations of motion of the CRQS using a Lagrangian approach. A simplified dynamic model is then presented, which is
+used with the trajectory optimization algorithm presented in Sec. V.B.
+The reader can apply the modeling approach presented here to their own design of the CRQS should they want to
+deviate from the configuration used in this paper. This is discussed at the end of each of the following subsections.
+A. Kinetic and Potential Energy
+In what follows, we will use Figure 3 contains the definitions of the points, bodies, and frames used in the derivation.
+1. Quadcopter
+The quadcopter is modeled as an unconstrained rigid body as shown in Fig. 3. The location of the differential mass
+element of the quadcopterd𝑚𝑄 relative to inertially-fixed point𝑖 is 𝑟− →
+d𝑚𝑄𝑖 = 𝑟− →
+𝑞𝑖 + 𝑟− →
+d𝑚𝑄 𝑞, where point𝑞 is the center
+5
+
+=== PDF PAGE 6 ===
+of mass of the quadcopter. The kinetic energy of the quadcopter,𝑄, is found to be
+𝑇𝑄𝑖/𝑖 = 1
+2
+∫
+𝑄
+𝑟− →
+d𝑚𝑄𝑖·𝑖
+· 𝑟− →
+d𝑚𝑄𝑖·𝑖
+d𝑚𝑄 = 1
+2 𝝂𝑄 T
+"
+𝑚𝑄13×3 03×3
+∗ J𝑄𝑞
+𝑞
+#
+|                    {z                    }
+M𝑄
+𝝂𝑄, (3)
+where 𝑚𝑄 :=
+∫
+𝑄d𝑚𝑄 is the mass of the quadcopter,J𝑄𝑞
+𝑞 :=
+∫
+𝑄 −rd𝑚𝑄 𝑞
+𝑞
+×
+rd𝑚𝑄 𝑞
+𝑞
+×
+d𝑚𝑄 is the second moment of mass
+of the quadcopter relative to point𝑞, 𝝂𝑄 := S𝑄 ¤q𝑄 =
+
+v𝑞𝑖/𝑖T
+𝑖 𝝎𝑞𝑖 T
+𝑞
+ T
+, q𝑄 :=
+
+r𝑞𝑖 T
+𝑖 q𝑞𝑖 T
+𝑞
+ T
+, S𝑄 :=
+
+13×3 S𝑞𝑖 T
+𝑞
+ T
+, and
+v𝑞𝑖/𝑖
+𝑖 = ¤r𝑞𝑖
+𝑖 .
+2. Inverted Pendulum
+The inverted pendulum is modeled as a flexible, uniform circular shaft that can bend and twist as shown in Fig. 3.
+The strain energy of the inverted pendulum,𝐵, is given by Ref. [24]
+𝑉shaft = 1
+2
+∫ 𝐿
+0
+"
+𝐸 𝐼
+ 𝜕2𝑣 (𝑥, 𝑡)
+𝜕𝑥 2
+ 2
++ 𝐸 𝐼
+ 𝜕2𝑤 (𝑥, 𝑡)
+𝜕𝑥 2
+ 2
++ 𝐺𝐽
+ 𝜕𝜃 (𝑥, 𝑡)
+𝜕𝑥
+ 2#
+d𝑥, (4)
+where 𝐿 is the length of the shaft,𝐸 is the elastic modulus of the shaft,𝐼 is the area moment of inertia of the cross
+section of the shaft,𝐺 is the shear modulus of the shaft,𝐽 is the polar moment of inertia of the shaft,𝑥 is the location
+along shaft in the𝑏− →3 direction, 𝑣 (𝑥, 𝑡) and 𝑤 (𝑥, 𝑡) are the time-varying transverse deflections of the shaft at𝑥 along
+the 𝑏− →
+1 and 𝑏− →
+2 directions, respectively, and𝜃 (𝑥, 𝑡) is the time-varying rotation of the cross section at𝑥. The assumed
+modes method is applied and discretized to approximate the first few modes of the shaft [24]. The assumed modes
+methodallowsforthedisplacementsinEq. (4)tobeseparatedintoalocation-dependentcomponentandtime-dependent
+component. This allows the displacements to be described as
+𝑣 (𝑥, 𝑡) = 𝚿𝑣 (𝑥)q𝜀,𝑣 (𝑡), (5)
+𝑤 (𝑥, 𝑡) = 𝚿𝑤 (𝑥)q𝜀,𝑤 (𝑡), (6)
+𝜃 (𝑥, 𝑡) = 𝚿 𝜃 (𝑥)q𝜀, 𝜃 (𝑡). (7)
+The location-dependent and time-dependent components are
+𝚿 (·) (𝑥) =
+
+𝜓 (·)
+1 (𝑥) · · · 𝜓 (·)
+𝑛(·) (𝑥)
+
+, (8)
+q𝜀, (·) (𝑡) =
+
+𝑞 𝜀
+1 (𝑡) 𝑞 𝜀
+2 (𝑡) . . . 𝑞 𝜀
+𝑛(·) (𝑡)
+ T
+, (9)
+where 𝜓 (·)
+𝑚 (𝑥) is the𝑥-dependent assumed basis function for the𝑚th mode in the(·)direction, 𝑞 𝜀
+𝑚(𝑡) is the time-varying
+coordinateforthe 𝑚thmode,and 𝑛(·) isthenumberofmodesinthe (·)direction. Thebasisfunctions 𝜓𝑣
+𝑖 for 𝑖 = 1, . . . , 𝑛𝑣,
+𝜓𝑤
+𝑖 for 𝑖 = 1, . . . , 𝑛𝑤,and 𝜓 𝜃
+𝑖 for 𝑖 = 1, . . . , 𝑛𝜃 areselectedsuchthatthegeometricboundaryconditionsforapinned-free
+shaft are satisfied. Note that the fidelity of the model can be adjusted by increasing or decreasing the number of basis
+functions. Specific examples of these functions will be presented in Sec. V.A when we discuss the CRQS guidance
+problem.
+Substituting Eq. (5)–(7) into Eq. (4) results in𝑉shaft = 1
+2 q𝜀T
+(𝑡)K𝜀q𝜀 (𝑡), where
+K𝜀 = 1
+2
+∫ 𝐿
+0
+
+𝐸 𝐼d2𝚿𝑣
+d𝑥2
+Td2𝚿𝑣
+d𝑥2 0𝑛𝑣 ×𝑛𝑤 0𝑛𝑣 ×𝑛𝜃
+∗ 𝐸 𝐼d2𝚿𝑤
+d𝑥2
+Td2𝚿𝑤
+d𝑥2 0𝑛𝑤 ×𝑛𝜃
+∗ ∗ 𝐺𝐽 d𝚿 𝜃
+d𝑥
+Td𝚿 𝜃
+d𝑥
+
+d𝑥, (10)
+q𝜀 (𝑡) =
+
+q𝜀,𝑣 T (𝑡) q𝜀,𝑤 T (𝑡) q𝜀, 𝜃 T
+(𝑡)
+ T
+. Notice that there are no time-varying quantities in this matrix soK𝜀 is
+constant with respect to time. Also note thatK𝜀 will be a diagonal matrix because the off-diagonal terms in Eq. (10)
+will become zeros when the integral is taken due to the assumptions that the inverted pendulum has a circular cross
+section and homogeneous material properties.
+6
+
+=== PDF PAGE 7 ===
+The location of the differential mass element of the inverted pendulum d𝑚 𝐵 relative to inertially-fixed point𝑖 is
+𝑟− →
+d𝑚𝐵𝑖 = 𝑟− →
+𝑚𝑖 + 𝑟− →
+𝑒𝑚 + 𝑟− →
+d𝑚𝐵𝑒, (11)
+wherepoint 𝑚 islocatedatthebaseoftheinvertedpendulum,andpoint 𝑒 iswhere d𝑚 𝐵 islocatedalongtheundeformed
+inverted pendulum. Note that the inverted pendulum is not yet constrained to the quadcopter—that is, point𝑚 is not
+on the quadcopter as Fig. 3 implies. Section III.D handles the constraining of the system. The kinetic energy of the
+inverted pendulum is found to be
+𝑇𝐵𝑖/𝑖 = 1
+2
+∫
+𝐵
+𝑟− →
+d𝑚𝐵𝑖·𝑖
+· 𝑟− →
+d𝑚𝐵𝑖·𝑖
+d𝑚 𝐵, (12)
+= 1
+2 𝝂𝐵T
+
+𝑚 𝐵13×3 −CT
+𝑏𝑖c𝐵𝑚×
+𝑏 CT
+𝑏𝑖P𝜀
+∗ J𝐵𝑚
+𝑏 H𝜀
+∗ ∗ M𝜀
+|                                         {z                                         }
+M𝐵
+𝝂𝐵, (13)
+where 𝑚 𝐵 :=
+∫
+𝐵d𝑚 𝐵 is the mass of the inverted pendulum,c𝐵𝑚
+𝑏 :=
+∫
+𝐵 r𝑒𝑚
+𝑏 d𝑚 𝐵 is the first moment of mass of the
+undeformed inverted pendulum relative to point𝑚, J𝐵𝑚
+𝑏 :=
+∫
+𝐵 −r𝑒𝑚×
+𝑏 r𝑒𝑚×
+𝑏 d𝑚 𝐵 is the second moment of mass of the
+undeformed inverted pendulum relative to point𝑚,
+r𝑑𝑚 𝐵𝑒
+𝑏 =
+
+𝚿𝑣 (𝑥) 01×𝑛𝑤 −𝑧𝚿 𝜃 (𝑥)
+01×𝑛𝑣 𝚿𝑤 (𝑥) 𝑦𝚿 𝜃 (𝑥)
+−𝑦d𝚿𝑣 ( 𝑥 )
+d𝑥 −𝑧d𝚿𝑤 ( 𝑥 )
+d𝑥 01×𝑛𝜃
+|                                              {z                                              }
+𝚿( 𝑥, 𝑦,𝑧 )
+q𝜀, (14)
+P𝜀 :=
+∫
+𝐵 𝚿d𝑚 𝐵, H𝜀 :=
+∫
+𝐵 r𝑒𝑚×
+𝑏 𝚿d𝑚 𝐵, M𝜀 :=
+∫
+𝐵 𝚿T𝚿d𝑚 𝐵, 𝝂𝐵 := S𝐵 ¤q𝐵 =
+
+v𝑚𝑖/𝑖T
+𝑖 𝝎𝑏𝑖T
+𝑏 ¤q𝜀T T
+, q𝐵 :=
+r𝑚𝑖T
+𝑖 q𝑏𝑖T
+𝑏 q𝜀T T
+, S𝐵 :=
+
+13×3 S𝑏𝑖T
+𝑏 1𝑛𝜀 ×𝑛𝜀
+ T
+, 𝑛 𝜀 = 𝑛𝑣 + 𝑛𝑤 + 𝑛 𝜃, andv𝑚𝑖/𝑖
+𝑖 = ¤r𝑚𝑖
+𝑖 .
+3. Inverted Pendulum End Mass and Hanging Pendulum
+The end mass attached to the top of the inverted pendulum is modeled as an unconstrained, free-floating point
+mass, which will later be constrained in place in Sec. III.D. The location of the point mass located at point𝑝 relative to
+inertially-fixed point𝑖 is 𝑟− →
+𝑝𝑖. The kinetic energy of the point mass,𝑃, is found to be
+𝑇𝑃𝑖/𝑖 = 1
+2 𝑚 𝑃
+
+𝑟− →
+𝑝𝑖·𝑖
+· 𝑟− →
+𝑝𝑖·𝑖
+= 1
+2 𝑚 𝑃v 𝑝𝑖/𝑖T
+𝑖 v 𝑝𝑖/𝑖
+𝑖 , (15)
+where 𝑚 𝑃 is the mass of the point mass andv 𝑝𝑖/𝑖
+𝑖 = ¤r 𝑝𝑖
+𝑖 .
+This same approach is taken for the hanging pendulum. The location of the point mass located at pointℎ relative to
+inertially-fixed point𝑖 is 𝑟− →
+ℎ𝑖. The kinetic energy of the point mass,𝐻, is found to be
+𝑇𝐻𝑖 /𝑖 = 1
+2 𝑚𝐻
+
+𝑟− →
+ℎ𝑖·𝑖
+· 𝑟− →
+ℎ𝑖·𝑖
+= 1
+2 𝑚𝐻 vℎ𝑖/𝑖T
+𝑖 vℎ𝑖/𝑖
+𝑖 , (16)
+where 𝑚𝐻 is the mass of the point mass andvℎ𝑖/𝑖
+𝑖 = ¤rℎ𝑖
+𝑖 .
+4. Total Kinetic and Potential Energies
+The total kinetic energy of the system is written as
+𝑇T𝑖/𝑖 = 𝑇𝑄𝑖/𝑖 + 𝑇𝐵𝑖/𝑖 + 𝑇𝑃𝑖/𝑖 + 𝑇𝐻𝑖 /𝑖 = 1
+2 𝝂TMT𝑖𝝂 = 1
+2 ¤qTSTMT𝑖S ¤q, (17)
+where 𝝂 := S ¤q =
+
+𝝂𝑄T
+𝝂𝐵T
+v 𝑝𝑖/𝑖T
+𝑖 vℎ𝑖/𝑖T
+𝑖
+ T
+are the augmented velocities, q :=
+
+q𝑄T
+q𝐵T
+r 𝑝𝑖 T
+𝑖 rℎ𝑖T
+𝑖
+ T
+are the
+generalized coordinates,S := diag{S𝑄, S𝐵, 13×3, 13×3}, andMT𝑖 = diag{M𝑄, M𝐵, 𝑚𝑃, 𝑚𝐻 }. Since gravity is treated
+7
+
+=== PDF PAGE 8 ===
+as an external force, the strain energy of the inverted pendulum is the only potential energy of the system. Therefore, the
+total potential energy is𝑈T𝑖 = 𝑉shaft = 1
+2 qTKq, where K = diag{03×3, 09×9, 03×3, 09×9, K𝜀, 03×3, 03×3}.
+If anyone would like to include additional rigid bodies, flexible bodies, or point masses in their configuration of
+the CRQS, then the procedure outlined above for deriving the kinetic and potential energies should be followed. The
+additional states, mass properties, and stiffness matrices would be concatenated to𝝂, q, MT𝑖, andK. The constraining
+of these new features is discussed in Sec. III.C. If anyone would like to remove one of the features presented here, then
+the rows and columns of𝝂, q, MT𝑖, andKcorresponding to the feature should simply be omitted.
+B. Generalized Forces and Moments
+Figure 3 shows the external forces and torques that act on the CRQS due to the propellers and gravity. The
+generalized forces and moments generated by the propellers and gravity are derived in the following sections for each of
+the bodies.
+1. Quadcopter
+The virtual work done on the quadcopter by the thrust of the𝑗th rotor located at𝑑 𝑗 is
+𝛿𝑊 𝑓 𝑗
+= 𝑓− →
+𝑗
+·𝛿𝑟− →
+𝑑 𝑗 𝑖 = f 𝑗 T
+𝑞 C𝑞𝑖 𝛿r𝑑 𝑗 𝑖
+𝑖 , (18)
+where 𝑗 = 1, 2, 3, 4 and 𝑓− →
+𝑗 is the thrust force produced by the𝑗th rotor. The virtual displacement𝛿r𝑑 𝑗 𝑖
+𝑖 is
+r𝑑 𝑗 𝑖
+𝑖 = r𝑞𝑖
+𝑖 + CT
+𝑞𝑖 r𝑑 𝑗 𝑞
+𝑞 , (19)
+𝛿r𝑑 𝑗 𝑖
+𝑖 = 𝛿r𝑞𝑖
+𝑖 +
+𝜕CT
+𝑞𝑖 r𝑑 𝑗 𝑞
+𝑞
+𝜕q𝑞𝑖
+𝑞
+𝛿q𝑞𝑖
+𝑞 . (20)
+Substituting Eq. (20) into Eq. (18) yields
+𝛿𝑊 𝑓 𝑗
+= f 𝑗
+𝑞
+T
+C𝑞𝑖
+
+13×3
+𝜕CT
+𝑞𝑖 r𝑑 𝑗 𝑞
+𝑞
+𝜕q𝑞𝑖
+𝑞
+
+𝛿q𝑄 = 𝛿q𝑄 T
+𝒇 𝑓 𝑗
+. (21)
+The contents off 𝑗
+𝑞 are made up of the approximated aerodynamics of the thrust of a stationary rotor and are expressed as
+f 𝑗
+𝑞 =
+
+0 0 − 𝑘 𝐹 𝑛2
+𝑗
+ T
+, (22)
+where 𝑘 𝐹 is the thrust constant of all four rotors and𝑛 𝑗 is the speed of the𝑗th rotor [8, 25].
+The quadcopter can control its rotation about the𝑞− →
+3 axis, known as yaw, by varying the speeds of the pairs of rotors
+on opposite diagonals. The torque that the quadcopter can use to control its yaw is the combination of reaction torques
+caused by each rotor pushing against the air as it rotates. The virtual work done on the quadcopter by the reaction torque
+of the 𝑗th rotor is [26]
+𝛿𝑊 𝜏 𝑗
+= 𝝉 𝑗
+𝑞
+T
+S𝑞𝑖
+𝑞 𝛿q𝑞𝑖
+𝑞 = 𝝉 𝑗
+𝑞
+T
+03×3 S𝑞𝑖
+𝑞
+
+𝛿q𝑄 = 𝛿q𝑄 T
+𝒇 𝜏 𝑗
+, (23)
+where 𝑗 = 1, 2, 3, 4and 𝝉 𝑗
+𝑞 is the reaction torque acting on the𝑗th rotor resolved inF𝑞. The contents of𝝉 𝑗
+𝑞 are made up
+of the approximated aerodynamics of the reaction torque on a stationary rotor and are expressed as
+𝝉 𝑗
+𝑞 =
+
+0 0 ± 𝑘 𝑀 𝑛2
+𝑗
+ T
+(24)
+where 𝑘 𝑀 is the torque constant of all four rotors [8, 25] and the sign of𝑘 𝑀 is dependent on the direction the𝑗th rotor
+spins.
+The virtual work done by gravity acting on the quadcopter is
+𝛿𝑊 𝑓 𝑔,𝑄
+=
+∫
+𝑄
+𝑓− →
+𝑔,d𝑚𝑄
+·𝛿𝑟− →
+d𝑚𝑄𝑖 =
+∫
+𝑄
+f𝑔,d𝑚𝑄
+𝑖
+T
+𝛿rd𝑚𝑄𝑖
+𝑖 = gT
+∫
+𝑄
+𝛿rd𝑚𝑄𝑖
+𝑖 d𝑚𝑄, (25)
+where 𝑓− →
+𝑔,d𝑚𝑄 is the force of gravity acting ond𝑚𝑄 and g =
+
+0 0 𝑔
+ T
+is the acceleration due to gravity inF𝑖. Once
+the integral is taken, Eq. 25 becomes
+𝛿𝑊 𝑓 𝑔,𝑄
+=
+
+𝑚𝑄gT 01×9
+
+𝛿q𝑄 = 𝛿q𝑄 T
+𝒇 𝑔,𝑄 , (26)
+8
+
+=== PDF PAGE 9 ===
+2. Inverted Pendulum
+The virtual work done by gravity acting on the inverted pendulum is
+𝛿𝑊 𝑓 𝑔,𝐵
+=
+∫
+𝐵
+𝑓− →
+𝑔,d𝑚𝐵
+·𝛿𝑟− →
+d𝑚𝐵𝑖 =
+∫
+𝐵
+f𝑔,d𝑚𝐵
+𝑖
+T
+𝛿rd𝑚𝐵𝑖
+𝑖 = gT
+∫
+𝐵
+𝛿rd𝑚𝐵𝑖
+𝑖 d𝑚 𝐵, (27)
+where 𝑓− →
+𝑔,d𝑚𝐵 is the force of gravity acting ond𝑚 𝐵. Using Eq.(11)and (14), the virtual displacement𝛿rd𝑚𝐵𝑖 is found
+to be
+𝛿rd𝑚𝐵𝑖 = 𝛿r𝑚𝑖
+𝑖 +
+𝜕  CT
+𝑏𝑖
+ r𝑒𝑚
+𝑏 + 𝚿q𝜀
+𝜕q𝑏𝑖
+𝑏
+𝛿q𝑏𝑖
+𝑏 + CT
+𝑏𝑖 𝚿𝛿q𝜀. (28)
+Once the integral is taken in Eq. (27), the virtual work becomes
+𝛿𝑊 𝑓 𝑔,𝐵
+=
+
+𝑚 𝐵gT gT 𝜕(CT
+𝑏𝑖 (c𝐵𝑚
+𝑏 +P𝐵𝑚
+𝑏 q𝜀))
+𝜕q𝑏𝑖
+𝑏
+gTCT
+𝑏𝑖P𝐵𝑚
+𝑏
+
+𝛿q𝐵 = 𝛿q𝐵T
+𝒇 𝑔,𝐵 . (29)
+3. Inverted Pendulum End Mass and Hanging Pendulum
+The virtual work done by gravity acting on the point mass that will serve as the inverted pendulum’s end mass once
+constrained is
+𝛿𝑊 𝑓 𝑔, 𝑃
+= 𝑓− →
+𝑔, 𝑃
+·𝛿𝑟− →
+𝑝𝑖 = 𝛿r 𝑝𝑖
+𝑖
+T
+𝒇 𝑔, 𝑃, (30)
+where 𝒇 𝑔, 𝑃 = 𝑚 𝑃g is the force of gravity acting on the end mass resolved inF𝑖.
+The same approach is taken for the hanging pendulum. The virtual work done by gravity acting on the point mass
+that will be constrained to act as the hanging pendulum is
+𝛿𝑊 𝑓 𝑔,𝐻
+= 𝑓− →
+𝑔,𝐻
+·𝛿𝑟− →
+ℎ𝑖 = 𝛿rℎ𝑖
+𝑖
+T
+𝒇 𝑔,𝐻 , (31)
+where 𝒇 𝑔,𝐻 = 𝑚𝐻 g is the force of gravity acting on the point mass resolved inF𝑖.
+4. Combined Forces and Moments
+We must now combine the virtual work for each of the components into the total virtual work of the system. The
+total virtual work is
+𝛿𝑊 =
+4∑︁
+𝑗=1
+𝛿𝑊 𝑓 𝑗
++
+4∑︁
+𝑗=1
+𝛿𝑊 𝜏 𝑗
++ 𝛿𝑊 𝑓 𝑔,𝑄
++ 𝛿𝑊 𝑓 𝑔,𝐵
++ 𝛿𝑊 𝑓 𝑔, 𝑃
++ 𝛿𝑊 𝑓 𝑔,𝐻
+. (32)
+Equation(32)needs to be written in terms of𝛿qto be used later in the formulation of the equations of motion. It will be
+useful to separate the forces used for control and the remaining external forces. Thus,
+𝛿𝑊 = 𝛿qT
+
+Í4
+𝑗=1 𝒇 𝑓 𝑗
++ Í4
+𝑗=1 𝒇 𝜏 𝑗
+0(12+𝑛𝜀 ) ×1
+03×1
+03×1
+|                             {z                             }
+𝒇c
++𝛿qT
+
+𝒇 𝑔,𝑄
+𝒇 𝑔,𝐵
+𝒇 𝑔, 𝑃
+𝒇 𝑔,𝐻
+|      {z      }
+𝒇ext
+, (33)
+where 𝒇c are the control forces and𝒇ext are the external forces.
+Toincludeadditionalexternalforces,thevirtualworkdonebythoseforcesmustbederivedforeachoftheapplicable
+bodies, then summed with the respective rows within𝒇ext. For example, aerodynamic drag due to wind gusts is a
+common disturbance force acting on the vehicles of interest, provided there is an atmosphere. Should anyone to capture
+thiseffect,theycouldflytheCRQSoutdoorsonawindyday. Theywouldthenfollowtheabovederivationtoincorporate
+those forces into their model. For alternative configurations of the CRQS that include more or less bodies/masses, the
+rows of 𝒇c and 𝒇ext should be adjusted in correspondence with𝛿q.
+9
+
+=== PDF PAGE 10 ===
+C. Constraints
+The formulation so far has the quadcopter, inverted pendulum, inverted pendulum end mass, and hanging pendulum
+modeled as separate bodies. The bodies need to be constrained together in a manner reflecting the proposed physical
+testbed. This section derives the rate form of the geometric constraints for each of the bodies, which is the form
+required when the bodies are constrained together in Sec. III.D, and the kinematic constraints of the DCM attitude
+parameterizations.
+The base of the inverted pendulum at point𝑚 is constrained to the top of quadcopter at the gimbal joint. This is
+represented by the holonomic constraint𝑟− →
+𝑚𝑖 = 𝑟− →
+𝑞𝑖 + 𝑟− →
+𝑚𝑞. The rate form of this constraint in terms ofq and 𝝂 is
+
+13×3 − CT
+𝑞𝑖 r𝑚𝑞 ×
+𝑞
+
+𝝂𝑄 +
+
+−13×3 03×3 03×3
+
+𝝂𝐵 = 03×1, (34)
+where r𝑚𝑞
+𝑞 isconstantlength. Theinvertedpendulumisenvisionedtobeconnectedtothequadcopterviaadual-gimabled
+systemthatallowsforrelativemotioninthe 𝑞− →
+1and 𝑞− →
+2directions,butnot 𝑞− →
+3. Thisgeometricconstraintisaccomplished
+by kinematically constraining the angular velocity of the inverted pendulum about the quadcopter-body-fixed down axis,
+𝑞− →
+3, to be equal to the quadcopter’s angular velocity about the same axis. This is represented by the rate constraint
+1T
+3 𝝎𝑞𝑖
+𝑞 − 1T
+3 C𝑞𝑏 𝝎𝑏𝑖
+𝑏 = 0, which can be written in terms ofq and 𝝂 as
+
+01×3 1T
+3 01×3
+
+𝝂𝑄 +
+
+01×3 − 1T
+3 C𝑞𝑏 01×3
+
+𝝂𝐵 = 0, (35)
+where 13 =
+
+0 0 1
+ T
+.
+Theinvertedpendulumendmassatpoint 𝑝 isconstrainedtothetopoftheinvertedpendulum. Thisisrepresentedby
+the holonomic constraint𝑟− →
+𝑚𝑖 = 𝑟− →
+𝑞𝑖 + 𝑟− →
+𝑚𝑞 + 𝑟− →
+𝑡 𝑚 + 𝑟− →
+𝑝𝑡, where point𝑡 is the point fixed to the tip of the undeformed
+inverted pendulum. The rate form of this constraint in terms ofqand 𝝂 is
+
+13×3 − CT
+𝑞𝑖 r𝑚𝑞 ×
+𝑞
+
+𝝂𝑄 +
+
+03×3 − CT
+𝑏𝑖r𝑡 𝑚×
+𝑏 CT
+𝑏𝑖 𝚿𝑡
+𝝂𝐵 − v 𝑝𝑤 /𝑖
+𝑖 = 03×1, (36)
+where 𝚿𝑡 := 𝚿(𝐿, 0, 0). The point mass at pointℎ is constrained a constant distance from the bottom of the quadcopter
+at point𝑛 to represent the hanging pendulum. This is represented by the holonomic constraint𝑟− →
+ℎ𝑛·𝑟− →
+ℎ𝑛 − 𝑙2 = 0,
+where 𝑙 is the length of the pendulum. Leveraging the relationship𝑟− →
+ℎ𝑛 = 𝑟− →
+ℎ𝑖 − 𝑟− →
+𝑞𝑖 − 𝑟− →
+𝑛𝑞, the rate form of the
+constraint in terms ofq and 𝝂 is
+2rℎ𝑛T
+𝑖
+
+13×3 CT
+𝑞𝑖 r𝑛𝑞 ×
+𝑞
+
+𝝂𝑄 + 2rℎ𝑛T
+𝑖 vℎ𝑖/𝑖
+𝑖 = 0, (37)
+where rℎ𝑛
+𝑖 = rℎ𝑖
+𝑖 − r𝑞𝑖
+𝑖 − CT
+𝑞𝑖 r𝑛𝑞
+𝑞 and r𝑛𝑞
+𝑞 is constant length.
+There are also kinematic constraints on each of the DCM parameters:𝚵𝑞𝑖
+𝑞 ¤q𝑞𝑖
+𝑞 = 0 and 𝚵𝑏𝑖
+𝑏 ¤q𝑏𝑖
+𝑏 = 0, where these
+𝚵 matrices are defined in Ref. [20]. These matrices are not described in detail here as they will be removed in the
+application of the null-space method in Sec. III.D.
+Recall 𝝂𝑄 = S𝑄 ¤q𝑄 and 𝝂𝐵 = S𝐵 ¤q𝐵. Then, by using Eq.(34)–(37), the geometric constraints of the pendulums
+and the kinematic constraints of the DCM attitude parameterizations are combined into one constraint matrix, which
+satisfies 𝚵 ¤q = 0,
+𝚵 =
+
+
+13×3 − CT
+𝑞𝑖 r𝑚𝑞 ×
+𝑞
+
+S𝑄 
+−13×3 − 03×3 03×𝑛𝜀
+
+S𝐵 03×3 03×3
+01×3 1T
+3 01×3
+
+S𝑄 
+01×3 − 1T
+3 C𝑞𝑏 01×𝑛𝜀
+
+S𝐵 01×3 01×3
+13×3 − CT
+𝑞𝑖 r𝑚𝑞 ×
+𝑞
+
+S𝑄 
+03×3 − CT
+𝑏𝑖r𝑡 𝑚×
+𝑏 CT
+𝑏𝑖 𝚿𝑡
+S𝐵 −13×3 03×3
+2rℎ𝑛T
+𝑖
+
+13×3 CT
+𝑞𝑖 r𝑛𝑞 ×
+𝑞
+
+S𝑄 01× (12+𝑛𝜀 ) 01×3 2rℎ𝑛T
+𝑖
+𝚵𝑄 03× (12+𝑛𝜀 ) 03×3 03×3
+03×12 𝚵𝐵 03×3 03×3
+
+, (38)
+where 𝚵𝑄 = diag{03×3, 𝚵𝑞𝑖
+𝑞 } and 𝚵𝐵 = diag{03×3, 𝚵𝑏𝑖
+𝑏 , 0𝑛𝜀 ×𝑛𝜀 }.
+If anyone would like a different configuration of the CRQS, this section is where their derivation will be the most
+different. If additional bodies or masses are added, the procedures outlined in Sec. III.A and III.B for the additional
+feature(s) should be followed. Then, those bodies can be geometrically constrained using the examples presented
+10
+
+=== PDF PAGE 11 ===
+here or in whichever manner is appropriate—see Sec. 10.6 and 10.7 of Ref. [22] for ideas. One can add or remove
+geometric constraints simply by adding or removing rows of𝚵. Note that the DCMs of the body-fixed reference frames
+from new bodies result in additional rows in𝚵 due to the kinematic constraints. The columns of Eq.(38) should be
+adjusted to reflect all changes inqfor alternative configurations. As an example, consider the case of another pendulum
+hangingfromthefirsthangingpendulumtobetterapproximatehighersloshmodes. TheprocedureoutlinedinSec.III.A
+and III.B for the additional point mass would be followed, resulting in additional terms in𝝂, q, MT𝑖, and 𝒇ext. Then,
+another constraint like Eq.(37) would appear, which would be dependent on the states of the quadcopter, original
+hanging pendulum, and new hanging pendulum. An additional column would then be added to Eq.(38) corresponding
+to the change inq, and an additional row would be added to Eq.(38)for the new constraint similar to the row resulting
+from Eq. (37).
+D. Equations of Motion
+The Lagrangian is defined as
+L T𝑖/𝑖 = 𝑇T𝑖/𝑖 − 𝑈T𝑖 = 1
+2 ¤qTSTMT𝑖S ¤q − 1
+2 qTKq. (39)
+Lagrange’s Equations of the first kind are defined as
+d
+d𝑡
+ 𝜕L T𝑖/𝑖
+𝜕 ¤q
+ T
+−
+ 𝜕L T𝑖/𝑖
+𝜕q
+ T
+= 𝚵T𝝀 + fc + fext, (40)
+where
+d
+d𝑡
+ 𝜕L T𝑖/𝑖
+𝜕 ¤q
+ T
+= STMT𝑖 ¤𝝂 + ST ¤MT𝑖𝝂 + ¤STMT𝑖𝝂, (41)
+ 𝜕L T𝑖/𝑖
+𝜕q
+ T
+= −Kq + 𝛀TMT𝑖𝝂 − 𝒂 T,non, (42)
+𝛀 = diag
+
+03×3, 𝜕𝝎𝑞𝑖
+𝑞
+𝜕q𝑞𝑖
+𝑞
+, 03×3,
+𝜕𝝎𝑏𝑖
+𝑏
+𝜕q𝑏𝑖
+𝑏
+, 0𝑛𝜀 ×𝑛𝜀 , 03×3, 03×3
+
+, (43)
+and 𝝀 are the Lagrange multipliers. The term 𝛀TMT𝑖𝝂 is a result of the dependence ofS𝑞𝑖
+𝑞 and S𝑏𝑖
+𝑏 on q𝑞𝑖
+𝑞
+and q𝑏𝑖
+𝑏 , respectively. The term 𝒂 T,non comes from the dependence of MT𝑖 on q𝑞𝑖
+𝑞 and q𝑏𝑖
+𝑏 . For numerical
+stability, some damping in the structural dynamics is required. Here, we will include the damping term,D =
+diag{03×3, 09×9, 03×3, 09×9, D𝜀, 03×3, 03×3}, whereD𝜀 = 0.002 ×diag
+
+𝜔1, 𝜔2, . . . , 𝜔𝑛𝜀
+	
+corresponds to 1% damping
+for the𝑖th mode with natural frequency𝜔𝑖. Equation (40) is then
+STMT𝑖 ¤𝝂 + ST ¤MT𝑖𝝂 +
+
+¤ST − 𝛀T
+
+MT𝑖𝝂 + D𝝂 + Kq + 𝒂 T,non = 𝚵T𝝀 + 𝒇c + 𝒇ext. (44)
+We premultiply Eq.(44) by 𝚷T𝚪T to eliminate the Lagrange multipliers through the identity𝚵𝚪𝚷 = 0, where
+𝚪 := diag{03×3, 𝚪𝑞𝑖
+𝑞 , 03×3, 𝚪𝑏𝑖
+𝑏 , 0𝑛𝜀 ×𝑛𝜀 , 03×3, 03×3} and 𝚷 is defined in the Appendix. The operation𝚵𝚪 eliminates
+the Lagrange multipliers from the attitude parameterizations [20], and𝚷 eliminates multipliers from the geometric
+constraints [21–23]. Also, we make use of the identityS𝚪 = 1 during the operation. Therefore, Eq. (44) becomes
+𝚷TMT𝑖 ¤𝝂 + 𝚷T𝚪TD𝝂 + 𝚷T𝚪TKq = 𝚷T𝚪T 𝒇c + 𝚷T𝚪T 𝒇ext − 𝚷T ¤MT𝑖𝝂 − 𝚷TWMT𝑖𝝂 − 𝚷TaT,non, (45)
+where W = diag 03×3, 𝝎𝑞𝑖 ×
+𝑞 , 03×3, 𝝎𝑏𝑖 ×
+𝑏 , 0𝑛𝜀 ×𝑛𝜀 , 03×3, 03×3
+, and [20]
+aT,non := 𝚪T 𝒂 T,non =
+
+06×1
+
+03×1
+C𝑏𝑖v𝑚𝑖/𝑖
+𝑖
+ × 
+P𝐵𝑚
+𝑏 ¤q𝜀 − c𝐵𝑚
+𝑏
+×𝝎𝑏𝑖
+𝑏
+
+0𝑛𝜀 ×1
+
+03×1
+03×1
+
+. (46)
+11
+
+=== PDF PAGE 12 ===
+The inner set of brackets are included to show how Eq.(46)relates to𝝂. Equation(45)contains 𝝂, which is made up
+of independent and dependent coordinates. We would like there to only be the augmented velocities of independent
+coordinates, ˆ𝝂 =
+
+v𝑞𝑖/𝑖T
+𝑖 𝝎𝑞𝑖 T
+𝑞 ˆ𝝎𝑏𝑖T
+𝑏 ˆ𝝎𝑠𝑖 T
+𝑠 ¤q𝜀T T
+, where ˆ𝝎𝑏𝑖
+𝑏 :=
+
+𝜔𝑏𝑖
+𝑏1 𝜔𝑏𝑖
+𝑏2
+ T
+contains the first two components
+of 𝝎𝑏𝑖
+𝑏 and ˆ𝝎𝑠𝑖
+𝑠 :=
+
+𝜔𝑠𝑖
+𝑠1 𝜔𝑠𝑖
+𝑠2
+ T
+contains the two degrees of freedom corresponding to the rotation of the hanging
+pendulumonceitisconstrained. Therelationshipbetween 𝝂 and ˆ𝝂 is 𝝂 = 𝚷 ˆ𝝂 sowesubstitutethisanditstimederivative
+¤𝝂 = ¤𝚷 ˆ𝝂 + 𝚷 ¤ˆ𝝂 into Eq. (45) to get
+ˆMT𝑖 ¤ˆ𝝂 + ˆDˆ𝝂 + ˆKq = 𝚷T ˆBu + ˆfnon, (47)
+where ˆMT𝑖 = 𝚷TMT𝑖𝚷, ˆD = 𝚷T𝚪TD𝚷, ˆK = 𝚷T𝚪TK, ˆfnon = 𝚷T𝚪T 𝒇ext − 𝚷T ¤MT𝑖𝚷 ˆ𝝂 − 𝚷TWMT𝑖𝚷 ˆ𝝂 − 𝚷TMT𝑖 ¤𝚷 ˆ𝝂 −
+𝚷TaT,non, ˆBu = 𝚪T 𝒇c [20], and
+u =
+
+𝑛2
+1 𝑛2
+2 𝑛2
+3 𝑛2
+4
+ T
+, (48)
+ˆB =
+
+"
+𝑘 𝐹CT
+𝑞𝑖 13
+𝑘 𝐹r𝑑1𝑞×
+𝑞 13 − 𝑘 𝑀 13
+# "
+𝑘 𝐹CT
+𝑞𝑖 13
+𝑘 𝐹r𝑑2𝑞×
+𝑞 13 − 𝑘 𝑀 13
+# "
+𝑘 𝐹CT
+𝑞𝑖 13
+𝑘 𝐹r𝑑3𝑞×
+𝑞 13 + 𝑘 𝑀 13
+# "
+𝑘 𝐹CT
+𝑞𝑖 13
+𝑘 𝐹r𝑑4𝑞×
+𝑞 13 + 𝑘 𝑀 13
+#
+0(6+𝑛𝜀 ) ×1 0(6+𝑛𝜀 ) ×1 0(6+𝑛𝜀 ) ×1 0(6+𝑛𝜀 ) ×1
+03×1 03×1 03×1 03×1
+03×1 03×1 03×1 03×1
+
+.
+(49)
+TheinnersetofbracketsareincludedtoshowhowEq. (49)relatesto 𝝂. Recallthesigninfrontofeach 𝑘 𝑀 isdependent
+on the spin direction of the rotors. The signs in Eq. 49 are not general, but are for the configuration of the CRQS used
+for the remainder of the paper.
+For alternative configurations of the CRQS, care should be taken to make sure changes made in previous steps
+appear here.
+E. Simplified Dynamic Model
+The simplified dynamic model of the testbed used in the trajectory optimization algorithm consists of a point mass
+with a variable thrust force acting on it. The model is a modified version of the landing system model found in Ref. [19].
+Unlike the model for the landing system, the simplified model of the testbed has constant mass and the effects due to the
+rotation of the planet are neglected. The dynamics of this system are
+¤x𝑔 (𝑡) = Ax𝑔 (𝑡) + B
+
+g + T𝑐 (𝑡)
+𝑚 T
+
+, (50)
+where x𝑔 (𝑡) =
+
+r𝑞𝑖
+𝑖
+T
+v𝑞𝑖/𝑖
+𝑖
+T T
+, T𝑐 (𝑡) ∈ R3×1 is the time-varying thrust acting on the point mass resolved inF𝑖,
+𝑚 T = 𝑚𝑄 + 𝑚 𝐵 + 𝑚 𝑃 + 𝑚𝐻, and
+A =
+"
+03×3 13×3
+03×3 03×3
+#
+, B =
+"
+03×3
+13×3
+#
+. (51)
+IV. Guidance and Control Formulation
+The guidance and control formulation is separated into two problems, as shown in Fig. 4: the trajectory generation
+and the inner-loop control synthesis. The desired trajectory,x𝑑, is a time history of position and velocity, which
+is optimized to softly land the CRQS from the initial conditions. Along with these time histories, the trajectory
+generation also includes feed-forward control commands,u 𝑓, which are desired DC motor speeds of the four motors.
+The inner-loop control is designed to stabilize the configuration of the CRQS consisting of the quadcopter and a rigid
+inverted pendulum—the motor speeds,u𝑐, are added tou 𝑓 to stabilizethe systemand have it track the desired trajectory,
+where u𝑐 + u 𝑓 is related to Eq. (48) via
+
+𝑛1 𝑛2 𝑛3 𝑛4
+ T
+= u𝑐 + u 𝑓.
+As discussed in Sec. I, the CRQS is designed with flexibility in the inverted pendulum and a hanging pendulum to
+create a relevant environment for testing G&C algorithms. The inner-loop control is intentionally designed without
+knowledge of these features to demonstrate the CRQS’s unique ability to capture these analogous dynamics at this stage
+of maturing.
+12
+
+=== PDF PAGE 13 ===
+T rajectory
+Generation Control Plant
+Fig. 4 Block diagram of the guidance and control strategy. The trajectory generation block is run a single time
+offline while the inner-loop runs continuously to stabilize the system and track the trajectory.
+A. Trajectory Generation Algorithm
+A trajectory is designed to softly land the CRQS from prescribed initial conditions while satisfying state and control
+constraints. There are many approaches to generate a trajectory for the booster soft-landing algorithm (BSLA) [27–30],
+but the one implemented here is the one developed in Ref. [19]. We chose this algorithm because it is relatively
+straightforward to implement and a possible starting point for a practicing engineer. This is why a higher-fidelity
+approach, which may employ successive convexification or additional state and control constraints [31, 32], is not
+implemented here. Also, the goal of the CRQS is to help mature novel algorithms, and this algorithm is topical and
+relatively novel.
+TheBSLAiscompletedinthreesteps: 1)minimizedistancebetweenthelandinglocationandthetargetgivenatime
+offlight(minimumlandingerrorproblem),2)minimizetheamountoffuelittakestogettothelandingsolutiontoStep1
+given the same time of flight (minimum fuel problem), and 3) perform an optimizing line search over the time-of-flight.
+These problems are originally non-convex due to the thrust magnitude and pointing constraints. Reference [19] applies
+lossless convexification to make the problem convex, which results in a convex second-order cone program (SOCP).
+What follows are the convexified versions of these problems (known as Problems 3 and 4 in Ref. [19]) adjusted for
+implementation with the CRQS.
+The BSLA leverages the simplified dynamic model derived in Sec. III.E. In the minimum landing error problem, the
+objective is to minimize
+𝐽 𝑡 𝑓 , T𝑐, Γ =
+𝐸r∗ 𝑡 𝑓
+ − d
+ , (52)
+where r∗ is the desired time history ofr𝑞𝑖
+𝑖 , 𝑡 𝑓 is the time of flight,T𝑐 (𝑡) is the time-varying thrust acting on the point
+mass, Γ is the slack variable for the thrust magnitude introduced during the lossless convexification,d is the landing
+target, and
+𝐸 =
+"
+i1T
+𝑖
+i2T
+𝑖
+#
+=
+"
+1 0 0
+0 1 0
+#
+. (53)
+In addition to the dynamic model state constraint in Eq.(50), this minimization problem is subject to the state and input
+constraints
+x𝑔 (𝑡) ∈ X ∀𝑡 ∈ [ 0, 𝑡 𝑓 ], (54)
+r∗ 0 = r0, v∗ 0 = v0, (55)
+i3T
+1 r∗ 𝑡 𝑓
+ = 0, v∗ 𝑡 𝑓
+ = 03×1, (56)
+∥T𝑐 (𝑡) ∥ ≤ Γ(𝑡), 0 < 𝜌 1 ≤ Γ(𝑡) ≤ 𝜌2, (57)
+ˆnTT𝑐 (𝑡) ≥ cos 𝜃Γ(𝑡), (58)
+where v∗ is the desired time history ofv𝑞𝑖/𝑖
+𝑖 , r0 is the initial position,v0 is the initial velocity,𝜌1 is the lower thrust
+magnitudebound, 𝜌2 istheupperthrustmagnitudebound, ˆn =
+
+0 0 − 1
+ T
+istheunitdirectionvector, 𝜃 isthemaximum
+allowable angle of deviation fromˆn, andX =
+
+(r∗, v∗) ∈ R6 : || v∗|| ≤ 𝑉max,
+𝐸 r∗ − r∗ 𝑡 𝑓
+ − cT (r∗ − r∗ 𝑡 𝑓
+) ≤ 0
+	
+,
+in whichc := −i3
+𝑖 /tan 𝛾𝑔𝑠 and 𝛾𝑔𝑠 is the glideslope angle from the ground.
+The objective of the minimum fuel problem is to minimize
+𝐽 𝑡 𝑓 , T𝑐, Γ =
+∫ 𝑡 𝑓
+0
+Γ(𝑡)d𝑡 subject to (54)−(58), and
+𝐸r∗ 𝑡 𝑓
+ − d
+ ≤
+d∗
+𝑚𝑙𝑒 − d
+ , (59)
+13
+
+=== PDF PAGE 14 ===
+where d∗
+𝑚𝑙𝑒 is the final optimal position from the minimum landing error problem. Note that, for both the minimum
+landing error and minimum fuel problems, the constraints in Ref. [19] due to time-varying mass are omitted from this
+implementation due to the constant mass properties of the CRQS. The implementation of the BSLA on the CRQS
+requires the discretized version of the minimum landing error and minimum fuel problems—the discretization method
+using a zero-order hold described in Sec. 4 of Ref. [27] is not described here, but is used to obtain the results that follow.
+B. Inner-Loop Control
+The inner-loop controller is a constant gain, discrete-time linear quadratic regulator with reference tracking of the
+form
+u𝑐 (𝑘) = K𝑙𝑞𝑟
+ x𝑑 (𝑘) − x𝑐 (𝑘), (60)
+where 𝑘 is the discrete time step, u𝑐 is the column matrix of change in DC motor speeds from u 𝑓, x𝑑 =
+r∗T 01×5 v∗T 01×5
+ T
+, x𝑐 =
+
+r𝑞𝑖 T
+𝑖 𝜽 T
+𝑞𝑖 ˆ𝜽
+T
+𝑏𝑖 v𝑞𝑖/𝑖T
+𝑖 𝝎𝑞𝑖 T
+𝑞 ˆ𝝎𝑏𝑖T
+𝑏
+ T
+, ˆ𝜽
+T
+𝑏𝑖 =
+
+𝜃𝑖 𝑝 𝜙𝑖 𝑝
+ T
+, 𝜃𝑖 𝑝 and 𝜙𝑖 𝑝 are the
+angles of the two degrees of freedom of the inverted pendulum, and
+K𝑙𝑞𝑟 =  R + BT
+𝑐PB𝑐
+ −1BT
+𝑐PA𝑐. (61)
+P ∈ R16×16 isthesolutiontothediscrete-timealgebraicRiccatiequation P = AT
+𝑐P − AT
+𝑐PB𝑐
+ R + BT
+𝑐PB𝑐
+ −1BT
+𝑐PA𝑐 + Q,
+where Q ∈ R16×16 and R ∈ R4×4 are the weighting matrices on the state and control effort, respectively. Similar to the
+trajectory generation, we chose this controller since it is well-documented, straightforward to implement, and a popular
+first choice for practicing engineers—a desirable choice for a benchmark platform. We also chose the discrete-time
+version since the physical testbed will use a digital computer and the desired trajectory is a discrete signal. For this
+implementation, the time-step size for the inner-loop controller is the same as that for the trajectory optimization.
+The discrete-time LQR of Eq. (61) requires a discrete-time, linear model of the form
+x𝑐 (𝑘 + 1) = A𝑐x𝑐 (𝑘) + B𝑐u𝑐 (𝑘), (62)
+where A𝑐 ∈ R16×16 and B𝑐 ∈ R16×4 describe the discrete-time dynamics of the quadcopter and rigid inverted pendulum.
+To obtain a model of this form for the CRQS, the nonlinear dynamics in Eq.(47) are linearized using a first-order
+Taylor-series approximation, then discretized using a zero-order hold. During the linearization step, the terms and
+equations relating to the structural dynamics and the hanging pendulum are neglected—this results in a system with 8
+degrees of freedom. The system is linearized about the equilibrium point where the inverted pendulum is standing on
+end atop the quadcopter hovering in place. It is assumed that the inner-loop controller has perfect knowledge ofx𝑐 from
+the nonlinear dynamic model.
+V. Results & Discussion
+This section presents the results of four numerical simulations each of different configurations of the CRQS using
+the model presented in Sec. III with the inner-loop controller and the BSLA trajectory from in Sec. IV to establish the
+testbed as a benchmark platform for G&C algorithm validation.
+A. Simulation Parameters
+When applicable, the prototype in Fig. 2 is used to inform the simulation parameters. Otherwise, engineering
+standards or academic literature are used. The mass properties of the quadcopter, which are approximated from the
+prototype, include a mass of𝑚𝑄 = 1.4kg and an principal inertia matrixJ𝑄𝑞
+𝑞 with values of𝐼𝑥 𝑥 = 𝐼𝑦 𝑦 = 0.0181kg·m2
+and 𝐼𝑧𝑧 = 0.0234kg·m2. TheDCmotorsaremounted0.165mfromthecenterofmass. Athrustteststandmeasuredthe
+minimum and maximum static thrust of one rotor to be 0.4 N and 11 N, respectively. The rotors have a thrust constant
+of 𝑘 𝐹 = 8.61 × 10−6 kg·m and a torque constant of𝑘 𝑀 = 0.151 × 10−6 kg·m2 [8,25,33]. To replicate the dynamics of
+the rotors, the control inputs are passed through a low-pass filter with time constant 0.02 s and then saturated below
+230 rad/s and above 1100 rad/s before being applied to the system’s equations of motion. The inverted pendulum is
+based on a physical Polycarbonate rod of mass𝑚 𝐵 = 250 g, end mass of𝑚 𝑃 = 50 𝑔, length of𝐿 = 1.64 m, radius of
+6.45 mm, elastic modulus of𝐸 = 2.2GPa, shear modulus of𝐺 = 700MPa, andr𝑚𝑞
+𝑞 =
+
+0 0 − 0.03
+ T
+m. The basis
+functionschosenforthe 𝑏− →
+1 and 𝑏− →
+2 directionsthatsatisfythepinned-massgeometricboundaryconditionsoftherodare
+𝚿𝑣 (𝑥) = 𝚿𝑤 (𝑥) =
+
+sin (2.2𝑥) − 0.022 sinh (2.2𝑥) sin (4𝑥) + 7.6 × 10−4 sinh (4𝑥)
+
+, (63)
+14
+
+=== PDF PAGE 15 ===
+Fig. 5 A frequency spectrum plot comparing the frequency content of the Cost- and Risk-Reducing Quadcopter
+SystemtothatoftheSaturnV.ThebarswithsolidlinesrepresentthefrequencyspectrumoftheSaturnVduring
+first-stage ascent, and the dot-dashed lines represent the frequency content of the CRQS given the properties
+found in Sec. V.A. Recreated using Refs. [34, 35].
+where these basis functions are found by solving for the mode shapes of a pinned-free Euler-Bernoulli beam with an end
+mass following the procedure outlined in Sec. 11.5 of Ref. [24]. The basis function for the twist of the beam, which
+satisfy the boundary conditions, is𝚿 𝜃 (𝑥) = (𝑥/𝐿)2. This results in𝑛 𝜀 = 5. All of the properties of the flexible inverted
+pendulum are used for the rigid inverted pendulum, except: 1) the arbitrary stiffening of the elastic modulus to 100 GPa,
+and2) 𝚿𝑣 (𝑥) = 𝚿𝑤 (𝑥) = sin (2.2𝑥) − 0.022 sinh (2.2𝑥), 𝚿 𝜃 (𝑥) = 0. Thepropertiesofthehangingpendulumarebased
+onaphysicalmassof 𝑚𝐻 = 100ghangingfromanegligible-massstringoflength30cmpinnedat r𝑛𝑞
+𝑞 =
+
+0 0 0 .1
+ T
+m.
+The initial conditions are of the stationary CRQS hovering at equilibrium 3 m above the ground and 3 m up range. That
+is, r0 = r𝑞𝑖
+𝑖 =
+
+−3 0 − 10
+ T
+m, C𝑞𝑖 = C𝑏𝑖 = C𝑠𝑖 = 13×3, q𝑒 = 09×1, and ˆ𝝂 = 019×1. The system is commanded to
+hover in place for 2 s before the beginning and 8 s after the end of the trajectory from Sec. V.B to observe how the
+CRQS performs.
+These design decisions for the simulation and prototype of the CRQS are selected to obtain dynamic characteristics
+analogous to no vehicle in particular. It was shown in Ref. [10] that the open-loop poles of the CRQS can be placed
+directly on top of those of the Saturn V resulting in a one-to-one open-loop dynamic representation. The paper
+acknowledges, however, that the required materials are infeasible, particularly for the inverted pendulum. The seminal
+paper, Ref. [34], which describes the attitude control system of the Saturn V rocket, presents a figure of the frequency
+bands that the vehicle sweeps through during its first-stage ascent—a recreation of this figure is shown in Fig. 5 with the
+addition of the frequency content of the CRQS. The properties of the simulation and prototype we select here are such
+that the frequency content of the CRQS is in the neighborhood of the Saturn V. For example, there are bounds on the
+length of the hanging pendulum to keep its natural frequency between the gravity and bending modes. If anyone would
+like to create a CRQS that is analogous to a particular vehicle, the vehicle’s properties can be used to influence the
+features of the CRQS. For a vehicle under development, the design and, therefore, dynamic characteristics can change
+often. The low-cost and modularity of the CRQS allow it to adapt as the design of a launch vehicle or landing system
+are being finalized.
+B. Trajectory Generation Results
+For this numerical problem, the same initial position and velocity from Sec. V.A are used,𝜌1 = 2 N, 𝜌2 = 44 N,
+𝜃 = 20◦, 𝛾𝑔𝑠 = 20◦, and𝑉max = 2m/s. MATLAB’s built-in SOCP solverconeprogis used to solve the BSLA once the
+problems are manually parsed to fit the syntax of the function. The solution yields a landing error of8.6 × 10−7 m, a
+cumulativeimpulseof 1.7kN·s, andatimeofflightof 𝑡 𝑓 = 5s, whichisselectedfromthelinesearchduetothebalance
+between speed and margin to allow the inner-loop controller to account for unmodeled dynamics of the CRQS. The
+optimal trajectories from the solutions to the minimum landing error and minimum fuel problems are shown in Figs. 6a
+and 6b. Notice the solution to the minimum landing error problem takes a more direct route to get to the landing target.
+15
+
+=== PDF PAGE 16 ===
+(a) Time history of the position and velocity.
+ (b) 3D parametric plot of position.
+Fig. 6 Solutions to the minimum landing error problem and minimum fuel problem, where downrange is𝑥,
+crossrange is𝑦, and altitude isℎ. The solution to the minimum fuel problem is given to the inner loop asr∗, v∗.
+This is because it is more fuel efficient for the system to throttle high at the beginning and end while throttling as low as
+possible in between—also known as bang-bang control. The plots versus time of the thrust magnitude, thrust pointing
+direction, glideslope angle, and speed are shown in Fig. 7. Notice the thrust magnitude and pointing results do not
+exhibit full bang-bang control between its upper and lower bounds. This is because the time of flight is larger than the
+minimum time of flight so it must spend extra time in the air, thus pointing more straight-upward and consuming more
+fuel. Theresultsofthisbehaviorareseenintheglideslopeangleandspeedconstraintplots. Theglideslopeangleateach
+step increases between the minimum error and minimum fuel solutions, and the speed never reaches its limits, which we
+expect to see in the minimum-time-of-flight solution. The feed-forward control commands,u 𝑓, are the constant DC
+motor speeds that keep the quadcopter hovering, which are used in the linearization for the inner-loop control presented
+in Sec. IV.B. Another approach could be to implementu 𝑓 (𝑡) as a function ofT𝑐 (𝑡) that corresponds tor∗ and v∗.
+C. Trajectory Tracking Results & Discussion
+Four simulations are performed in which a feature is successively added to the CRQS. The first simulation is of the
+quadcopter and the rigid inverted pendulum (RIP). The second adds to this the hanging pendulum (RIP+HP), the third
+addsthestructuraldynamicsoftheinvertedpendulum(i.e. flexiblependulum)andremovesthehangingpendulum(FIP),
+and the fourth is of the entire system (FIP+HP). The weighting matrices used for the inner-loop LQR controller are
+Q = diag{100 × 13×3, 15×5, 10 × 13×3, 15×5} and R = 1 × 10−4 × 14×4. Figure 8 includes plots of the quadcopter’s
+position and velocity versus time for the three different simulations along with the trajectoryx𝑑 from Sec. V.B. Figure 9
+presents the Euler 3-2-1 sequence of the quadcopter attitude computed from the DCM at each time step. Figure 10
+includes plots of the inverted and hanging pendulums’ quadcopter-relative orientations as well as the tip deflection of
+the inverted pendulum.
+As expected, Figs. 8–10 show the tracking performance of the inner-loop controller degrades as additional features
+are added with each simulation. When the hanging pendulum is added, low-frequency oscillations appear in the
+responses. This is most apparent in the quadcopter attitude response of the RIP+HP configuration in Fig. 9, where the
+additional low-frequency oscillations match the frequency of the quadcopter-relative hanging pendulum orientation
+in Fig. 10. These oscillations are eventually damped out by the inner-loop controller, but that may not be the case if
+the hanging pendulum is slightly different. Unstable high-frequency oscillations appear in the responses when the
+structural dynamics are added. This is most noticeable in the quadcopter attitude response of the FIP and FIP+HP
+configurations in Fig. 9 and the the tip deflection plots in Fig. 10. The addition of the structural dynamics drive the
+system unstable because the closed-loop control system has a natural frequency near the first bending mode of the FIP.
+To improve the trajectory tracking results, the unmodeled dynamics should be considered in the trajectory generation
+algorithm and inner-loop controller synthesis. This highlights the need to consider fuel slosh and structural dynamics
+when synthesizing a guidance and control strategy. Other testbeds, such as the ones in Ref. [16–18], consider the rigid
+16
+
+=== PDF PAGE 17 ===
+Fig. 7 Time history plots of thrust magnitude∥𝑇𝑐 ∥, thrust pointingˆ𝜃, glideslope𝛾, and speed||𝑉 ||. The dashed
+black represents the upper- and lower-bounding thrust magnitude constraints, upper-bounding thrust pointing
+constraint, lower-bounding glideslope constraint, and upper-bounding speed constraints.
+body dynamics of these vehicles, but they do not capture the disturbances due to fuel slosh and structural dynamics.
+This may be sufficient for some applications, but this is not always the case. These results show that CRQS has the
+ability to test algorithms in the presence of fuel slosh and structural dynamics.
+VI. Conclusion & Future Work
+A dynamic model has been developed of a quadcopter-based test platform (known as the Cost- and Risk-Reducing
+Quadcopter System) for maturing guidance, navigation, and control algorithms through the mid-level maturity levels.
+An optimal trajectory was generated to softly land the CRQS based on the booster soft-landing algorithm presented in
+Ref. [19]. An inner-loop LQR with tracking controller was synthesized with knowledge only of the quadcopter and a
+rigid inverted pendulum. Results from simulations of four configurations of the CRQS highlighted the importance of
+considering fuel slosh and structural dynamics when synthesizing a guidance and control strategy as well as the CRQS’s
+usefulness as a platform for maturing G&C algorithms.
+Futureworkwillincludeusingthesimulationto1)informthedesign,fabrication,andflightofthephysicalprototype,
+and 2) validate more complex guidance and control algorithms. Although it is not addressed in this paper, the CRQS
+may also be useful for validating novel navigation algorithms and hardware, which is another active area of research.
+Appendix
+This appendix provides details regarding the matrices𝚷 and ¤𝚷 used in the derivation of the equations of motion in
+Sec. III.D.
+Let 𝝂 = 𝚷 ˆ𝝂, where𝝂 and ˆ𝝂 are defined in Sec. III.A.4 and
+𝚷 =
+
+13×3 03×3 03×2 03×2 03×𝑛𝑞𝑒
+03×3 13×3 03×2 03×2 03×𝑛𝑞𝑒
+02×3 02×3 12×2 02×2 02×𝑛𝑞𝑒
+01×3 𝚷 (9, 4 : 6 ) 𝚷 (9, 7 : 8 ) 01×2 01×𝑛𝑞𝑒
+02×3 02×3 02×2 12×2 02×𝑛𝑞𝑒
+01×3 𝚷 (12, 4 : 6 ) 01×2 01×2 02×𝑛𝑞𝑒
+0𝑛𝑞𝑒 ×3 0𝑛𝑞𝑒 ×3 0𝑛𝑞𝑒 ×2 0𝑛𝑞𝑒 ×2 1𝑛𝑞𝑒 ×𝑛𝑞𝑒
+
+, (64)
+17
+
+=== PDF PAGE 18 ===
+Fig. 8 Results of the three simulations with the optimal trajectory (x𝑑) from Sec. IV. Plots of the downrange (𝑥),
+crossrange (𝑦), and altitude (ℎ) trajectory tracking results versus time of three numerical simulations with
+differing CRQS configurations. To makex𝑑, two seconds of hover are added to the beginning ofr∗,v∗ and eight
+seconds are added to the end.
+Fig. 9 Results of the three simulations with the optimal trajectory from Sec. IV. Plots versus time of the Euler
+3-2-1 sequence extracted fromC𝑞𝑖 at each time step where𝜙 is roll,𝜃 is pitch, and𝜓 is yaw.
+where
+𝚷 (9, 4 : 6 ) =
+
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖13
+ −1
+1T
+3 , (65)
+𝚷 (9, 7 : 8 ) = −
+
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖13
+ −1
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖
+
+11 12
+
+, (66)
+𝚷 (12, 4 : 6 ) = 1T
+3 C𝑠𝑖 CT
+𝑞𝑖 . (67)
+18
+
+=== PDF PAGE 19 ===
+Fig.10 ResultsofthethreesimulationswiththeoptimaltrajectoryfromSec.IV.Plotsoftheinvertedpendulum’s
+pitch (𝛼𝑖 𝑝) and roll (𝛽𝑖 𝑝) relative toF𝑞, the hanging pendulum’s pitch (𝛼ℎ 𝑝) and roll (𝛽ℎ 𝑝) relative toF𝑞, and the
+deflection of the tip of the inverted pendulum in the𝑏− →
+1 and 𝑏− →
+2 directions (𝛿𝑥, 𝛿𝑦) versus time.
+The time derivative of𝝂 is then¤𝝂 = ¤𝚷 ˆ𝝂 + 𝚷 ¤ˆ𝝂, where
+¤𝚷 =
+
+03×3 03×3 03×2 03×2 03×𝑛𝑞𝑒
+03×3 03×3 03×2 03×2 03×𝑛𝑞𝑒
+02×3 02×3 02×2 02×2 02×𝑛𝑞𝑒
+01×3 ¤𝚷 (9, 4 : 6 ) ¤𝚷 (9, 7 : 8 ) 01×2 01×𝑛𝑞𝑒
+02×3 02×3 02×2 02×2 02×𝑛𝑞𝑒
+01×3 ¤𝚷 (12, 4 : 6 ) 01×2 01×2 02×𝑛𝑞𝑒
+0𝑛𝑞𝑒 ×3 0𝑛𝑞𝑒 ×3 0𝑛𝑞𝑒 ×2 0𝑛𝑞𝑒 ×2 0𝑛𝑞𝑒 ×𝑛𝑞𝑒
+
+, (68)
+and
+¤𝚷 (9, 4 : 6 ) = −
+
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖13
+ −2
+1T
+3
+
+−𝝎𝑞𝑖
+𝑞
+×
+C𝑞𝑖 CT
+𝑏𝑖 + C𝑞𝑖 CT
+𝑏𝑖𝝎𝑏𝑖
+𝑏
+×
+131T
+3 , (69)
+¤𝚷 (9, 7 : 8 ) = −
+
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖13
+ −2
+1T
+3
+
+−𝝎𝑞𝑖
+𝑞
+×
+C𝑞𝑖 CT
+𝑏𝑖 + C𝑞𝑖 CT
+𝑏𝑖𝝎𝑏𝑖
+𝑏
+×
+131T
+3 C𝑞𝑖 CT
+𝑏𝑖
+
+11 12
+
+, (70)
+−
+
+1T
+3 C𝑞𝑖 CT
+𝑏𝑖13
+ −1
+1T
+3
+
+−𝝎𝑞𝑖
+𝑞
+×
+C𝑞𝑖 CT
+𝑏𝑖 + C𝑞𝑖 CT
+𝑏𝑖𝝎𝑏𝑖
+𝑏
+× 
+11 12
+
+, (71)
+¤𝚷 (12, 4 : 6 ) = 1T
+3
+
+−𝝎𝑠𝑖
+𝑠
+×
+C𝑠𝑖 CT
+𝑞𝑖 + C𝑠𝑖 CT
+𝑞𝑖 𝝎𝑏𝑖
+𝑏
+×
+, (72)
+where Poisson’s equations¤C𝑞𝑖 = −𝝎𝑞𝑖
+𝑞
+×
+C𝑞𝑖 is used to simplify these expressions.
+Funding Sources
+This material is based upon work supported by the NASA Office of STEM Engagement (OSTEM) under Grant
+No. 80NSSC19K1672 issued through the NASA Fellowships Program under MUREP funding.
+19
+
+=== PDF PAGE 20 ===
+Acknowledgments
+The authors would like to thank Jing Pei, Dr. Demoz Gebre-Egziabher, and Alex Hayes for useful discussions
+regarding the motivation for this work, the dynamic modeling of the CRQS testbed, and the trajectory generation
+algorithm.
+References
+[1] “Artemis Plan: NASA’s Lunar Exploration Program Overview,” 2020. URLhttps://www.nasa.gov/sites/default/
+files/atoms/files/artemis_plan-20200921.pdf.
+[2] “Starship Users Guide,” 2020. URLhttps://www.spacex.com/media/starship_users_guide_v1.pdf.
+[3] Niemela, J., and Fisher, M., “The Use of Technology Readiness Levels for Software Development,”ARMY AL&T, May 2004,
+pp. 10–14.
+[4] Hanson, J. M., “A Plan for Advanced Guidance and Control Technology for 2nd Generation Reusable Launch Vehicles,”AIAA
+Guidance, Navigation, and Control Conference and Exhibit, 2002, p. 4557. https://doi.org/10.2514/6.2002-4557.
+[5] “Astra Knows What Caused Its Rocket Launch Failure in August and Will Try Again Soon,”Space.com, 2021. URL
+https://www.space.com/astra-identifies-cause-august-launch-failure.
+[6] Blackmore, L., “Autonomous Precision Landing of Space Rockets,”Frontiers of Engineering, 2016. https://doi.org/10.17226/
+23659, URL https://nap.nationalacademies.org/read/23659/chapter/10.
+[7] Pei, J., and Rothhaar, P., “Demonstration of the Space Launch System Augmenting Adaptive Control Algorithm on Pole-Cart
+Platform,”AIAA Guidance, Navigation, and Control Conference, 2018. https://doi.org/10.2514/6.2018-0608.
+[8] Miller, L., Pei, J., and Rothhaar, P., “Demonstration of the Space Launch System Augmenting Adaptive Control Algorithm on a
+Quad-Rotor,”AIAA Guidance, Navigation, and Control Conference, 2018. https://doi.org/10.2514/6.2018-0609.
+[9] Pei, J., Puetz, A., Duarte, C., Miller, L., and Rothhaar, P., “Suppression of Nonlinear Rotary Slosh Dynamics using
+the SLS Adaptive Augmenting Control System Demonstration on a Quadcopter Testbed,”AIAA Scitech Forum , 2019.
+https://doi.org/10.2514/6.2019-0114.
+[10] Elke, W. J., Pei, J., Caverly, R. J., and Gebre-Egziabher, D., “A Low-Cost and Low-Risk Testbed for Control Design of Launch
+Vehicles and Landing Systems,”IEEE Aerospace Conference Proceedings, 2021. https://doi.org/10.1109/AERO50100.2021.
+9438532.
+[11] Miller, C. J., Orr, J. S., Hanson, C. E., and Gilligan, E. T., “Airborne Simulation of Launch Vehicle Dynamics,”Annual AAS
+Guidance and Control Conference, 2015.
+[12] McGee, T. G., Artis, D. A., Cole, T. J., Eng, D. A., Reed, C., Hannan, M. R., Chavers, D. G., Kennedy, L. D., Moore, J. M., and
+Stemple, C. D., “Mighty Eagle: The Development and Flight Testing of an Autonomous Robotic Lander Test Bed,”Johns
+Hopkins APL Technical Digest, Vol. 32, No. 3, 2013, pp. 619–635.
+[13] Frampton, R., Oittinen, K., Ball, J. M., Ferguson, P., Ake, C., and Mahoney, S., “Planetary Lander Testbed for Technology
+Demonstration,”AIAA SPACE Conference and Exposition, 2013.
+[14] Trawny, N., Benito, J., Tweddle, B. E., Bergh, C. F., Khanoyan, G., Vaughan, G., Zheng, J., Villalpando, C., Cheng, Y., Scharf,
+D. P., et al., “Flight Testing of Terrain-Relative Navigation and Large-Divert Guidance on a VTVL Rocket,”AIAA SPACE
+Conference and Exposition, 2015, p. 4418.
+[15] Carson, J. M., Seubert, C. R., Amzajerdian, F., Villalpando, C., Bergh, C., O’Neal, T. V., Robertson, E. A., Hines, G. D., and
+Pierrottet, D., “COBALT: A Payload for Closed-Loop Flight Testing of Lander GN&C Technologies on Terrestrial Rockets,”
+AIAA SPACE Conference and Exposition, 2016, p. 5592.
+[16] Spannagl, L., Hampp, E., Carron, A., Sieber, J., Pascucci, C. A., Zgraggen, A. U., Domahidi, A., and Zeilinger, M. N., “Design,
+Optimal Guidance and Control of a Low-Cost Re-Usable Electric Model Rocket,”IEEE/RSJ International Conference on
+Intelligent Robots and Systems (IROS), 2021, pp. 6344–6351.
+[17] Linsen, R., Listov, P., de Lajarte, A., Schwan, R., and Jones, C. N., “Optimal Thrust Vector Control of an Electric Small-Scale
+Rocket Prototype,”International Conference on Robotics and Automation (ICRA), 2022, pp. 1996–2002.
+20
+
+=== PDF PAGE 21 ===
+[18] Bourliatoux, N., Riera, J. M., and Lustosa, L. R., “Definition of a Landing Strategy for a Model-Scale Reusable Rocket,”CEAS
+EuroGNC, Conference on Guidance, Navigation, and Control, 2022.
+[19] Açikmeşe,B.,III,J.M.C.,andBlackmore,L.,“LosslessConvexificationofNonconvexControlBoundandPointingConstraints
+oftheSoftLandingOptimalControlProblem,” IEEE Transactions on Control Systems Technology,Vol.21,2013,pp.2104–2113.
+https://doi.org/10.1109/TCST.2012.2237346.
+[20] de Ruiter, A. H., and Forbes, J. R., “General Identities for Parameterizations of SO(3) with Applications,”Journal of Applied
+Mechanics, Transactions ASME, Vol. 81, 2014. https://doi.org/10.1115/1.4027144.
+[21] de Jalon, J. G., and Bayo, E.,Kinematic and Dynamic Simulation of Multibody Systems: The Real-Time Challenge , Springer,
+1994.
+[22] Bauchau, O. A.,Flexible Multibody Dynamics, 1st ed., Springer, 2011. URL www.springer.com/series/6557.
+[23] Caverly, R. J., and Forbes, J. R., “Dynamic Modeling, Trajectory Optimization, and Control of a Flexible Kiteplane,”IEEE
+Transactions on Control Systems Technology, Vol. 25, 2017, pp. 1297–1306. https://doi.org/10.1109/TCST.2016.2606346.
+[24] Rao, S. S.,Vibration of Continuous Systems, John Wiley & Sons, Inc., 2007. URL http://www.wiley.com/go/permissions.
+[25] McCormick, B.,Aerodynamics, Aeronautics, and Flight Mechanics, 2nd ed., John Wiley & Sons, 1995.
+[26] Forbes,J.R.,Barfoot,T.D.,andDamaren,C.J.,“DynamicModelingandStabilityAnalysisofaPower-GeneratingTumbleweed
+Rover,”Multibody System Dynamics, Vol. 24, 2010, pp. 413–439. https://doi.org/10.1007/s11044-010-9202-2.
+[27] Açikmeşe, B., and Ploen, S. R., “Convex Programming Approach to Powered Descent Guidance for Mars Landing,”Journal of
+Guidance, Control, and Dynamics, Vol. 30, 2007, pp. 1353–1366. https://doi.org/10.2514/1.27553.
+[28] Blackmore, L., Açikmeşe, B., and Scharf, D. P., “Minimum-Landing-Error Powered-Descent Guidance for Mars Landing using
+Convex Optimization,”Journal of Guidance, Control, and Dynamics , Vol. 33, 2010, pp. 1161–1171. https://doi.org/10.2514/1.
+47202.
+[29] Açikmeşe, B., and Blackmore, L., “Lossless Convexification of a Class of Optimal Control Problems with Non-Convex Control
+Constraints,”Automatica, Vol. 47, 2011, pp. 341–347. https://doi.org/10.1016/j.automatica.2010.10.037.
+[30] Malyuta, D., Reynolds, T. P., Szmuk, M., Lew, T., Bonalli, R., Pavone, M., and Açıkmeşe, B., “Convex Optimization for
+Trajectory Generation: A Tutorial on Generating Dynamically Feasible Trajectories Reliably and Efficiently,”IEEE Control
+Systems Magazine, Vol. 42, No. 5, 2022, pp. 40–113. https://doi.org/10.1109/MCS.2022.3187542.
+[31] Szmuk, M., Açıkmese, B., Berning, A. W., and Huntington, G., “Successive Convexification for Fuel-Optimal Powered
+Landing with Aerodynamic Drag and Non-Convex Constraints,”AIAA Guidance, Navigation, and Control Conference, 2016.
+https://doi.org/10.2514/6.2016-0378.
+[32] Lysandrou, P. S., and Braun, R. D., “A 6-DoF Successive Convexification Powered Descent Guidance Implementation using
+Modified Rodrigues Parameters,”AIAA Scitech Forum, 2021, pp. 1–17. https://doi.org/10.2514/6.2021-0861.
+[33] Deters, R. W., Kleinke, S., and Selig, M. S., “Static Testing of Propulsion Elements for Small Multirotor Unmanned Aerial
+Vehicles,”35th AIAA Applied Aerodynamics Conference, 2017, pp. 1–34. https://doi.org/10.2514/6.2017-3743.
+[34] Frosch, J. A., and Vallely, D. P., “Saturn AS-501/S-IC Flight Control System Design,”Journal of Spacecraft and Rockets ,
+Vol. 4, 1967, pp. 1003–1009. https://doi.org/10.2514/3.29009.
+[35] Haesserman, W., “Guidance and Control of Saturn Launch Vehicles,”AIAA Second Annual Meeting , 1965, pp. 1–70.
+https://doi.org/10.2514/6.1965-304.
+21

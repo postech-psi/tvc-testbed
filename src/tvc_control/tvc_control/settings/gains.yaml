@@ -1,0 +1,29 @@
+# Simulation-tuned gains, not flight-validated hardware gains.
+# Rate PID outputs angular acceleration; attitude.py multiplies by inertia.
+axis_convention: rocket_v2
+default_profile: simulation
+profiles:
+  simulation:
+    attitude:
+      kp_angle: 5.0
+      kp_rate: 22.0
+      ki_rate: 0.0
+      kd_rate: 0.0
+      i_limit: 50.0
+    roll:
+      kp_angle: 2.0
+      kp_rate: 229.9438
+      ki_rate: 0.0
+      kd_rate: 0.0
+      i_limit: 200.0
+    altitude:
+      kp_alt: 4.0
+      kp_vz: 3.0
+      ki_vz: 0.0
+      kd_vz: 0.0
+      i_limit_vz: 4.0
+      vz_max: 2.0
+    position:
+      kp_pos: 0.1
+      kd_pos: 0.2
+      max_tilt_deg: 8.0

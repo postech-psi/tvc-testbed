@@ -1,0 +1,893 @@
+=== PDF PAGE 1 ===
+Design, Optimal Guidance and Control of a Low-cost
+Re-usable Electric Model Rocket
+Lukas Spannagl‡, Elias Hampp†, Andrea Carron‡, Jerome Sieber‡, Carlo Alberto Pascucci†,
+Aldo U. Zgraggen†, Alexander Domahidi†, Melanie N. Zeilinger‡
+Abstract— In the last decade, autonomous vertical take-
+off and landing (VTOL) vehicles have become increasingly
+important as they lower mission costs thanks to their re-
+usability. However, their development is complex, rendering
+even the basic experimental validation of the required advanced
+guidance and control (G & C) algorithms prohibitively time-
+consuming and costly. In this paper, we present the design of
+an inexpensive small-scale VTOL platform that can be built
+from off-the-shelf components for less than 1000 USD. The
+vehicle design mimics the ﬁrst stage of a reusable launcher,
+making it a perfect test-bed for G & C algorithms. To control
+the vehicle during ascent and descent, we propose a real-time
+optimization-based G & C algorithm. The key features are a
+real-time minimum fuel and free-ﬁnal-time optimal guidance
+combined with an offset-free tracking model predictive position
+controller. The vehicle hardware design and the G & C algo-
+rithm are experimentally validated both indoors and outdoor,
+showing reliable operation in a fully autonomous fashion with
+all computations done on-board and in real-time.
+Index Terms— Aerial Systems: Mechanics and Control, Mo-
+tion and Path Planning, Optimization and Optimal Control
+I. I NTRODUCTION
+Sustainable and repeatable access to space requires drastic
+changes in the way space transportation systems are designed
+and operated. In this regard, novel approaches to guidance,
+navigation, and control are key enabling technologies as
+they allow launchers to be reused by performing pin-point
+landings. This signiﬁcantly lowers the cost of access to
+space and maximizes the science return for missions on
+other planetary bodies, where it is necessary to land close
+to relevant geological features. Concerning guidance and
+control (G & C), this paper focuses on the use of numerical
+optimization to generate trajectories and actuation proﬁles
+on-board and in real-time. Similar techniques are already
+used by SpaceX [1] demonstrating their potential in the real-
+world. The last decade of advances in embedded computa-
+tional hardware, numerical algorithms [2], [3], [4], [5], and
+optimization software [6], [7] has made optimization-based
+G & C algorithms feasible for space applications. Despite
+the clear potential and the active research in this area [8],
+This work was partly supported by the European Space Agency (ESA)
+under the Future Launchers Preparatory Programme (FLPP) Contract No.
+4000124652/18/F/JLV and he Networking Partnering Initiative (NPI) Con-
+tract No. 621-2018, and the Swiss Space Center (SSC).
+†E. Hampp, C.A. Pascucci, A. U. Zgraggen, and A.
+Domahidi are with Embotech AG, 8005 Zurich, Switzerland
+{hampp,pascucci, zgraggen,domahidi}@embotech . com
+‡L. Spannagl, A. Carron, J. Sieber, and M. N.
+Zeilinger are with the Institute for Dynamic Systems and
+Control (IDSC), ETH Zurich, 8092 Zurich, Switzerland
+{spalukas,carrona,jsieber,mzeilinger}@ethz.ch
+Fig. 1. The EmboRockETH during an outdoor ﬂight.
+[9], these techniques also pose new challenges in terms of
+performance and functional validation.
+In order to address these problems, we designed an in-
+expensive small-scale vertical take-off and landing (VTOL)
+aircraft, informally dubbed EmboRockETH and shown in
+Figure 1, which allows the analysis and validation of G & C
+algorithms before their deployment on more complex sys-
+tems. The EmboRockETH is designed to replicate some of
+the key aspects of a reusable rocket’s ﬁrst stage including
+aerodynamic control ﬁns and a gimbaled main engine. Our
+contribution is twofold: we detail the complete hardware
+design of the EmboRockETH and we propose a G & C
+pipeline for indoor and outdoor ﬂights. 1
+The remainder of the paper is organized as follows. Next,
+we discuss existing related work and introduce the notation,
+before detailing the hardware design of the EmboRockETH
+in Section II. Subsequently, we outline the guidance and
+control architecture of the vehicle in Section III, discuss
+experimental results in Section IV, and conclude the paper
+in Section V.
+A. Related Work
+In recent years, several test platforms similar to the
+EmboRockETH have been developed or are currently un-
+der development. The two most notable examples being
+the Grasshopper [10], which was used by SpaceX for the
+early testing of their propulsive landing maneuvers, and
+1A video summarizing the paper and presenting outdoor ﬂight footage
+can be accessed through the IROS 2021 conference website or watched on
+YouTube: https://youtu.be/r4V7S1Rsbkg
+2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)
+September 27 - October 1, 2021. Prague, Czech Republic
+978-1-6654-1714-3/21/$31.00 ©2021 IEEE 6344
+2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 978-1-6654-1714-3/21/$31.00 ©2021 IEEE | DOI: 10.1109/IROS51168.2021.9636430
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 2 ===
+Xombie from Masten Space Systems, which was used
+within the frame of the ADAPT project [11] to test the
+lossless convexiﬁcation-based GFOLD algorithm [12] and
+the terrain relative navigation system for the Mars 2020
+mission [13]. More recently, the European Space Agency has
+joined these efforts with the Future Launchers Preparatory
+Programme (FLPP) [14]. However, all the aforementioned
+vehicles are complex systems that require an appropriate bud-
+get, a crew and stringent safety measures for their operation.
+Hence, the use of quadrotors has been predominant in aca-
+demic research, since these vehicles enable rapid prototyping
+and real-world testing of advanced G & C methods [15], [16]
+in an agile setting. Nevertheless, quadrotors do not share
+the inverted pendulum-like dynamics or the thrust vectoring
+through a gimbal, which are typical for a reusable ﬁrst
+stage and especially relevant for planning landing maneuvers.
+Therefore, the vehicle presented in this paper is aimed at
+bridging this gap by providing an agile research platform
+for advanced G & C methods with an improved dynamical
+representation of reusable launchers.
+B. Notation
+In this paper, we denote vectors with bold letters,
+i.e., a∈ Rn, matrices with bold capital letters, i.e.,
+A∈ Rn×m, and the time derivative of a vector or matrix
+with the dot notation, i.e. ˙a. The symbol H denotes the set
+of unit quaternions and ei denotes a unit vector along the i-
+th axis. We denote with the symbols p∈ R3 andv∈ R3 the
+position and velocity of the EmboRockETH in the world
+frame, respectively. The quaternion q ∈ H denotes the
+aircraft’s attitude, while ω∈ R3 is the associated angular
+velocity. The symbol T∈ R3 represents the thrust vector
+applied to the aircraft and g∈ R3 denotes the gravitational
+force. Given a quaternion q ∈ H, the rotation matrix
+R(q)∈ R3×3 is deﬁned as
+R(q) =
+
+
+1− 2(q2
+y +q2
+z ) 2( qxqy−qzqw) 2( qxqz +qyqw)
+2(qxqy +qzqw) 1 − 2(q2
+x +q2
+z ) 2( qyqz−qxqw)
+2(qxqz−qyqw) 2( qyqz +qxqw) 1 − 2(q2
+x +q2
+y)
+
+,
+where qx/y/z/w are the components of the quaternion q.
+Finally, given an angular velocity ω ∈ R3, we deﬁne the
+quaternion propagation matrix as
+Q(ω) =
+
+
+0 −ωx −ωy −ωz
+ωx 0 ωz −ωy
+ωy −ωz 0 ωx
+ωz ωy −ωx 0
+
+,
+whereωx/y/z are the components of the angular velocity ω.
+II. V EHICLE DESIGN
+In this section, we detail the design of the EmboRockETH,
+which is an electric small-scale VTOL vehicle and has
+the capability to ﬂy both indoors and outdoors. The
+EmboRockETH is mainly built from off-the-shelf compo-
+nents with a total cost of less than 1000 USD. The fully
+assembled vehicle weighs 1.16 kilograms, stands 1.05 meters
+tall, and can continuously hover for about 5 minutes. In
+the following, we discuss the overall structural design, the
+actuators, and the electronics of the vehicle.
+A
+B
+C
+D
+Fig. 2. Structural overview of the EmboRockETH: (A) electronics &
+battery, (B) 3D-printed ﬁns, (C) carbon ﬁber central spine, (D) gimbaling
+mechanism & propeller cage.
+A. Structural Design
+The EmboRockETH’s core structure is a carbon ﬁber
+square tube mounted on four ﬂexible non-retractable landing
+legs made from carbon ﬁber. The housing of the electronics
+and the battery are mounted opposite of each other at the top
+of the central square tube, while the gimbaling mechanism
+is mounted between the landing legs at the bottom of the
+vehicle, see Figure 2 (A, C, D). The gimbal consists of an
+universal joint connecting the central spine to a propeller
+cage. Additionally, the vehicle is equipped with four 3D-
+printed ﬁns, which enable aerodynamic control of the vehicle
+and are designed to have a relevant aerodynamic effect, when
+ﬂying faster than 4 m/s. The four ﬁns are mounted on a ring
+below the electronics and are symmetrically arranged around
+the core structure as shown in Figure 2 (B).
+B. Actuators
+The EmboRockETH’s main propulsion system consists
+of two coaxially mounted propellers, each actuated by a
+brushless DC motor. To enable thrust vectoring, the two
+rotors are mounted in a propeller cage, which is gimbaled
+by two servo-motors. For aerodynamic steering, the four 3D-
+printed ﬁns are independently actuated by one servo-motor
+each.
+C. Electronics & Sensors
+The EmboRockETH uses a Raspberry Pi 4 [17] as its main
+computational platform, while a PixHawk 4 autopilot [18]
+provides the sensing capabilities and the low-level ﬂight
+control. The Raspberry Pi hosts the high-level decision
+algorithms, i.e., guidance and position control, running on
+the robot operating system (ROS). The Pixhawk autopilot
+interfaces the Raspberry Pi through MA VROS [19] and hosts
+the low-level attitude control and state estimator. A more
+detailed overview of the algorithms and their respective
+execution platform is shown in Figure 3. Additionally, the
+6345
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 3 ===
+Raspberry Pi 4 Pixhawk Autopilot
+{pf} Optimal
+Guidance
+Position
+Controller
+25 HzMPC
+psp
+vsp MavROS
+Tx
+qsp
+Tx
+qsp
+Attitude
+Controller
+P 250 Hz
+Att. Rate
+Controller
+PID 1 kHz
+Control
+Allocation
+y
+S
+EKFMavROS
+CT-DT
+Kalman
+Filter
+ωsp τ
+ˆωˆq
+ˆxˆx
+ˆw
+Fig. 3. The above schematic represents the guidance and control architecture of the EmboRockETH, including the computational execution platform of
+the individual algorithms. The Raspberry Pi hosts the optimal guidance (1) and the high-level MPC position controller (7), while the Pixhawk hosts the
+low-level PID controllers and the control allocation. The communication between the two computation platforms is handled by the ROS package MA VROS.
+Pixhawk provides all the sensor measurements needed for
+estimation, i.e. the GPS signal and the inertial measurement
+unit (IMU) signal. For indoor ﬂights, the GPS module is
+disabled and replaced by a motion capture system. This
+is interfaced through the Raspberry Pi, which relays the
+measurements to the estimation algorithm on the Pixhawk.
+The computational platforms and the actuators are powered
+by a 14.8 V lithium polymer battery mounted at the top of
+the vehicle.
+III. G UIDANCE AND CONTROL ARCHITECTURE
+In this section, we describe the guidance and control
+architecture of the EmboRockETH that consists of a real-
+time optimal guidance algorithm, a model predictive control
+(MPC) position controller, two low-level PID attitude con-
+trollers, and a control allocation algorithm. Additionally, the
+state of the EmboRockETH is estimated using an extended
+Kalman ﬁlter (EKF). The overall architecture is shown in
+Figure 3 and the individual blocks are discussed in the
+following sections.
+A. Optimal Guidance
+In the following, we present the optimal guidance used
+on the EmboRockETH. The guidance leverages previous
+work presented in [20], [21], but is adapted to the speciﬁc
+properties of the EmboRockETH, i.e. the electric propulsion
+system and the ﬁxed mass of the vehicle. The optimal
+guidance problem is formulated as follows
+min
+tf,T(·)
+∫ tf
+t0
+∥T(t)∥ +λ1∥ ˙T(t)∥2 +λ2η(t)2 dt (1a)
+s.t.
+p(t0) =p0 ∥p(tf)−pf∥≤ ptol (1b)
+v(t0) =v0 ∥v(tf)−vf∥≤ vtol (1c)
+˙p(t) =v(t) ˙v(t) = 1
+m T(t) +g (1d)
+e1·(p(t)−p(t0))≥ tan(γ)∥ [e2 e3]·(p(t)−p(t0))∥ (1e)
+e1·(p(t)−p(tf))≥ tan(γ)∥ [e2 e3]·(p(t)−p(tf))∥ (1f)
+∥v(t)∥≤ vmax +η(t) η(t)≥ 0 (1g)
+0≤Tmin≤∥ T(t)∥≤ Tmax (1h)
+˙Tmin≤∥ ˙T(t)∥≤ ˙Tmax (1i)
+e1· T(t)≥ cos(θmax)∥T(t)∥ (1j)
+where the subscripts 0 andf indicate initial and ﬁnal values,
+respectively,λ1 and λ2 are scalar weighting factors, η(t) is
+a slack variable on the velocity constraint, ptol and vtol are
+the tolerated deviations from the ﬁnal position and velocity,
+respectively,γ is the half-angle deﬁning the aperture of the
+glide slope cone, and θmax is the maximum tilt angle. The
+optimal guidance is based on a free-ﬁnal-time formulation
+minimizing fuel consumption and violation of the velocity
+constraint, while discouraging large changes in the input (1a).
+It treats the thrust rate as a control input in order to account
+for the time response of the actuators. Additionally, it uses
+a three degrees of freedom (3-DoF) model (1d) subject to
+a soft velocity constraint (1g) and lower and upper bounds
+on the magnitudes of thrust and thrust rate (1h) - (1i). In
+this 3-DoF formulation, we use the thrust vector as a proxy
+for the attitude. Therefore, the constraint (1j) limits the tilt
+with respect to the vertical axis in the inertial frame. The
+constraints (1e) - (1f) are the ascent and descent glide slope
+constraints, respectively. During ascent only (1e) is included
+in the problem formulation, while (1f) is only considered
+for the descent phase. These two constraints limit the ascent
+trajectory to a safe corridor and prohibit too shallow descent
+trajectories.
+Problem (1) is discretized using the forward Euler method
+over 30 points in the interval [t0,tf]. It is worth noting that,
+to implement this formulation as free-ﬁnal-time, the [t0,tf]
+time range is mapped into the [0, 1] pseudo-time interval and
+the dynamics scaled accordingly. The optimal guidance prob-
+lem is only solved when a request is received. This occurs
+shortly before takeoff for the ascent target, if the vehicle is
+6346
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 4 ===
+close to the end of the currently computed trajectory, if the
+tracking error exceeds a predeﬁned threshold, or the desired
+landing position is changed during the descent phase.
+B. MPC-based Position Controller
+In this section, we describe the MPC-based position
+controller used for the EmboRockETH. The next sections
+are organized as follows. First, model and constraints are
+presented. We then introduce an augmented model that
+captures the model mismatch and disturbances that can be
+estimated by a Kalman ﬁlter. Finally, we propose the MPC
+control scheme.
+1) Model: To control the position of the EmboRockETH,
+we leverage a more complex dynamical model [22] compared
+to the one used in the optimal guidance. The model is
+described by the following differential equations
+˙p(t) =v(t) (2a)
+˙v(t) =R(q(t))· T(t)/m +g (2b)
+˙q(t) = 0.5·Q(ω(t))·q(t) (2c)
+˙ω(t) =J−1· (T(t)×rG−ω(t)× (J·ω(t))) (2d)
+˙T(t) = (u(t)− T(t))/tτ, (2e)
+where the state of the system is given by
+x =
+[
+p⊤,v⊤,q⊤,ω⊤, T⊤]⊤
+. Equation (2c) is norm
+preserving, implying that ∥q∥ = 1. The model’s input is the
+desired thrust vector and it is denoted by u∈ R3. To model
+the delay in the response of the motors, the actual thrust
+dynamics T is modeled as a ﬁrst order system with time
+constant tτ∈ R, as described in equation (2e).
+The distance between the engine’s hinge point
+and the vehicle’s center of gravity is represented by
+rG = [rG, 0, 0]⊤∈ R3, while the inertia matrix is denoted
+by J ∈ R3×3. The nominal system dynamics can be
+compactly rewritten as ˙x(t) =f(x(t),u(t)).
+2) Disturbance Model and State Estimation: In order
+to consider partial state knowledge, sensor noise, model
+mismatch and unknown disturbances, the nominal model is
+augmented with an output model and an uncertainty term in
+the state-space equation. The uncertain system dynamics can
+then be written as
+˙x(t) =f(x(t), u(t)) + Bdw(x(t), u(t)),
+˙w(t)(x(t), u(t)) = 0,
+y(t) = Cx(t) + v(t),
+(3)
+where we assume that the uncertainty in (3) has zero-
+order dynamics [23], i.e., the disturbance is constant, Bd
+is the noise to state matrix, w(x, u) models the unknown
+uncertainty and disturbances, C is the output matrix, and
+v is the measurement noise, which is assumed to be in-
+dependent of the state or input and Gaussian i.i.d. with
+zero mean and covariance Σv =σ2I. We further model the
+uncertainty term such that w(x, u) =
+[
+dv⊤,da⊤,dα⊤]⊤
+,
+where dv = [dvx,dvy,dvz]⊤ is the mismatch between the
+actual and nominal velocity, da = [dax,day,daz]⊤ is the
+mismatch between the actual and nominal acceleration, and
+z y
+x
+u
+δmax
+Fig. 4. Polytopic set deﬁned by the input constraints (5) including an
+example input vector u (in blue) satisfying the constraints.
+dα = [dαx,dαy,dαz]⊤ is the mismatch between the actual
+and nominal angular acceleration. The system dynamics
+in (3) are discretized using the Runge-Kutta 4 method with 4
+intermediate nodes with a sampling-time of 25Hz , obtaining
+a non-linear system of the form
+x(k + 1) = ¯f(x(k), u(k), w(k)),
+w(k + 1) = w(k),
+y(k) = Cx(k) + v(k),
+(4)
+where ¯f are the discretized system dynamics. As we directly
+measure position, asset, acceleration, and angular velocity,
+we assume model (4) to be observable, such that the state x
+and offset w can be estimated using an extended Kalman
+ﬁlter and a CT-DT Kalman ﬁlter [24], respectively.
+3) Constraints: The system is subject to the following
+polytopic input constraints
+−ux tan(δmax)≤uy≤ux tan(δmax), (5a)
+−ux tan(δmax)≤uz≤ux tan(δmax), (5b)
+ux,min≤ux≤ux,max, (5c)
+where δmax is the maximum gimbal angle. The set formed
+by (5) is depicted in Figure 4. As the thrust constraints
+of the propulsion system are deﬁned by the minimal and
+maximal achievable thrust magnitudes∥T∥min and∥T∥max,
+respectively, we need to convert these constraints intoux,min
+and ux,max, i.e.,
+ux,min =||T||min, (6a)
+ux,max = ||T||max√
+1 + 2 tan2(δmax)
+. (6b)
+The conversion equations (6) deﬁne the lower and upper
+bounds of a pyramid, which is inscribed in the spherical
+sector deﬁned by ∥T∥min and∥T∥max. We only consider
+input constraints, therefore our MPC formulation does not
+include state constraints.
+4) Offset-free Tracking MPC: We propose a non-linear
+MPC control scheme for system (4), which exploits the
+disturbance model to perform offset-free tracking and en-
+sures constraint satisfaction. In the following, we will assume
+6347
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 5 ===
+that the optimal guidance and the offset-free tracking MPC
+controller are time-synchronized. The following optimization
+problem deﬁnes the MPC scheme
+min
+xi|k,ui|k
+lf(xN|k, rN|k) +
+N−1∑
+i=0
+li(xi|k, ui|k, wi|k, ri|k) (7a)
+s.t.∀i∈{ 0, 1,...,N − 1} (7b)
+x0|k = ˆ x(k) (7c)
+w0|k = ˆ w(k) (7d)
+xi+1|k = ¯f(xi|k, ui|k, wi|k) (7e)
+wi+1|k = wi|k (7f)
+Aui|k≤ b, (7g)
+where the subscript i|k denotes the i-th prediction starting
+from the initial condition at the time instant k. The vector
+r = [ p⊤
+sp,v⊤
+sp]⊤ is the position and velocity reference
+provided by the optimal guidance and is kept constant over
+the whole horizon, ˆ x(k) and ˆ w(k) are the initial conditions
+of the optimization problem obtained by the Kalman ﬁlters,
+and N is the prediction horizon. The terms li and lf are
+appropriate functions for reference tracking, for example
+quadratic functions that penalize the error between state and
+reference, i.e.,
+li =||pi−psp||2
+Qp +||(vi +dv)−vsp||2
+Qv+
+||ωyz,i||2
+Qω +||Ti− Teq||2
+QT +||ui− Teq||2
+R
+(8)
+and lf =||pN−psp||2
+QN with
+ωyz,i =
+[ωy,i
+ωz,i
+]
+, Teq =
+
+
+m· (g−dax)
+(Jzz·dαz)/rG
+(Jyy·dαy)/rG
+
+. (9)
+The ﬁrst term in (8) accounts for the deviation between
+the predicted and desired trajectory. The second penalizes
+the deviation between the desired velocity and the offset-
+free predicted velocity. The third term helps in dampening
+the oscillations produced by large variations of the angular
+velocities in the y and z-axes. The last two terms penalize
+the deviation of the thrust from the desired offset-free thrust
+equilibrium Teq, computed as in (9). Finally, equations (7e) -
+(7f) represent the system dynamics and equation (7g) the
+input constraints (5). Problem 7 can be efﬁciently solved
+using nonlinear programming solvers such as [25]. Given the
+optimal solution ui|k, the quaternion set-point qsp and the
+thrust along the body x-axis Tx are computed by inverting
+the dynamics of the low-level PID controllers. This allows
+us to compute the qsp,Tx, which realize the desired optimal
+control action.
+C. Low-Level PID Controllers
+The attitude and attitude rate PID controllers run on the
+Pixhawk autopilot. As they are computationally lightweight,
+they are executed at high sampling rates, i.e., 250Hz and
+1kHz, respectively. The input to the low-level attitude con-
+troller is the quaternion set-point qsp generated by the MPC
+controller and its output is the velocity set-point ωsp for the
+attitude rate controller. This in turn outputs the torque τ that
+bb
+cc
+ee
+dd
+φ1
+θ1
+aa
+Fig. 5. Above picture shows the gimbal and a schematic of its geometry
+for one gimbaling direction. The gimbal’s deﬂection in this direction is
+determined by the position of servo arm (a) and the geometry. The servo-
+motor rotates the servo arm (a) by the angle φ1. Given the geometry of the
+gimbal, this motion rotates the gimbal arm (c) by the angle θ1, which then
+deﬁnes the deﬂection of the gimbal. The symbols a,b,c,d, and e denote
+the names and lengths of the ﬁve arms deﬁning the gimbal’s geometry.
+should be generated by the actuators. This structure reﬂects
+the architecture presented in [26].
+D. Control Allocation
+The control allocation converts the torque τ =
+[τx,τy,τz]⊤ and thrust along the body x-axis Tx into com-
+mands for the actuators. The controlled actuators are the two
+servo-motors, which determine the orientation of the univer-
+sal joint, and the two DC motors connected to the propellers.
+The vehicle’s ﬁns are currently not considered in the control
+allocation and will be the subject of future research. The
+allocation algorithm is described in Algorithm 1. At ﬁrst,
+the control allocation maps the torque τ and the thrust Tx
+into an equivalent three-dimensional thrust vector acting on
+the center of the universal joint, i.e.
+T =
+
+
+Tx
+Ty
+Tz
+
+ =
+
+
+Tx
+−τz/rG
+τy/rG
+
+. (10)
+The second step consists of determining the gimbal angles
+given the thrust vector. As depicted in Figure 5, the gimbal
+angles θ1 and θ2 correspond to the thrust vector orientation
+with respect to the center of the universal joint, and their
+relationship is given by the following equalities
+θ1 =− arcsin
+
+ Tz√
+||T||2
+2−T 2y
+
+
+θ2 = arcsin
+( Ty
+||T||2
+)
+.
+(11)
+Next, the kinematics of the gimbal is inverted to obtain
+the servo angles φ1 and φ2, see Figure 5. The ﬁrst servo-
+motor rotates the gimbal around the y-axis with angle φ1 and
+deﬁnes the axis of rotation for the second servo-motor. From
+6348
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 6 ===
+1,000
+1,500
+2,000
+1,000
+1,500
+2,000
+0
+5
+10
+15
+τDC1 [µs]
+τDC
+2 [µs]
+Thrust [N]
+1,000
+1,500
+2,000
+1,000
+1,500
+2,000
+−0.1
+0
+0.1
+τDC
+1 [µs]τDC2 [µs]
+Torque [N]
+Fig. 6. The experimentally determined thrust magnitude ||T|| (left) and torque τx (right) as a function of the moter PWM’s duty cycle commands. The
+red dots indicate thrust and torque measurements averaged over a 2 s horizon and the blue surfaces show the cubic surface ﬁts, which are used as models.
+the geometry of the gimbaling mechanism, it is possible to
+derive the two following equalities
+b2 =(e−a sin(φ1) +c sin(θ1))2+
+(d−c cos(θ1) +a cos(φ1))2,
+b2 =(e−a sin(φ2) +c cos(θ1) sin(θ2))2+
+(d−c cos(θ2) +a cos(φ2))2+
+c2 sin(θ2)2 sin(θ1)2.
+(12)
+These equations can be solved explicitly to obtainφ1 andφ2.
+Finally, the last step consists of ﬁnding the motor com-
+mands τDC 1 and τDC 2 such that the torque τx and the
+thrust||T|| are generated by the propeller pair. These two
+maps can be described by two third-order polynomials, see
+Figure 6. In Section IV-A, we detail how these maps have
+been experimentally determined.
+Algorithm 1 Control Allocation
+Input Torqueτ , Thrust Tx
+Output φ1, φ2, τDC 1, τDC 2
+1: Computation of the thrust vector using (10)
+2: Computation of the gimbal angles using (11)
+3: Solve (12) to obtain the servo-motor angles φ1 and φ2
+4: Compute PWM duty cycle motor commands τDC 1
+and τDC 2 from τx and||T||
+IV. E XPERIMENTAL RESULTS
+We performed three kinds of experiments. The ﬁrst ex-
+periment identiﬁed the motor command maps. These maps
+are necessary to covert thrust and torque commands into
+motor commands. The second experiment tested the offset-
+free tracking MPC using a reliable and accurate localization
+system, i.e. a motion capture system. Finally, we tested the
+overall guidance and control pipeline using the on-board GPS
+as localization system. All the experiments were conducted
+using the FORCESPRO [25], [27] non-linear programming
+solver to solve the optimization problems (1) and (7) on the
+Raspberry Pi (1.8 GHz ARM Cortex A72, 4 GB memory) in
+real-time. In the Raspberry Pi, two cores were used to run
+the guidance and one to run the MPC controller.
+A. Identiﬁcation of Motor Command Maps
+In the ﬁnal step of Algorithm 1, the thrust magnitude||T||
+and the torque τx have to be mapped to the motor com-
+mands τDC 1 and τDC 2, which represent the pulse width
+modulation’s duty cycle, where the fundamental frequency
+is set to 400 Hz. These maps have to be determined ex-
+perimentally, since they vary depending on the speciﬁc
+motors and propeller conﬁguration used. In the following, we
+detail the experimental procedure that obtains these maps.
+While individually increasing the motor commands τDC 1
+and τDC 2 in 100µs increments, we measure the thrust ||T||
+and torqueτx with a load cell. Subsequently, we ﬁt two cubic
+surfaces to the thrust and torque measurements, see Figure 6.
+Then, the two maps are inverted to obtain a description of
+the motor commands as a function of the thrust and torque.
+These inversions are always feasible since the cubic surfaces
+are required to be strictly monotonic in the admissible range
+of motor commands. Since the measurements are performed
+at the nominal voltage of the battery, deviations arise due
+to variations in the battery voltage. These deviations are
+compensated by the offset-free MPC formulation and are not
+accounted for in the control allocation.
+B. Indoor Flight for Validation
+In a ﬁrst step, we test the performance of the position
+control-loop, i.e., the architecture in Figure 3 without the
+optimal guidance. The experiment is performed indoors
+and the vehicle is localized using a Vicon motion capture
+system. The reference and the vehicle trajectory are shown
+in Figure 7 for a ﬂight between the set-points A and B.
+Additionally, Figure 8 shows the references and trajectories
+for all three axes individually. The MPC offset-free tracking
+formulation compensates the model mismatch, given e.g.
+by the misalignment between the center of gravity of the
+6349
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 7 ===
+0
+1
+2
+−2
+−1
+0
+0.5
+1
+1.5
+A
+B
+z [m]
+y [m]
+x [m]
+Measurement
+Setpoints
+Fig. 7. The measured indoor ﬂight trajectory (blue line) between set-points
+A and B is shown for a control conﬁguration as in Fig. 3, but excluding the
+optimal guidance. The vehicle starts in A x = [1.2 m, 0 m, 0 m]⊤, is then
+commanded to ﬂy to B x = [1.2 m, 2 m, 2 m]⊤, before returning to A.
+vehicle and the barycenter of the central rod, resulting in
+the offset-free tracking observed in Figures 7 and 8. In a
+second experiment, we further highlight the effectiveness of
+the offset-free formulation. We let the EmboRockETH hover
+at a ﬁxed position and observe if it can hold the altitude as
+the battery voltage drops. The results are shown in Figure 9,
+notice the voltage drop and the corresponding adjustment
+of the estimated uncertainty term dax in order to keep the
+vehicle at the desired position.
+C. Outdoor Flight Campaign
+In a second step, we validate the platform and test the
+full control pipeline shown in Figure 3 in an outdoor ﬂight
+campaign with 19 ﬂights. In the campaign, we distinguish
+between three different mission scenarios: (i) vertical ascent
+to a pre-deﬁned altitude and subsequent vertical descent to
+the starting position, (ii) vertical ascent to a pre-deﬁned
+altitude followed by the descent to a horizontally displaced
+ﬁnal position, which is known as a divert maneuver (see
+Figure 10), and (iii) divert maneuver as described in the pre-
+vious scenario, however the ﬁnal position is changed at a pre-
+deﬁned time during the ﬂight, hence the optimal guidance has
+to re-plan the trajectory in-ﬂight (see Figure 11). All ﬂights
+are performed with both optimal guidance (1) and offset-
+free MPC (7) running in real-time on the Raspberry PI with
+average solve times of 120 ms and 30 ms, respectively, and
+the vehicle is localized using the GPS in combination with
+the IMU. The maximum altitude, maximum divert distance,
+and maximum velocity reached during the campaign are
+100 m, 50 m, and 3 m/s, respectively. The EmboRockETH
+successfully completed all 19 ﬂights, therefore verifying the
+control pipeline in a real-world setting and showing that the
+vehicle can ﬂy a variety of autonomous landing missions.
+V. C ONCLUSIONS
+This paper has proposed an inexpensive small-scale
+vertical take-off and landing (VTOL) aircraft dubbed
+EmboRockETH, with the purpose to serve as a test-bed for
+0 5 10 15 20 25
+−2
+0
+2
+Time [s]
+Position [m]
+x
+y
+z
+Fig. 8. Behavior of the offset-free MPC position controller in the indoor
+environment to a step input in the y− andz−direction. The position along
+thex-,y- andz-axis is shown by the solid lines and the dashed lines indicate
+the corresponding set-points.
+0 10 20 30 40 50
+−0.5
+0
+0.5
+1
+Time [s]
+Altitude [m], Learned Offset [ms−2]
+x
+dax
+Battery
+V oltage
+13.4
+13.5
+13.6
+13.7
+13.8
+V oltage [V]
+Fig. 9. The plot shows the vehicle tracking a constant reference (dashed
+red line). The measured vehicle trajectory (solid red line) is close to the
+reference for the whole experiment even if there is a battery voltage drop
+(dark blue line) of 0.3 V . This is achieved by the CT-DT Kalman ﬁlter
+through continuously adapting the estimated model offset (light blue line).
+advanced real-time guidance and control algorithms. The
+EmboRockETH was designed to better capture the dynamical
+aspects of a reusable rocket than existing quadrotor platforms
+and perform indoor and outdoor ﬂights. Additionally, a real-
+time guidance and control pipeline was proposed for the
+EmboRockETH and veriﬁed in indoor and outdoor ﬂights.
+REFERENCES
+[1] L. Blackmore, “Autonomous precision landing of space rockets,”
+National Academy of Engineering ’The Bridge on Frontiers of En-
+gineering’, vol. V olume 4 Issue 46, 2016.
+[2] B. Ac ¸ikmese and S. R. Ploen, “Convex programming approach to
+powered descent guidance for mars landing,” Journal of Guidance,
+Control, and Dynamics , vol. 30, no. 5, pp. 1353–1366, sep 2007.
+[3] D. Malyuta and B. Ac ¸ikmes ¸e, “Lossless convexiﬁcation of optimal
+control problems with semi-continuous inputs,” 2019.
+[4] X. Liu and P. Lu, “Solving nonconvex optimal control problems by
+convex optimization,” Journal of Guidance, Control, and Dynamics ,
+vol. 37, no. 3, pp. 750–765, 2014.
+6350
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 8 ===
+Fig. 10. EmboRockETH in several states along the optimal trajectory
+(dashed blue line) of an outdoor divert maneuver.
+[5] C. S ´anchez-S´anchez and D. Izzo, “Real-time optimal control via deep
+neural networks: study on landing problems,” Journal of Guidance,
+Control, and Dynamics , vol. 41, no. 5, pp. 1122–1135, 2018.
+[6] A. Domahidi, A. U. Zgraggen, M. N. Zeilinger, M. Morari, and C. N.
+Jones, “Efﬁcient interior point methods for multistage problems arising
+in receding horizon control,” in 2012 IEEE 51st IEEE conference on
+decision and control (CDC) . IEEE, 2012, pp. 668–674.
+[7] J. L. Jerez, P. J. Goulart, S. Richter, G. A. Constantinides, E. C.
+Kerrigan, and M. Morari, “Embedded online optimization for model
+predictive control at megahertz rates,”IEEE Transactions on Automatic
+Control, vol. 59, no. 12, pp. 3238–3251, 2014.
+[8] JGCD, Special Issue on Computational Guidance and Control, vol. 40,
+no. 2, Feb. 2017.
+[9] U. Eren, A. Prach, B. B. Koc ¸er, S. V . Rakovi ´c, E. Kayacan, and
+B. Ac ¸ıkmes ¸e, “Model predictive control in aerospace systems: Current
+state and opportunities,” Journal of Guidance, Control, and Dynamics,
+vol. 40, no. 7, pp. 1541–1566, 2017.
+[10] SpaceX, “Grasshopper 744m test — single camera (hexacopter),”
+SpaceX (YouTube), url=https://youtu.be/9ZDkItO-0a4, 2013.
+[11] D. P. Scharf, B. Ac ¸ıkmes ¸e, D. Dueri, J. Benito, and J. Casoliva,
+“Implementation and experimental demonstration of onboard powered-
+descent guidance,” Journal of Guidance, Control, and Dynamics ,
+vol. 40, no. 2, pp. 213–229, 2017.
+[12] B. Ac ¸ikmes ¸e, J. Casoliva, J. Carson, and L. Blackmore, “G-fold: A
+real-time implementable fuel optimal large divert guidance algorithm
+for planetary pinpoint landing,” Concepts and Approaches for Mars
+Exploration, vol. 1679, p. 4193, 2012.
+[13] K. A. Farley, K. H. Williford, K. M. Stack, R. Bhartia, A. Chen,
+M. de la Torre, K. Hand, Y . Goreva, C. D. Herd, R. Huesoet al., “Mars
+2020 mission overview,” Space Science Reviews , vol. 216, no. 8, pp.
+1–41, 2020.
+[14] J.-P. Pr ´eaud, S. Dussy, J. Breteau, and J. Bru, “Preparing the future of
+european space transportation: Reusable technologies and demonstra-
+tors,” in 8th European Conference for Aeronautics and Space Sciences
+(EUCASS), 2019.
+[15] A. P. Schoellig, F. L. Mueller, and R. D’andrea, “Optimization-
+based iterative learning for precise quadrocopter trajectory tracking,”
+Autonomous Robots, vol. 33, no. 1, pp. 103–127, 2012.
+[16] M. Szmuk, C. A. Pascucci, and B. Ac ¸ikmes ¸e, “Real-time quad-
+rotor path planning for mobile obstacle avoidance using convex opti-
+20
+10
+z [m]
+00
+5
+10
+-1010
+15
+20
+y [m]
+0
+25
+30
+35
+-10
+40
+-20
+45
+-20
+50
+-30
+x [m]
+optimal
+actual
+attitude
+Fig. 11. Optimal trajectory of a divert maneuver with re-targeting (blue
+line) generated in real-time by the optimal guidance (1) together with the
+measured trajectory followed by the vehicle controller (red line). During the
+ﬂight, the EmboRockETH is re-targeted from its initial target (red circle)
+to its new target (green circle).
+mization,” in 2018 IEEE/RSJ International Conference on Intelligent
+Robots and Systems (IROS) . IEEE, 2018, pp. 1–9.
+[17] Raspberry Pi Foundation, Raspberry Pi 4B Speciﬁca-
+tions. [Online]. Available: https://www.raspberrypi.org/products/
+raspberry-pi-4-model-b/speciﬁcations/
+[18] PX4, Pixhawk4 Technical Data Sheet, august 2018 ed. [Online]. Avail-
+able: https://raw.githubusercontent.com/PX4/PX4-user guide/master/
+assets/ﬂight controller/pixhawk4/pixhawk4 technical data sheet.pdf
+[19] MA VLink, “Mavros (v1.6.0): Mavlink extendable
+communication node for ros,” MA VLink (GitHub),
+url=https://github.com/mavlink/mavros, 2020.
+[20] J. Jerez, S. Merkli, S. Bennani, and H. Strauch, “Forces-RTTO: A tool
+for on-board real-time autonomous trajectory planning,” in 2017 10th
+International ESA Conference on Guidance, Navigation & Control
+Systems 29 May - 2 June, Salzburg, Austria , 2017.
+[21] C. A. Pascucci, A. Fernandez, J. Jerez, S. Bennani, J.-P. Preaud, and
+J. Bru, “Design simulation and software validation for on-board and
+real-time optimal guidance,” in Proceedings of the 8th EUCASS .
+[22] M. Szmuk and B. Ac ¸ikmes ¸e, “Successive convexiﬁcation for 6-dof
+mars rocket powered landing with free-ﬁnal-time,” in 2018 AIAA
+Guidance, Navigation, and Control Conference .
+[23] F. Borrelli and M. Morari, “Offset free model predictive control,” in
+2007 46th IEEE Conference on Decision and Control , Dec 2007, pp.
+1245–1250.
+[24] R. E. Kalman and R. S. Bucy, “New Results in Linear Filtering and
+Prediction Theory,” Journal of Basic Engineering , vol. 83, no. 1, pp.
+95–108, mar 1961.
+[25] A. Zanelli, A. Domahidi, J. Jerez, and M. Morari, “Forces NLP:
+an efﬁcient implementation of interior-point methods for multistage
+nonlinear nonconvex programs,” International Journal of Control , pp.
+1–17, 2017.
+[26] D. Brescianini, M. Hehn, and R. D’Andrea, “Nonlinear quadrocopter
+attitude control: Technical report,” ETH Zurich, Tech. Rep., 2013.
+[Online]. Available: https://www.research-collection.ethz.ch/bitstream/
+handle/20.500.11850/154099/eth-7387-01.pdf
+[27] A. Domahidi and J. Jerez, “Forces professional,” Embotech AG,
+url=https://embotech.com/FORCES-Pro, 2014–2019.
+6351
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:08:25 UTC from IEEE Xplore.  Restrictions apply. 

@@ -3,28 +3,31 @@
 <package format="3">
   <name>tvc_control</name>
   <version>0.0.1</version>
-  <description>Phase 4: simulator_node + controller_node, splitting tvc_physics.py's 6-DOF dynamics and cascaded PID across a ROS2 topic boundary</description>
+  <description>TVC VTVL flight code, plant models and ROS 2 nodes (POSTECH UGRP coaxial thrust-vectored demonstrator)</description>
   <maintainer email="kyber06@icloud.com">devkyber</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>tvc_msgs</depend>
   <depend>python3-numpy</depend>
   <depend>python3-scipy</depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
+  <exec_depend>python3-tk</exec_depend>
 
-  <!-- Phase 5 (Gazebo): the bridge node and gazebo.launch.py -->
+  <!-- Launch files and installed package discovery. -->
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Gazebo software-in-the-loop: gazebo_bridge_node + gazebo.launch.py -->
   <depend>actuator_msgs</depend>
   <depend>nav_msgs</depend>
+  <depend>rosgraph_msgs</depend>
   <exec_depend>ros_gz_bridge</exec_depend>
-  <exec_depend>ros_gz_sim</exec_depend>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

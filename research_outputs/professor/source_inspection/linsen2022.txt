@@ -1,0 +1,698 @@
+=== PDF PAGE 1 ===
+Optimal Thrust Vector Control of an Electric Small-Scale Rocket Prototype
+Rapha¨el Linsen y, Petr Listov y, Alb ´eric de Lajarte y, Roland Schwan and Colin N. Jones
+Abstract Recent advances in Model Predictive Control
+(MPC) algorithms and methodologies, combined with the surge
+of computational power of available embedded platforms,
+allows the use of real-time optimization-based control of fast
+mechatronic systems. This paper presents an implementation
+of an optimal guidance, navigation and control (GNC) system
+for the motion control of a small-scale electric prototype of
+a thrust-vectored rocket. The aim of this prototype is to
+provide an inexpensive platform to explore GNC algorithms
+for automatic landing of sounding rockets. The guidance and
+trajectory tracking are formulated as continuous-time optimal
+control problems and are solved in real-time on embedded
+hardware using the PolyMPC library. An Extended Kalman
+Filter (EKF) is designed to estimate external disturbances and
+actuators offsets. Finally, indoor and outdoor ight experiments
+are performed to validate the architecture.
+I. I NTRODUCTION
+Thrust Vector Control (TVC) is a key technology enabling
+rockets to perform complex autonomous missions, such as
+active stabilization, orbit insertion, or propulsive landing.
+This is achieved by independently controlling the thrust
+direction and magnitude of each of its engines. Compared to
+aerodynamic control such as ns or canard, it guarantees a
+high control authority even in the absence of an atmosphere,
+i.e. during high altitude launches or exploration of other
+planetary bodies.
+It is common in the aerospace industry to develop low-cost
+and low-risk vehicles to experiment on GNC [1]. Particularly,
+Masten Space Systems, an aerospace company, that has
+worked on various test vehicles since 2009, mainly to sup-
+port NASA in developing autonomous landing technologies
+[2]. The company deployed a real-time version of the G-
+FOLD landing algorithm [3] developed by the Jet Propulsion
+Laboratory (JPL) of NASA. The algorithm is used to nd
+the optimal trajectory to the landing site by minimizing
+fuel consumption. An adapted version of G-FOLD was inte-
+grated into the Xombie vehicle for the Autonomous Ascent
+and Descent PoweredFlight Testbed (ADAPT) program [4].
+NASA itself has worked on many test vehicles since its
+Lunar Landing Research Vehicle (LLRV) developed for the
+Apollo program. Their Mighty Eagle vehicle was used to
+test the nal phase of landing using classic cascaded PID
+controllers to stabilize the vehicle orientation and track the
+landing position. [5]. A more recent SPLICE program (Safe
+and Precise Landing  Integrated Capabilities Evolution)
+This work was partially supported by the Swiss National Science Founda-
+tion under the NCCR Automation project, grant agreement 51NF40 180545.
+yThe authors contributed equally.
+All authors are with Laboratoire d'Automatique, EPFL, Switzerland.
+fpetr.listov, roland.schwan, colin.jones g@epfl.ch
+explored new technologies to improve the landing precision
+up to tens of meters [6] employing a six-degree-of-freedom
+(DoF) ying vehicle model for optimal guidance problems
+[7] [8].
+The academic research in this domain is limited due to
+high manufacturing costs and exploitation risks of such ying
+vehicles. In order to foster the research and explore differ-
+ent GNC technologies, we developed a small-scale electric
+prototype that serves as a test platform for deployment and
+in-ight validation of GNC algorithms. Our vehicle relies
+on inexpensive materials and standard drone components,
+making it simple for development and modication at a
+relatively low cost of around 500 US dollars. Compared to
+traditional test vehicles integrating a rocket engine for its
+propulsion, we use electrically powered propellers as the
+source of thrust, which signicantly reduces the cost and
+logistics associated with the operation of a rocket engine,
+while still maintaining a high degree of similarity to the
+dynamics of a rocket. This allows early and diverse ight
+tests and fast design iterations of the GNC system.
+A similar approach was proposed by Spannagle et al.
+who developed an electric low-cost Vertical Take-Off and
+Landing (VTOL) vehicle to test a reusable launcher GNC
+system [9]. Albeit sharing some similarities, the project
+presented in this paper features a different mechanical design
+of the ying vehicle and optimal guidance and trajectory
+stabilization formulations. Contrary to their approach with a
+separate thrust allocation algorithm and cascaded PID loops
+for orientation control, we use a nonlinear MPC algorithm
+to simultaneously track the optimal reference trajectory and
+stabilize the attitude of the vehicle. Importantly, the software
+presented in this paper is solely based on open-source
+components and is publicly available through the following
+link: https://github.com/EPFLRocketTeam/tvc drone.
+This paper is structured as follows. First, the hardware and
+software design of the vehicle are presented in sections II
+and III. Then a complete mathematical model is derived and
+identied in section IV. This model is then used in section
+V to formulate optimal guidance and control problems,
+and in section VI to build an extended state observer for
+disturbances estimations. Finally, section VII presents indoor
+and outdoor ights results.
+II. H ARDWARE DESIGN
+The vehicle is 60 [cm] tall, and has a diameter of 26 [cm],
+totaling a weight of 1.7 [kg]. It has a maximum thrust of
+about 2.3 [kg]. The center of mass is located at a distance
+of 21.5 [cm] from the propellers. The batteries are mounted
+2022 IEEE International Conference on Robotics and Automation (ICRA)
+May 23-27, 2022. Philadelphia, PA, USA
+978-1-7281-9680-0/22/$31.00 ©2022 IEEE 1996
+2022 IEEE International Conference on Robotics and Automation (ICRA) | 978-1-7281-9681-7/22/$31.00 ©2022 IEEE | DOI: 10.1109/ICRA46639.2022.9811938
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 2 ===
+at the top of the vehicle to achieve similarity with rocket
+dynamics by moving the center of gravity (CoG) further from
+the propellers. The 31 [Wh] battery allows for a maximum
+ight time of 130 [s].
+Fig. 1: TVC Prototype.
+The thrust is generated by two counter-rotating propellers
+mounted on a two-axis gimbal, which is controlled by two
+servomotors, as shown in Figure 2.
+Fig. 2: Two-axis gimbal with mounted propellers.
+The structure is built in a modular fashion to allow for
+fast iterative improvements.
+A Pixhawk 4 mini is used for state estimation and servo
+control. It contains an inertial measurement unit (IMU) with
+a magnetometer, as well as an external GPS antenna. The
+state estimates are accessed through the MA VROS protocol.
+For indoor ights, the motion capture system Optitrack
+replaces the GPS measurements.
+A Raspberry Pi 4 model B, equipped with a quad-core
+Cortex-A72 processor and 4 GB of RAM, plays the role of
+the onboard computer and hosts the guidance, control and
+disturbance estimation algorithms. Each of the aforemen-
+tioned algorithms is assigned to a separate core to enhance
+the performance.
+III. S OFTWARE DESIGN
+The robot operating system (ROS) [10] running on an
+embedded Ubuntu Server provides the interprogram com-
+munication interface between the software components. The
+GNC architecture can be seen in Figure 3. The current
+state estimate is provided by the Kalman lter on Pixhawk.
+The guidance algorithm computes an optimal trajectory
+linking the current and the target states. This trajectory is
+then tracked by the nonlinear model predictive controller
+(NMPC).
+IV. M ODEL
+A. Notations
+Throughout the paper, the vectors without superscript
+are assumed to be given in the xed inertial reference
+frame (IRF), and the vectors with superscript b are given
+in the body reference frame (BRF). The position vector is
+denoted by p =
+x y z 
+, the velocity v =
+vx vy vz
+
+,
+and the orientation is dened by the quaternion q =qx qy qz qw
+
+, while the angular speed in BRF is given
+by !b =
+!b
+x !b
+y !b
+z
+
+. The rotation matrix from BRF to
+IRF derived from the quaternion q is denoted R(q).
+B. Equations of motion
+The state vector is denoted x, and contains the position
+vector, the velocity, the orientation q, and the angular speed
+in the body frame !b.
+x =
+
+p v q ! bT (1)
+The control vector is denoted u. The prototype is con-
+trolled through the command servo angles 1 and 2, as
+well as the speed of the bottom and top propellers, PB
+and PT respectively (in % for the rest of the paper). It
+is more convenient, however, to consider the propellers'
+average command speed as an input P = PB +PT
+2 and the
+command speed difference P4 =PT  PB:
+u =
+
+1 2 P P 4
+T
+(2)
+The state equations are given by the generic 6 DoF solid
+body dynamics. Omitting the atmosphere interaction, the
+forces acting on the vehicle are: gravity mg, thrust Fb
+T and
+total torque Mb in BRF. Mb comprises the torque due to
+the thrust vector Fb
+T and the torque Mb
+P caused by the speed
+difference between the two propellers.
+1997
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 3 ===
+debugging data
+Remote computer
+GUI logging
+GNC (Raspberry Pi 4)
+Control
+2 s horizon
+full dynamics
+50 Hz
+Guidance
+minimal energy
+~ 20 Hz target
+trajectory Navigation
+Kalman Filter
+125 Hzextended state
+actuators control
+state
+Pixhawk
+Low level
+sensor fusion
+Prototype
+sensor data
+actuators PWM
+target apogee
+Fig. 3: Software architecture.
+_x =f (x; u) =
+2
+664
+_p
+_v
+_q
+_!b
+3
+775 =
+2
+66664
+v
+R(q)Fb
+T
+m +g
+1
+2q !b
+I 1(Mb  !b  (I!b))
+3
+77775
+Mb =r Fb
+T +Mb
+P
+(3)
+with I the inertia matrix of the drone, and r the position of
+the thrust Fb
+T from the center of mass.
+Both the thrustFb
+T and the torqueMb
+P vectors are determined
+by the gimbal angles:
+Fb
+TFb
+T
+ = Mb
+PMb
+P
+ =
+2
+4
+sin2
+  sin1 cos2
+cos1 cos2
+3
+5 (4)
+The relations between absolute values of Fb
+T andMb
+P and
+control parameters P;P4 are difcult to establish from the
+physical principles. Therefore, these relations are identied
+experimentally, as will be shown in the next section:
+Fb
+T
+ =f1(P;P4)Mb
+P
+ =f2(P;P4) (5)
+C. Propellers thrust and torque
+In order to identify thrust and torque models, the prototype
+was attached to a load cell while allowing rotation around
+the z-axis.
+The thrust is assumed to be independent of P4, as P4 is
+constrained to stay small with respect to P . During the iden-
+tication experiment for the thrust, stair speed commands
+were applied to both propellers, and the steady-state thrust
+was measured for each control value. The results can be seen
+in Figure 4. A second order polynomial model was t to the
+points:
+Fb
+T
+ =f1(P ) = aP
+2
++bP +c (6)
+The torque model was identied through its effect on
+rotational motion by estimating angular acceleration:
+0 20 40 60 80 100
+0
+0.5
+1
+1.5
+2
+Fig. 4: Experimental identication of the thrust curve.
+Mb
+P
+ =Izz
+d!b
+z
+dt (7)
+We carried out an experiment where various piece-wise
+constant velocity commands were sent to the propellers, in
+order to cover the possible [P;P4] combinations in given
+intervals.P4 ranged from -18% to 18% with 4% increments,
+while P ranged from 35% to 80% with 5% increments.
+Furthermore, a simple proportional controller was imple-
+mented, in order to slow down the rotation between [P;P4]
+samples. The result can be seen in Figure 5.
+It can be observed from the data that the torque is
+independent of the average propeller speed P . We conclude
+that a linear approximation is sufcient:
+Mb
+P
+ =f2(P4) = c IzzP4 (8)
+V. G UIDANCE AND CONTROL
+In this section, we describe the design of the optimal
+guidance and tracking algorithms. A free terminal time
+optimal control problem minimizing the energy consumption
+is solved to nd a trajectory linking the vehicle with a
+target position. This trajectory is consequently tracked by an
+NMPC algorithm in real-time. The details of the formulations
+1998
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 4 ===
+Fig. 5: Experimental torque curve identication.
+and numerical implementation are discussed in the following
+subsections.
+A. Guidance
+Similar to [3] and [11], the guidance algorithm is based on
+a point mass model and uses a minimal energy formulation
+where terminal time tf is an optimization variable. The nal
+position p(tf ) is constrained to the small neighborhood of
+the target position pt with zero-velocity.
+min
+FT (t);(t); (t);tf
+Z tf
+t0
+F 2
+T (t)dt +
+s:t: _p(t) = v(t); _v(t) = FT (t)
+m
+2
+4
+sin sin 
+  cos sin 
+cos 
+3
+5 +g
+vmin v(t) vmax
+Fmin FT (t) Fmax
+  max  (t)  max
+p(t0) = p0
+v(t0) = v0
+z(tf ) = zt
+(x(tf )  xt)2 + (y(tf )  yt)2 
+v(tf ) = 0
+(9)
+The propulsion vector of the rocket is dened in spherical
+coordinates, whereFT is an absolute value of thrust, azimuth
+angle  and polar angle  . Symmetric constraints on the
+polar angle dene the aperture of the reachable cone. Since
+the attitude of the vehicle is not explicitly considered in the
+guidance problem, the polar angle is usually related to the
+tilt angle of the rocket, thus should not be too large.
+The slack variable  weighted by  is used to formulate a
+slack constraint on the target horizontal position, which may
+be violated when close to the target position.
+Since the guidance OCP has free terminal time, the hori-
+zon is scaled to the interval [0, 1],   t t0
+tf t0
+, the dynamics
+become _x = (tf  t0)f (x;u ), and the horizon length (tf  t0)
+then becomes a variable parameter in the OCP. An initial
+guess for this parameter is given to accelerate the solving of
+the OCP using a simple closed form solution.
+B. NMPC Tracking Controller
+The NMPC controller uses the full state dynamics (3),
+augmented with the disturbance estimation (see section VI-
+A). It has a prediction horizon of 2 seconds. Close to the
+target, the length of the horizon is scaled down to match the
+time to target provided by the guidance algorithm.
+min
+u(t)
+Z tf
+t0
+l(x; u;t )dt +Vf (xf )
+s:t: _x =f (x; u)
+ max 1 max
+ max 2 max
+  _max  _1  _max
+  _max  _2  _max
+Pmin P +P4=2 Pmax
+Pmin P  P4=2 Pmax
+P4min P4 P4max
+0 z
+(10)
+The servo motors are constrained in a range of 15°. We
+introduce derivative constraints to limit the maximum rate of
+inputs given by the controller and smoothen the open-loop
+trajectories.
+The propeller speed models are directly included in the
+formulation, and along with the constraints on top and
+bottom propeller speeds PT and PB, provide a simple way
+to deal with the trade-off between roll control (through P4)
+and altitude control (through P ).
+1) Stage Cost: The tracking residual at time t corre-
+sponds to the difference between the predicted x(t) and the
+target guidance trajectory xG(t). The stage cost combines
+the squared tracking residual, penalty on the control input
+and penalty on the deviation from vertical orientation. The
+componentsqwqx  qyqz andqwqy +qxqz penalize deviations
+of pitch and yaw angles from zero [12]. The roll angle is not
+controlled directly, but rather the roll rate !b
+z, as the nal roll
+angle is not critical for the ight mission.
+l(x; u;t ) = e(x   xG(t))TQe (x   xG(t)) + uTRu (11)
+e(x) 
+
+p v q wqx  qyqz qwqy +qxqz !bT
+(12)
+2) Terminal Cost: In order to improve stability, a
+continuous-time linear quadratic regulator (LQR) based on a
+linearization around the zero-speed steady-state (13) is used
+as a terminal controller. The matrices Q andR for the LQR
+design are identical to the ones used in the stage cost.
+1999
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 5 ===
+A = @f (x;u )
+@x
+
+xs;us
+B = @f (x;u )
+@u
+
+xs;us
+(13)
+Note that the statesqw andqz are xed in the linearization,
+as they are not controlled. The matrix of the terminal
+quadratic costQf is then obtained by solving the continuous
+time algebraic Riccati equation (CARE).
+The nal cost is then:
+Vf (xf ) = e(xf )TQf e(xf ) (14)
+Compared to previously proposed methods, this formu-
+lation allows for simultaneous tracking of the optimal tra-
+jectory and vertical stabilization, and therefore improves the
+agility of the vehicle.
+C. Solver
+The continuous-time guidance problem (9) and the track-
+ing problem (10) are solved in real-time using the Chebyshev
+pseudospectral collocation method implemented in the open-
+source C++ package PolyMPC [13]. For the tracking prob-
+lem, a Lagrange polynomial of order 6 on the Chebyshev-
+Gauss-Lobatto (CGL) grid is chosen to parametrize both
+state and control trajectories. The computation time on the
+Raspberry Pi 4 does not exceed 18 [ms] which allows the use
+of the NMPC algorithm for rocket stabilization directly. The
+guidance trajectory is interpolated by a two-segment spline,
+where in each segment a Lagrange polynomial of order
+7 is collocated on the CGL grid. The guidance trajectory
+update is performed at least every 50 [ms]. In both cases, the
+parametrization is chosen based on the extensive simulation
+studies. The small number of required collocation nodes can
+be explained by the spectral convergence of the method for
+(10) and (9) [14].
+The continuous solution representation allows for efcient
+sampling of the optimal control trajectory at any given time
+t using the Lagrange interpolation:
+x(t) =
+NX
+k=0
+xkk(t); u (t) =
+NX
+k=0
+ukk(t) (15)
+where xk = x(tk) and uk = u(tk) are the state and
+controls evaluated at the so-called collocation nodes tk, and
+k is a Lagrange polynomial of order k. The solution of (10)
+can also be resampled if a faster low-level stabilization loop
+is required.
+VI. N AVIGATION
+The state estimation is mostly performed on the Pixhawk
+which directly provides the state x from raw sensor data.
+To estimate the external disturbances as well as unmodeled
+dynamics, a continuous-time extended Kalman Filter (EKF)
+with discrete measurements [15] was implemented on the
+embedded computer.
+A. Parameter estimation and offset-free tracking
+The state equations (3) are extended to estimate parameters
+and disturbances: the external torque and forces in IRF Mext
+and Fext, the thrust and torque scaling factors 1 and 2
+respectively.1 varies due to the aerodynamic ground effect
+as shown in Figure 4 and battery voltage decrease.
+x0 =
+
+x 1 2 Fext Mext
+T
+(16)
+f0(x0; u) =
+2
+6664
+v
+R(q) Fb
+T
+m +g +Fext
+1
+2q !b
+I 1(M  !b  (I!b))
+3
+7775
+M =r Fb
+T +Mb
+P +R(q) 1MextFb
+T
+ =1f1(P )Mb
+P
+ =2f2(P4)
+(17)
+The NMPC controller utilizes the equations (17) with the
+disturbances assumed constant. This approach allows esti-
+mating other model parameters, such as center of mass offset
+due to imprecise weight balancing. After stable ights were
+achieved in the absence of external disturbances indoors,
+the parameters were set to the estimated values to improve
+disturbance rejection.
+VII. R ESULTS
+This section presents indoor and outdoor ights experi-
+ments performed with the vehicle. The indoor experiment
+included tracking of a complex geometric pattern. For the
+outdoor ight, a simple launching and landing mission is
+chosen to demonstrate the combination of the optimal guid-
+ance and tracking algorithms.
+A. Indoor experiment
+For the GNC system validation, the controller had to track
+a complex MPC-shaped pattern with a constant speed
+of 0.35 [m/s]. The ight was performed indoors, where
+Optitrack was used to obtain the position and orientation
+data.
+Figure 6 shows the resulting ight, along with the com-
+parison with the simulation. In this project, we employ a
+real-time ight simulator developed in collaboration with
+EPFL Rocket Team, which can be found on the link:
+https://github.com/EPFLRocketTeam/real time simulator.
+B. Disturbance rejection
+To test the robustness of the prototype against external
+perturbations, an experiment was carried out using the Wind-
+Shape fan array. The prototype starts from the ground and
+reaches a target located 1 m above its start while under the
+effect of strong wind coming from positive x, in this case
+with a speed of 3.1 [m/s].
+Figure 7 shows the resulting estimation and x-axis track-
+ing. The parameter estimation algorithm quickly estimates
+the force and torque due to the wind along the x-axis,
+2000
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 6 ===
+ 1:5  1:0  0:5 0:0 0:5 1:0 1:5
+y [m]
+0:5
+1:0
+1:5
+2:0
+z [m]
+Target trajectory
+Motion capture estimated state
+ 1
+0
+1
+y [m]
+Target trajectory
+Motion capture estimated state
+20 25 30 35 40 45
+t [s]
+0:5
+1:0
+1:5
+z [m]
+Fig. 6: NMPC Tracking performance in an indoor ight
+experiment.
+0:0 0:5 1:0 1:5 2:0 2:5 3:0 3:5
+t [s]
+0
+1x [m]
+EKF estimated state
+open loop trajectories
+0:0 0:5 1:0 1:5 2:0 2:5 3:0 3:5
+t [s]
+ 2
+0
+2
+Fx [N]
+0:0 0:5 1:0 1:5 2:0 2:5 3:0 3:5
+t [s]
+ 0:5
+0:0
+0:5
+My [Nm]
+Fig. 7: Demonstration of the disturbance rejection. The
+constant wind disturbance is produced by the WindShape
+fan array during the indoor ight experiment.
+cancelling the tracking offset in the negative x direction that
+would occur in the absence of estimation.
+C. Outdoor apogee tracking and landing
+In order to validate the overall architecture using the guid-
+ance and tracking, the outdoor experiment includes reaching
+a 3-meter apogee, followed by a controlled descent to a given
+landing point 2 meters away from the starting position.
+Fig. 8: Apogee tracking and controlled descent. It could be
+observed that the vehicle initially deviates from the vertical
+trajectory due to the wind disturbance, then recovers and at
+the altitude of 3 meters computes the descent trajectory.
+The resulting trajectory can be observed in Figure 8.
+VIII. C ONCLUSION
+The paper presents a small-scale electric VTOL prototype
+whose goal is to foster academic research in the TVC
+domain. Along with the hardware design, we provide an
+experimentally validated and publicly available implementa-
+tion of the rocket simulator and GNC system. The platform
+is suitable both for outdoor and indoor ights, capable of
+apogee tracking and landing as well as more agile maneuvers
+and robust to external disturbances.
+The future research directions will include an adaptation of
+the proposed GNC framework for active attitude control and
+precise apogee tracking of a moderate-scale sounding rocket.
+Further, a 6DoF model is expected to improve the quality of
+the optimized trajectory, especially near the ground.
+2001
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+=== PDF PAGE 7 ===
+REFERENCES
+[1] W. J. Elke, J. Pei, R. J. Caverly, and D. Gebre-Egziabher, A low-cost
+and low-risk testbed for control design of launch vehicles and landing
+systems, Optimal Control Applications and Methods, pp. 112, 2021.
+[2] R. V . Frampton, J. Ball, D. Masten, P. Ferguson, K. C.
+Oittinen, and C. Ake, Planetary Lander Testbed for Technology
+Demonstration, 2013. [Online]. Available: https://arc.aiaa.org/doi/abs/
+10.2514/6.2013-5337
+[3] B. Acikmese and S. R. Ploen, Convex programming approach to
+powered descent guidance for mars landing, Journal of Guidance,
+Control, and Dynamics , vol. 30, no. 5, pp. 13531366, 2007.
+[4] D. P. Scharf, M. W. Regehr, G. M. Vaughan, J. Benito, H. Ansari,
+M. Aung, A. Johnson, J. Casoliva, S. Mohan, D. Dueri, B. Ac ¸ikmes ¸e,
+D. Masten, and S. Nietfeld, Adapt demonstrations of onboard large-
+divert guidance with a vtvl rocket, in 2014 IEEE Aerospace Confer-
+ence, 2014, pp. 118.
+[5] T. McGee, D. Artis, T. Cole, D. Eng, C. Reed, M. Hannan, D. Chavers,
+L. Kennedy, J. Moore, and C. Stemple, Mighty eagle: The develop-
+ment and ight testing of an autonomous robotic lander test bed,
+Johns Hopkins Apl Technical Digest , vol. 32, pp. 619635, 12 2013.
+[6] J. M. Carson, M. M. Munk, R. R. Sostaric, J. N. Estes,
+F. Amzajerdian, J. B. Blair, D. K. Rutishauser, C. I. Restrepo,
+A. M. Dwyer-Cianciolo, G. Chen, and T. Tse, The SPLICE
+Project: Continuing NASA Development of GN&C Technologies
+for Safe and Precise Landing , 2019. [Online]. Available: https:
+//arc.aiaa.org/doi/abs/10.2514/6.2019-0660
+[7] T. Reynolds, M. Szmuk, D. Malyuta, M. Mesbahi, B. Acikmese, and
+J. M. Carson, A State-Triggered Line of Sight Constraint for 6-DoF
+Powered Descent Guidance Problems , 2019. [Online]. Available:
+https://arc.aiaa.org/doi/abs/10.2514/6.2019-0924
+[8] D. Malyuta, T. Reynolds, M. Szmuk, M. Mesbahi, B. Acikmese,
+and J. M. Carson, Discretization Performance and Accuracy Analysis
+for the Rocket Powered Descent Guidance Problem , 2019. [Online].
+Available: https://arc.aiaa.org/doi/abs/10.2514/6.2019-0925
+[9] L. Spannagl, E. Hampp, A. Carron, J. Sieber, C. A. Pascucci,
+A. U. Zgraggen, A. Domahidi, and M. N. Zeilinger, Design,
+optimal guidance and control of a low-cost re-usable electric model
+rocket, CoRR, vol. abs/2103.04709, 2021. [Online]. Available:
+https://arxiv.org/abs/2103.04709
+[10] M. Quigley, K. Conley, B. P. Gerkey, J. Faust, T. Foote, J. Leibs,
+R. Wheeler, and A. Y . Ng, ROS: an open-source robot operating
+system, in ICRA Workshop on Open Source Software , 2009.
+[11] B. Ac ¸kmes ¸e, J. M. Carson, and L. Blackmore, Lossless convexi-
+cation of nonconvex control bound and pointing constraints of the
+soft landing optimal control problem, IEEE Transactions on Control
+Systems Technology, vol. 21, no. 6, pp. 21042113, 2013.
+[12] B. Graf, Quaternions and dynamics, 2008.
+[13] P. Listov and C. Jones, PolyMPC: An efcient and extensible tool for
+real-time nonlinear model predictive tracking and path following for
+fast mechatronic systems, Optimal Control Applications and Methods,
+vol. 41, no. 2, pp. 709727, 2020.
+[14] L. N. Trefethen, Approximation Theory and Approximation Practice,
+Extended Edition. Philadelphia, PA, USA: SIAM-Society for Indus-
+trial and Applied Mathematics, 2019.
+[15] D. Simon, Optimal State Estimation: Kalman, H Innity, and Nonlin-
+ear Approaches. USA: Wiley-Interscience, 2006.
+2002
+Authorized licensed use limited to: POSTECH Library. Downloaded on March 14,2026 at 14:18:06 UTC from IEEE Xplore.  Restrictions apply. 
