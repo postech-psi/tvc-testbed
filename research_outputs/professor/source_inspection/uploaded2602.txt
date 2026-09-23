@@ -1,0 +1,1063 @@
+=== PDF PAGE 1 ===
+1
+Learning End-to-End Control for Omnidirectional
+Aerial Motion on Overactuated Tilt-rotor Quadrotors
+Wentao Zhang1, Zhaoqi Ma 1, Jinjie Li 1, Huayi Wang 2, Haokun Liu 1, Junichiro Sugihara 1, Chen Chen 1, Yicheng
+Chen1, Cuniato Eugenio 3, Pantic Michael 3 and Zhao, Moju 1
+ 
+Fig. 1:Proposed end-to-end RL framework enables omnidirectional real-world flight across multiple scenarios. (a) Waypoint hovering, (b) Trajectory tracking,
+(c) Vertical tilt angle operation, (d) Payload variation (0.25 kg×2), (e) External force recovery, and (f) Wind disturbance rejection (2.5 m/s).
+Abstract—While reinforcement learning (RL) has been suc-
+cessfully applied to conventional quadrotors for agile and robust
+flight, whether actuator-level RL can be reliably deployed on tilt-
+rotor aerial robots remains an open question, as the hybrid actu-
+ation coupling brushless rotors with rotational joints introduces
+a substantially harder sim-to-real gap. In this work, we propose
+an end-to-end RL framework for omnidirectional motion control
+on overactuated tilt-rotor quadrotors, directly mapping target
+poses to joint and rotor commands. The learning framework
+combines actuator-level simulation with an asymmetric actor-
+critic architecture for 6D pose-reaching. For reliable sim-to-
+real transfer on the hybrid actuation, we integrate system
+identification with minimal yet physically grounded domain
+randomization. The trained policy is deployed zero-shot on
+real hardware and evaluated across waypoint hovering, external
+disturbances, payload variation and trajectory tracking, together
+with simulated traversal of allocation-singular configurations.
+The policy is compared with a state-of-the-art NMPC baseline:
+NMPC attains lower steady-state position error, whereas the RL
+policy offers a more uniform orientation error across evaluations,
+transitions between poses faster, and requires less onboard
+Manuscript received May, 30, 2026; Revised August, 24, 2026; Accepted
+September, 12, 2026. This work was supported by JST ASPIRE (JPM-
+JAP2521) and in part by CSC. (Corresponding author: Moju Zhao.)
+1Wentao Zhang, Zhaoqi Ma, Jinjie Li, Haokun Liu, Junichiro Sugihara,
+Chen Chen, Yicheng Chen and Moju Zhao are with the DRAGON Lab,
+Department of Mechanical Engineering, The University of Tokyo, Tokyo,
+113-8656, Japan{wentao-zhang, zhaoqi-ma, jinjie-li,
+haokun-liu, j-sugihara, chen-chen, yicheng-chen,
+chou}@dragon.t.u-tokyo.ac.jp
+2Huayi Wang is with the School of Computing and Data Science, The Uni-
+versity of Hong Kong, 999077, HKSARhuayiwang@connect.hku.hk
+3Cuniato Eugenio and Pantic Michael are with the Autonomous Sys-
+tems Lab(ASL), ETH Zurich, 8092 Zurich, Switzerland{ecuniato,
+mpantic}@ethz.ch
+Digital Object Identifier (DOI): see top of this page.
+computation.
+Index Terms—Reinforcement Learning, Aerial Systems: Me-
+chanics and Control, Motion Control
+I. INTRODUCTION
+Aerial robots have demonstrated remarkable capabilities
+across a wide range of applications. In particular, quadrotors
+have been extensively deployed in diverse real-world missions,
+including inspection, delivery, and search and rescue [1].
+Despite their success, conventional quadrotors are inherently
+underactuated and cannot independently regulate position and
+orientation, which limits their applicability to advanced aerial
+interaction. To address this limitation, omnidirectional aerial
+robots have recently attracted growing attention for their abil-
+ity to perform full six-degree-of-freedom (6D) motion [2], [3],
+[4]. Among the various designs, tilt-rotor platforms stand out
+by actively reorienting individual thrust vectors, attaining high
+actuation efficiency without internal force cancellation [4],
+[5], [6]. However, this expanded capability comes at the
+cost of substantially increased system complexity. The strong
+coupling between joint and rotor dynamics, combined with
+the highly flexible omnidirectional motion capability (Fig. 1),
+poses fundamental challenges for motion control.
+Model-based control has long been the mainstream ap-
+proach for tilt-rotor aerial robots, with geometric control [4],
+[7], [8] and Model Predictive Control (MPC) [9], [10] as
+the most representative formulations. These methods typically
+adopt a sequential structure, as illustrated in Fig. 2. For an
+aerial robot expressed in the body frame with massm, inertia
+arXiv:2602.21583v2  [cs.RO]  18 Sep 2026
+
+=== PDF PAGE 2 ===
+2
+Jb, linear velocityv b, and angular velocityω b, the rigid-body
+dynamics are written as:
+ Fb
+τb
+
++
+ Fd
+τd
+
+=
+ mI3 0
+0J b
+ ˙vb
+˙ωb
+
++
+ ωb ×mv b
+ωb ×J bωb
+
+(1)
+where[F b τb]⊤ denotes the body wrench produced by the
+actuators and[F d τd]⊤ represents the external disturbance
+wrench. For tilt-rotor platforms, the body wrench is jointly
+produced by joint positionsq j and rotor thrustsf r, coupled
+through the allocation matrixA α:
+Fb τb
+⊤
+=A α (qj)
+fr,1 fr,2 · · ·⊤
+(2)
+Actuator commands are then recovered by inverting this al-
+location mapping. Under nominal conditions, the hierarchical
+framework achieves accurate pose regulation and offers strong
+layer-wise interpretability.
+ 
+Fig. 2:Model-based control framework for tiltable aerial robots.
+Beyond accuracy and interpretability, this decomposition
+keeps each subproblem solvable at the control rate, en-
+abling onboard deployment. However, several characteristics
+of model-based methods motivate complementary research
+directions: (i) the model must stay tractable within the on-
+line control period, so it is often reduced under simplifying
+assumptions; unmodeled dynamics and external disturbances
+[Fd τd]are then handled by dedicated observers and com-
+pensated through the allocator [7], whereas learning-based
+formulations can propagate the dynamic model offline, through
+large-scale training-time exposure; (ii) the allocation matrix
+Aα becomes ill-conditioned at certain joint configurations,
+which prior work has addressed through explicit regularization
+or actuator-dynamics integration [9], [11]. These observations
+motivate us to investigate whether a policy trained offline can
+directly operate actuators while subsuming planning, control,
+and allocation within a single policy.
+Learning-based approaches have emerged as a promising
+alternative to model-based control and have showcased impres-
+sive performance across various aerial robotics tasks. [12] pio-
+neered actuator-level reinforcement learning (RL) for quadro-
+tor waypoint tracking. [13] demonstrated robust disturbance
+rejection under strong winds via deep learning combined with
+meta-learning. [14] and [15] achieved aggressive quadrotor
+flight comparable to human champions in drone racing. [16]
+trained a single policy that generalizes across quadrotor plat-
+forms with diverse physical parameters and rotor configura-
+tions. While these studies highlight the potential of learning-
+based control, they are largely confined to fixed-rotor plat-
+forms. To the best of our knowledge, data-driven control for
+tilt-rotor robots remains significantly underexplored, with only
+a few works integrating learned components into MPC [17],
+guiding policy training with a model-based action prior [18],
+or fine-tuning actuator-level policies with real-world data for
+sim-to-real transfer [19]. These preliminary efforts suggest that
+learning-based control is promising for tilt-rotor platforms, but
+also expose the substantial challenges in learning formulation
+and sim-to-real transfer on such complex systems.
+Adopting RL on a new robotic platform fundamentally re-
+quires answering two questions: (1)whatlearning formulation
+fits the platform, and (2)howcan the trained policy be reliably
+transferred from simulation to the real system? Prior work on
+fixed-rotor quadrotors has explored three action-space abstrac-
+tions that occupy distinct points along the trade-off between
+sim-to-real transferability and the breadth of system dynamics
+they can exploit [20], as illustrated in Fig. 3. The Linear
+Velocity (LV) abstraction is the most high-level: it transfers
+easily with velocity controller but underexploits the platform’s
+full dynamic capabilities. The Collective Thrust and Bodyrates
+(CTBR) abstraction strikes a balance between transferability
+and dynamic expressiveness, and is widely adopted on fixed-
+rotor systems [15], [14]; however, applying CTBR to tilt-rotor
+platforms still requires a low-level allocator beneath the policy,
+leaving the singularity-prone allocation problem unresolved.
+The Single-Rotor Thrusts (SRT) abstraction operates directly
+at the actuator level and can holistically capture the platform’s
+dynamics [12], but is less commonly used because of the
+stronger sim-to-real demands it imposes.
+ 
+Fig. 3:Data-driven control frameworks for quadrotors. LV: rely on a control
+stack to process velocity commands. CTBR: require a feedback regulator to
+process rotor thrusts. SRT: directly command rotor thrusts.
+Given the highly flexible motion capability and strong joint-
+rotor coupling of tilt-rotor platforms, we adopt an actuator-
+level abstraction analogous to SRT and propose an end-to-end
+RL framework for 6D pose-reaching control on overactuated
+tilt-rotor quadrotors. The policy directly maps the target pose
+and current state to joint position and rotor thrust commands
+with a single policy. However, this approach introduces a
+more severe sim-to-real gap, further exacerbated by the hybrid
+actuation system that couples brushless rotors with servo-
+driven joints. To bridge this gap, we integrate actuator system
+identification with minimal yet physically grounded domain
+randomization into a sim-to-real pipeline, validated through
+extensive real-world experiments. The main contributions are
+summarized as follows:
+•An end-to-end reinforcement learning framework is pro-
+posed, which produces joint and rotor commands from
+a single policy on overactuated tilt-rotor quadrotors, en-
+abling actuator-level 6D pose-reaching control.
+•A sim-to-real pipeline tailored to the hybrid actuation
+is introduced, integrating actuator system identification,
+control-architecture latency alignment, and minimal yet
+physically grounded domain randomization.
+•Zero-shot deployment across five real-world flight scenar-
+ios and a simulated traversal of allocation-singular con-
+figurations, together with a matched comparison against
+a servo-integrated NMPC baseline on the same platform
+and software stack, in which the policy holds a more
+uniform orientation error at lower online computation.
+
+=== PDF PAGE 3 ===
+3
+ 
+Fig. 4:Overall framework for simulation, RL training, and deployment.Robot: Rotor modules (blue, target thrustf ∗
+r →real thrustf r and torqueτ r),
+joint modules (red, joint position commandsq ∗
+j →position feedbackq j), and system latency (green arrows) are modeled to construct physically consistent
+simulation environments.Training: The policy is trained under an asymmetric actor-critic framework and dynamics randomization (green) is integrated
+according to models and deployment scheme.Deployment: Trained policy is deployed on real robot platform with a consistent system architecture. The
+robot’s state is estimated by fusing data from a motion capture system (MoCap) and an onboard IMU using an Extended Kalman filter (EKF).
+II. METHOD
+The proposed RL framework for pose-reaching control is
+designed in accordance with the real robot platform and
+deployment scheme, as shown in Fig. 4.
+A. Preliminaries
+1) Platform Introduction:The tilt-rotor quadrotor platform
+consists of four rotor modules, each mounted at the tip of
+one arm. Each module uses a three-bladed9 inpropeller
+driven by a T-Motor AT2814 KV900 brushless DC motor
+and is connected to the arm through a single-degree-of-
+freedom rotational joint actuated by a DYNAMIXEL XC330
+T181-T servomotor. This design enables full 6-DOF wrench
+generation; the detailed physical parameters are listed in
+Appendix IV-A.
+2) Task Definition:The control task is defined as reaching a
+target pose[p ∗
+w,θ ∗
+b]inSE(3)and maintaining stability there-
+after, by directly commanding the joint positionsq j and rotor
+thrustsf r. In contrast to velocity-tracking or body-wrench
+regulation, this pose-level formulation grants the policy full
+authority over the transition trajectory, prompting it to discover
+efficient motion strategies through trial-and-error interactions.
+3) Problem Formulation:The proposed RL control prob-
+lem is formulated as an infinite-horizon Partially Observable
+Markov Decision Process (POMDP), defined by the tuple
+(S,O,A,T, d 0, r, γ)[21]. Here,s∈ Sdenotes the full system
+state,o∈ Orepresents the partial observation, anda∈ A
+is action. The initial state distribution is given byd 0, and
+the state transition dynamics are described byT(s t+1|st,a t).
+The reward function is denoted byr(s t,a t)with discount
+factorγ∈[0,1). The objective is to learn a policyπ Θ(a|o),
+parameterized byΘ, that maximizes the expected cumulative
+discounted rewardE[ P∞
+t=0 γtr(st,a t)].
+B. Training Scheme
+1) Observation and Action Space:The policy action at
+time-steptis defined as
+at =
+
+aj,t,a r,t
+
+∈R 8,(3)
+wherea j,t ∈R 4 anda r,t ∈R 4 are the joint and rotor-thrust
+components, respectively. They are mapped to the target joint
+positionsq ∗
+j,t and rotor thrustsf ∗
+r,t as
+q∗
+j,t =c jaj,t,f ∗
+r,t =c rar,t + Cf ,(4)
+wherec j andc r are scale coefficients andC f is the nominal
+hovering thrust that approximately balances gravity. Centering
+the action aroundC f lets the policy issue both positive and
+negative thrust adjustments about hover, facilitating early-stage
+exploration and yielding smoother commands. The joint and
+rotor models are obtained through system identification, as
+detailed in Sec. II-C2 and Sec. II-C3.
+The policy observationo t ∈R 33 at time-steptis
+ot =
+
+vb,t,ω b,t,p ∗
+b,t, Rb,t, R∗
+b,t,q j,t,a t−1
+
+,(5)
+where the subscript b denotes quantities in the robot base
+frame.v b,t,ω b,t ∈R 3 are the base linear and angular
+velocities.p ∗
+b,t ∈R 3 is the world-frame targetp ∗
+w transformed
+into the current body frame. The current and target orientations
+Rb,t, R∗
+b,t ∈R 6 are encoded by the first two columns of
+their rotation matrices [22], a continuous representation that
+improves learning stability over quaternion or Euler-angle
+parameterizations.q j,t ∈R 4 contains the feedback joint
+positions, anda t−1 is the previous action.
+Since the deployed policy has access only to partial obser-
+vations, we adopt an asymmetric actor-critic framework [23]:
+the actor is conditioned ono t, while the critic is fed with a
+richer states t ∈R 41 for better value estimation,
+st =
+
+vb,t,ω b,t,p ∗
+b,t, Rb,t, R∗
+b,t,q j,t,f r,t,τ r,t,a t−1
+
+,(6)
+where the privileged variables are the rotor thrustsf r,t and
+the corresponding reaction torquesτ r,t ∈R 4.
+
+=== PDF PAGE 4 ===
+4
+2) Reward Function:The control objective is to drive the
+system toward a desired pose while maintaining smooth and
+stable motion. We characterize desirable performance as fast
+convergence to the target pose with reduced oscillations and
+moderate control effort, in line with criteria commonly adopted
+in model-based control. Accordingly, the reward function
+consists of: (1)pose-reachingterms that encourage rapid
+convergence toward the desired pose, and (2)regularization
+terms that promote smooth and stable motion. All terms and
+their weights are summarized in Table I.
+TABLE I: Reward Description
+Reward Formulation Weight
+Pose Reaching
+Towards Positiontanh
+∥pe∥
+0.6
+
+−1.0
+Towards Pose
+
+1−tanh
+∥θe∥
+2
+
+·
+
+1−tanh
+∥pe∥
+2
+
+2.0
+Reach Position
+"
+I[∥p e ∥< pth]
+∧I[∥v b ∥< vth]
+#
+·
+
+e− ∥pe∥
+pth +e − ∥vb∥
+vth
+
+1.0
+Reach Pose
+"
+I[∥p e ∥<0.02]∧I[∥θ e ∥<0.05]
+∧I[∥v b ∥<0.02]∧I[∥ω b ∥<0.02]
+#
+·
+
+ e− ∥pe∥
+0.02 +e − ∥vb∥
+0.02
++e−2∥θe∥
+0.05 +e −2∥ωb∥
+0.02
+
+
+0.75
+Regularization
+Linear Velocity  e0.6·min(∥vb∥,4.0)−12 −0.03
+Angular Velocity  e0.4·min(∥ωb∥,6.0)−12 −0.05
+Joint Limitation P4
+i
+  q∗
+i
+ −¯q Iq∗
+i
+ >¯q −0.02
+Thrust Limitation P4
+i
+ f∗
+i − ¯f2 If∗
+i > ¯f −0.01
+Joint Action Rate P4
+i
+
+q∗
+i,t −q ∗
+i,t−1
+2
+−5.0×10−4
+Thrust Action RateP4
+i
+
+f∗
+i,t −f ∗
+i,t−1
+2
+−1.0×10−4
+Thrust Power P4
+i f2
+i −1.0×10−5
+Joint AccelerationP4
+i ( ˙qi,t −˙qi,t−1)2 −1.5×10−5
+z-Axis AlignI[|b z −b ∗z|>1.5]−0.1
+Thrust Allocation P4
+i
+
+f∗
+i,t −
+P4
+j f∗
+j,t
+4
+2
+b2z −1.0×10−5
+Early Termination ground collision orpw,z >6.0−1.0
+Here,I[·]is the indicator function.p e =p b −p ∗
+b denotes
+the position error in body frame andp b is the current body
+position.θ e ∈R 3 denotes the orientation error between the
+current and desired base frames in axis-angle form, computed
+asLog(q ∗
+b ⊗q −1
+b ).b z, b∗
+z ∈[−1,1]are the projections of the
+bodyz-axes of the current and desired base frames onto the
+worldz-axis, providing a compact measure of the body tilt
+error through their difference.
+Towards Positionencourages the robot to move toward
+the target position, whileTowards Posepromotes orientation
+alignment as the position error decreases.Reach Positionand
+Reach Poseprovide sparse bonuses once the robot enters the
+specified thresholds and remains stable.Linear Velocityand
+Angular Velocitypenalties discourage aggressive motion and
+promote stable flight. Unlike the pose-reaching formulations
+commonly adopted in legged robot learning [24], we avoid
+explicit time- or reference-velocity-based terms that enforce
+convergence within a prescribed duration; instead, the reward
+design balances task completion, energy efficiency, and motion
+smoothness, allowing the policy to autonomously discover
+control strategies that achieve agile yet stable pose conver-
+gence. Additional regularization terms penalize actuator-limit
+violations, abrupt action changes, excessive thrust power, and
+large joint accelerations. Thez-Axis Alignauxiliary reward
+promotes reaching the desired tilt angle.Thrust Allocation
+encourages an even distribution of rotor thrusts across vary-
+ing base orientations, thereby balancing actuator workloads.
+Early Terminationsuppresses inefficient exploration of failure
+episodes by aborting upon ground collision or exceeding the
+altitude bound.
+3) Initial State Distribution:The desired positionp ∗
+w ∈R 3
+is drawn uniformly within a4 m×4 m×3 mregion and
+transformed into the body frame asp ∗
+b. The desired orientation
+θ∗
+b is sampled to broadly coverSO(3)by first drawing the
+target body+z-axis on the unit sphere and then applying a yaw
+rotation uniformly in[−π, π]about it. The robot is initialized
+at the world origin with zero linear and angular velocities,
+default hovering thrustC f, and orientation sampled in the
+same manner ofθ ∗
+b. The initial joint positionq j,0 requires
+particular care, since static hovering is feasible only at specific
+joint–thrust configurations. Initializing with default (fixed)
+joint configurations tends to converge to local optima, while
+uniform random sampling can lead to inefficient convergence.
+To encourage exploration while maintaining convergence effi-
+ciency,q j,0 is stratified across parallel environments into four
+equally weighted groups: (i) all joints at−π, (ii) all at0,
+(iii) all atπ, and (iv) each joint independently sampled from
+{−π,0, π}.
+C. Sim-to-Real Transfer
+1) System Latency:System latency is unavoidable on real-
+world platforms and can degrade control performance or even
+induce divergent oscillations. To bridge this gap, we explicitly
+model the dominant delays during training: the commanded
+q∗
+j,t andf ∗
+r,t are applied to the simulated actuators with an
+actuation delay, and the corresponding joint feedbackq j,t is
+returned with a sensing delay. The base velocitiesv b,t and
+ωb,t further carry an algorithmic delay from the EKF state es-
+timator, which fuses motion-capture and IMU measurements.
+These delays are estimated by collecting real platform data.
+2) Rotor Model:The rotor module serves as the primary
+actuator of the aerial robot. Since rotor thrust dynamics are
+highly nonlinear and depend on the coupled effects of motor
+characteristics, propeller aerodynamics, and supply voltage,
+accurate first-principles modeling is impractical. We instead
+identify the rotor thrust and reaction torque empirically by
+sweeping PWM commands and supply voltages on a 6-axis
+force-torque sensor, and fit polynomial functions to map the
+PWM commandcmd r and voltageV r to the generated thrust
+and torque:
+fr = fr(cmdr, Vr),τ r =C Ωfr,(7)
+whereC Ω denotes the torque-to-thrust ratio. During training,
+the commanded thrust is realized asf r,t =f ∗
+r,t and applied as
+external force and reaction torque on each rotor link. During
+deployment, the PWM command is recovered through the
+inverse mappingcmd r,t = f −1
+r (f ∗
+r,t, Vr).
+
+=== PDF PAGE 5 ===
+5
+3) Joint Model:Joint modeling is critical for tilt-rotor
+quadrotors, since the rotor-generated wrench is steered by the
+joint positions, distinguishing them from fixed-rotor platforms.
+Rotational joints in common rigid-body simulators are mod-
+eled as DC motors with proportional-derivative (PD) position
+control:
+J¨qj =K p(q∗
+j −q j)−K d ˙qj,(8)
+whereJis the effective rotational inertia, andK p,K d are
+the stiffness and damping coefficients, respectively. The re-
+sulting closed-loop joint dynamics are well-approximated by
+a second-order transfer function
+qj(s)
+q∗
+j (s) = Kp
+J s2 +K ds+K p
+,(9)
+with natural frequencyω n and damping ratioζsatisfying
+ω2
+n =K p/J,2ζω n =K d/J.(10)
+We identifyω n andζfrom the measured joint response,
+then back-computeK p andK d for the simulated joints via
+the relations above. The joint torque and velocity limits are
+similarly determined experimentally. During deployment, the
+joint position commands are directly issued ascmd q,t =q ∗
+j,t.
+TABLE II:Domain Randomization, Noise and Time Delay
+Variables Operation Latency(dt= 10 ms)
+Dynamics Parameters
+mass [kg] scale [0.9,1.1] -
+inertia [kg·m 2] scale [0.9,1.1] -
+COM [m] bias±0.01-
+State Observations
+pb [m] bias±0.01, noise±0.010
+θb [deg] bias±0.01, noise±0.010
+vb [m/s] bias±0.005, noise±0.0053∼5
+ωb [rad/s] bias±0.005, noise±0.0053∼5
+qj [deg] bias±3, noise±21∼2
+Action Commands
+aj [rad] - 1∼3
+ar [N] - 1∼3
+4) Domain Randomization and Noise:Domain randomiza-
+tion (DR) is widely adopted to improve policy robustness
+and facilitate sim-to-real transfer, but excessive randomization
+trades off task-level performance [25]. We therefore apply
+only minimal and physically grounded randomization to the
+body mass, body inertia, and joint position offsets, while
+injecting observation noise to account for sensor uncertainties.
+Combined with the actuator-level system identification of
+Sec. II-C2 and Sec. II-C3, this conservative scheme keeps the
+training environment closely aligned with the real platform
+while preserving robustness. The details of the proposed sim-
+to-real pipeline for the hybrid joint-rotor actuation system are
+summarized in Table II.
+III. EXPERIMENTS
+A. Experimental Setup
+The training environment is built on Isaac Sim [26] and
+Isaac Lab [27], and the policy is optimized with proximal
+policy optimization (PPO) [28] using the RSL-RL implemen-
+tation [29]. Training is performed on a single NVIDIA A10
+GPU, consuming approximately16 hfor 20,000 iterations;
+full hyperparameters are listed in Appendix IV-B. The learned
+policy is then deployed zero-shot in both simulation and
+on the real platform, without any fine-tuning. To facilitate
+reproducibility, the training and deployment code is publicly
+available at github.com/ut-dragon-lab/aerial lab.
+As a baseline, we reuse the servo-integrated NMPC of [9],
+running at100 Hzon the onboard computer and fully inte-
+grated into the robot software stack as the control module
+analogous to the actor network in Fig. 4. Its prediction model
+combines single-rigid-body dynamics with a first-order servo
+model over a horizon of2 s(20 steps), and shares the thrust
+mapping of Sec. II-C2. The NMPC parameters are fine-tuned
+for our platform and held fixed across the different scenarios.
+B. Simulation Experiments
+We first evaluated the learned policy and the NMPC baseline
+in a standalone Gazebo simulation that mirrors the real-
+platform control architecture.
+1) Waypoint Hovering:We sampled 1,000 target poses in
+SE(3)following the scheme of Sec. II-B3 and commanded
+the robot to reach them sequentially,8 sper pose. Results
+are summarized in Table III and Fig. 5, whereU(·)andL(·)
+denote the average over the static-hovering window (0.5 s
+before the next target, reflecting steady-state accuracy) and the
+transition window (6.0 sat the middle of the horizon, reflecting
+transient agility), respectively.∥p e ∥and∥θ e ∥represent the
+L2-norm of position and orientation error, respectively.
+0 0.1 0.2 0.3
+kpek [m]
+0
+0.5
+1
+0:0770:024
+0 50 100 150
+k3ek [deg]
+0
+0.5
+1
+3:88 25:12 RL
+NMPC
+Fig. 5:Cumulative distributions of steady-state position and orientation errors
+across the sampled target set.
+Both controllers could reach the sampled targets inSE(3),
+with complementary strengths: NMPC achieves lower steady-
+state position error, while the RL policy yields a tighter
+orientation-error distribution (Fig. 5). The larger orientation
+error of NMPC arises from pose transitions: for certain target
+pairs the controller executes a body rotation that drives the
+joints into their position limits, leaving a residual orientation
+error that can no longer be corrected. The RL policy also
+converges faster during the transition phase, as reflected in
+the lower transient errorsL ∥p e ∥andL ∥θ e ∥in Table III.
+TABLE III: Continuous Pose Reaching in Simulation
+U ∥pe ∥ ±std, min
+max
+[m]↓U ∥θ e ∥ ±std, min
+max
+[deg]↓L ∥p e ∥ ±std, min
+max
+[m]↓L ∥θ e ∥ ±std, min
+max
+[deg]↓
+q∗
+j −qj
+ (±std)[rad]↓f ∗r (±std)[N]↓
+RL 0.077  ±0.029,0.019
+0.304
+ 3.88 ±5.70, 0.25
+116.73
+ 0.127 ±0.071,0.030
+0.895
+ 7.85 ±10.60, 0.41
+145.77
+ 0.029(±0.083)10.00(±3.27)
+NMPC0.024  ±0.011,0.002
+0.068
+ 25.12 ±35.06, 0.16
+170.78
+ 0.422 ±0.147,0.096
+0.955
+ 40.93 ±31.03, 6.49
+171.01
+ 0.004(±0.015)9.31(±2.97)
+
+=== PDF PAGE 6 ===
+6
+2) Ablation Studies:We conducted ablation studies to
+evaluate the contribution of specific reward terms, as shown in
+Table IV (rows (a), (b), and (c) indicate the ablated settings).
+(a) RemovingReach Position/Poseleaves the steady-state pose
+errors essentially unchanged, but increases joint tracking error
+and action rates, indicating that this term mainly suppresses
+residual oscillations near the target. (b) Removingz-Axis Align
+elevates the transient orientation errors and the body velocity,
+confirming its role as an auxiliary orientation regularizer. (c)
+RemovingThrust Allocationincreases the mean thrust and
+joint tracking error, undermining actuator reliability in real-
+world deployment. Overall, these ablated terms act as soft
+regularizers rather than primary drivers of pose convergence:
+task-level rewards are sufficient forSE(3)pose control, while
+these regularizers shapehowthe dynamics are coordinated.
+TABLE IV: Rewards Ablation Study Results
+U ∥pe∥ ↓ U ∥θe∥ ↓ L ∥pe∥ ↓ L ∥θe∥ ↓ U ∥vb∥ ↓ U ∥ωb∥ ↓
+q∗j −qj
+↓f ∗r ↓
+˙q∗j,t
+↓
+ ˙f∗r,t
+↓
+[m] [deg] [m] [deg] [m/s] [rad/s] [rad] [N] [rad/step] [N/step]
+Base 0.077 3.88 0.127 7.85 0.009 0.007 0.029 10.00 0.69 7.35
+(a)0.081 3.79 0.135 7.26 0.010 0.010 0.032 10.22 0.79 7.77
+(b)0.081 3.83 0.134 7.96 0.011 0.0090.0299.930.697.62
+(c)0.079 3.74 0.140 8.27 0.012 0.012 0.031 10.290.697.32
+C. Real-world Experiments
+The real platform carries a KHADAS VIM4 onboard com-
+puter (2.2 GHzquad-core Cortex-A73 +2.0 GHzquad-
+core Cortex-A53) running Ubuntu 20.04 with ROS Noetic for
+state estimation, policy inference, and NMPC optimization,
+while an STM32 board handles low-level control. Notably,
+the RL policy inference takes about0.3ms, while NMPC
+typically fits within the10 mscontrol period but occasionally
+overruns. This headroom is beneficial for onboard deploy-
+ment on resource-constrained aerial platforms. The control
+rate bounds the bandwidth of the disturbances and actuator
+dynamics that a controller can compensate. Nonetheless, we
+ran both controllers at100 Hz, within the current100 Hzjoint-
+command update rate (Fig. 4) and to ensure a fair comparison.
+1) Waypoint Hovering:The robot was commanded to se-
+quentially reach a set of target poses with a period of8 s,
+and the test was repeated three times. Quantitative metrics are
+summarized in Table V, with snapshots shown in Fig. 1(a).
+For reference, RMSE results of similar tests from [9] are
+X:0.072 m, Y:0.029 m, Z:0.044 m, (norm0.089 m)
+Roll:3.250 deg, Pitch:2.810 deg, Yaw:4.342 deg, (norm
+6.108 deg) which are comparable to the results in Table V.
+TABLE V: Continuous Pose Reaching in Real World
+p∗w[m] θ∗b[deg] RL NMPC
+U ∥pe∥[m]↓ U ∥θe∥[deg]↓ U ∥pe∥[m]↓ U ∥θe∥[deg]↓
+[0.0, 0.0, 0.8] [0, 0, 0] 0.1142.589 0.0262.644
+[1.0, 0.0, 1.0] [45, 0, 0]0.060 4.3500.074 4.372
+[0.0, 1.0, 1.0] [0, -25, 0]0.046 4.2140.054 8.225
+[-1.0, 0.0, 1.0] [-25, 0, 0] 0.074 5.5610.028 4.742
+[0.0, 0.0, 0.8] [0, 0, 90] 0.091 4.5900.028 1.768
+Mean 0.077 4.261 0.042 4.350
+The RL policy achieves position and orientation accuracy
+comparable to NMPC across the five real-world targets with
+more uniform per-target orientation errors, consistent with
+observations in Sec. III-B1. Additionally, the state trajectories
+shown in Fig. 6 further show faster pose-error convergence
+under RL, with peak velocities exceeding2 m/sand5 rad/s.
+This transient behavior is consistent with recent comparative
+studies of learned and classical quadrotor controllers [30]
+-101px[m]
+00.51py[m]
+0 5 10 15 20 25 30 35 40Time[s]
+0.81pz [m]
+(a) Position Trajectory
+050100
+3z [deg]
+-200
+3y[deg]
+0 5 10 15 20 25 30 35 40Time[s]
+0403x[deg]
+(b) Orientation Trajectory
+Fig. 6:State trajectories from real-world waypoint hovering experiments.
+Solid lines show the mean values across trials, and the shaded regions
+represent the corresponding minimum and maximum ranges.
+2) Disturbance Rejection:We evaluated disturbance re-
+jection at the target posep ∗
+w = [0.0,0.0,1.0] m,θ ∗
+b =
+[0,0,0] degunder two disturbance conditions: a continuous
+2.5 m/swind generated by a fan (Fig. 1(f)) and impulsive
+pushes applied to the robot body (Fig. 1(e)). The resulting
+pose errors and body velocities are reported in Fig. 7.
+00.10.2kvbk[m/s]
+RL NMPC
+00.51
+k!bk[rad/s]
+00.10.2kpek[m]
+0 10 20 30 40 50 60Time[s]
+0510
+k3ek[deg]
+Fig. 7:Real-world disturbance rejection evaluation. Left: response under wind.
+Right: response to impulsive stick pushes.
+Under wind, the RL policy yields smaller position and
+orientation fluctuations than NMPC, with reduced standard
+deviations of0.005 mvs.0.028 mand0.63 degvs.1.32 deg.
+It does show a larger mean steady-state position offset (0.10 m
+vs.0.04 m) but a smaller mean orientation error (3.55 degvs.
+4.27 deg), consistent with the trade-off observed in waypoint
+hovering. Under impulsive pushes, the RL policy recovers
+more rapidly, exhibiting sharper but shorter velocity peaks
+and lower average linear and angular speeds (0.025 m/svs.
+0.033 m/s;0.081 rad/svs.0.092 rad/s). Under both wind
+and impulsive disturbances, the RL policy exhibits substan-
+tially smaller fluctuations and faster recovery than NMPC,
+with a trade-off of a larger steady-state position offset.
+We further evaluated payload variation by attaching addi-
+tional weights, as shown in Fig. 1(d). The robot alternated
+betweenp ∗
+w = [0.0,0.0,1.0] m,θ ∗
+b = [0,0,0] degand
+p∗
+w = [0.25,0.0,0.8] m,θ ∗
+b = [0,25,0] deg, repeated three
+nominal–tilted pose cycles for each of the four payload condi-
+tions. As expected, the added mass mainly inflates the position
+
+=== PDF PAGE 7 ===
+7
+error through the higher effective gravitational load; NMPC
+starts from a lower unloaded error but degrades about twice as
+fast, reaching about0.4 mvs.0.2 mat1 kg(Fig. 8). Notably,
+the RL orientation error stays below5 degat both target poses,
+whereas NMPC rises to about13 degat the25 degpitch pose.
+A1 kgpayload is a33%mass change, well beyond the±10%
+mass randomization used in training. Yet the policy generalizes
+to this out-of-distribution load without fine-tuning, preserving
+its orientation regulation.
+0 0.25 0.5 1
+Payload [kg]
+0
+0.2
+0.4
+kpek [m]
+0 0.25 0.5 1
+Payload [kg]
+0
+10
+20k3ek [deg] RL(0/)
+RL(25/)
+NMPC(0/)
+NMPC(25/)
+Fig. 8:Steady-state position and orientation errors under varying payloads.
+Lines denote the mean over all trials, shaded regions the min–max range, and
+markers the individual samples. Each evaluation trial contains four samples
+of nominal pose and three samples of tilted pose.
+D. Extended Studies
+1) Omnidirectional Operation:We verifiedSE(3)pose
+control under large-tilt configurations, which require highly
+coupled thrust maneuvering, through a real-world hovering test
+(Fig. 1(c), Fig. 9). The platform was reconfigured for this test
+(battery removed and protective structure added for safety con-
+cerns, total mass2.56 kg), and the policy was retrained under
+the same framework with only the inertial parameters updated,
+demonstrating the generality of the proposed framework. The
+robot flew fromp ∗
+w = [0.0,0.0,0.8] m,θ ∗
+b = [0,0,0] deg
+top ∗
+w = [0.5,0.0,1.0] m,θ ∗
+b = [0,90,0] deg, repeated three
+times. The policy achievesU ∥p e ∥= 0.044 mandU ∥θ e ∥=
+5.18 deg, while NMPC demonstratesU ∥p e ∥= 0.066 m
+andU ∥θ e ∥= 9.09 degwith updated physical parameters.
+The velocity profiles (Fig. 9) show that the policy reaches its
+peak velocities in shorter bursts, consistent with the faster pose
+transitions observed in the waypoint hovering tests, confirming
+the policy’s uniform performance across diverse target poses
+inSE(3).
+012kvbk [m=s]
+RL
+NMPC
+0 2 4 6 8 10 12 14 16
+t[s]
+0
+5
+k!bk [rad=s]
+Fig. 9:Velocity profile of the90 degpitch maneuver.
+2) Trajectory Tracking:Although the policy was trained
+only for pose-reaching, we further evaluated its generaliza-
+tion to trajectory tracking in the real world (Fig. 1(b)).
+The reference is a time-parameterized 3D lemniscate with
+synchronized orientation modulation (roll and pitch within
+0.5 rad, yaw in[0,2π] rad). The task was repeated five times,
+with results shown in Fig. 10. For reference, NMPC’s RMSE
+errors for similar scenarios reported in [9] are X:0.071 m,
+Y:0.067 m, Z:0.018 m, (norm0.099 m); Roll:4.934 deg,
+Pitch:2.023 deg, Yaw:2.789 deg, (norm6.018 deg).
+The RL policy successfully follows the trajectory despite
+never being trained for it. Its mean errors are larger than
+NMPC (0.16 mvs.0.05 min position;8.06 degvs.5.19 deg
+in orientation), but the tracking variability is comparable, with
+similar standard deviations in position (0.04vs.0.02) and
+orientation (2.45vs.2.46). This indicates that the learned
+policy generalizes to time-varying references beyond its train-
+ing distribution, although high-precision tracking remains a
+strength of model-based control.
+0.6
+0.8
+1
+1.2
+1.4Z[m]
+-1 0.5-0.5 0X[m] 0 Y[m]0.5 -0.51
+p$w;3$bNMPCRL
+-1 0 1X[m]
+-0.5
+0
+0.5
+Y[m]
+-1 0 1X[m]
+0.5
+1
+1.5Z[m]
+-1 0 1Y[m]
+0.5
+1
+1.5Z[m]
+Fig. 10:Real-world trajectory tracking of a 3D lemniscate with synchronized
+orientation modulation, repeated five times.
+3) Singularity Avoidance:We evaluated continuous rotation
+tracking in simulation, with targetp ∗
+w = [0.0,0.0,1.2] mand
+θ∗
+b = [0,90, ϕ] deg(XYZ Euler angles), whereϕsweeps
+continuously throughA α singularities in vertical configura-
+tions (ill-conditioned near45 deg,135 deg, . . . ). As shown in
+Fig. 11, the learned policy produces continuous joint trajec-
+toriesq j with pose errors remaining low. This also illustrates
+that, as a byproduct of actuator-level end-to-end learning, the
+policy naturally handles configurations that would otherwise
+require explicit allocation regularization [11].
+-2
+0
+2qj [rad]
+0
+10
+fr [N]
+f1;q1
+f2;q2
+f3;q3
+f4;q4
+fA,;qA,
+0.10.2kpek[m]
+0 2 4 6 8 10 12 14 16 18 20Time [s]
+010
+k3ek[deg]
+0 40 80 120 160 200 240 280 320 360 400?[deg]
+Fig. 11:State evolution under continuous rotation throughA α singularities.
+IV. CONCLUSION
+This paper presented a sim-to-real reinforcement learning
+pipeline forSE(3)pose-reaching on overactuated tilt-rotor
+quadrotors. A single policy directly produces joint and rotor
+commands for zero-shot real-world deployment with actuator-
+level system identification, latency alignment, and physically
+grounded domain randomization to bridge the gap induced
+by the hybrid joint-rotor actuation. Experiments demonstrate
+consistent performance across waypoint hovering, external dis-
+turbances, payload variation, trajectory tracking, and continu-
+ous rotation through allocation-singular configurations, the last
+typically requiring explicit regularization in allocation-based
+controllers. As the dynamics calculation is performed during
+training, the policy keeps its online computation minimal,
+
+=== PDF PAGE 8 ===
+8
+which suits platforms with limited onboard resources and tasks
+that demand consistent behavior across conditions rather than
+absolute accuracy. Two limitations remain: the platform model
+omits aerodynamic effects such as wind drag and inter-rotor
+downwash, calling for richer real-to-sim modeling; and the
+reward relies on manually shaped terms to coordinate the
+joint-rotor dynamics, motivating more principled formulations.
+Further hardware optimization and control problem formula-
+tion are needed to fully unlock the potential of actuator-level
+policies on tilt-rotor platforms.
+APPENDIX
+A. Physical Parameters
+TABLE VI:Physical Parameters
+Term Value Term Value
+Weight Parameters
+mass [kg] 3.0386 inertiaI x, Iy, Iz [g·m2] 63, 62, 95
+Joint Parameters
+Kp 0.3449K d 0.0094
+position limit [rad] 3.96 velocity limit [rad/s] 10.0
+effort limit [N·m] 3.0
+Rotor Parameters
+thrust limit¯f[N] 20 hovering thrustsC f [N] 7.0
+torque-to-thrust ratioCΩ 0.05
+B. Training Hyperparameters
+TABLE VII:Hyperparameters
+Term Value Term Value
+General
+num of robots 4096 num of epochs 5
+gradient clipping 1.0 adam epsilon1.0e−8
+num of steps per iteration 48 num of steps per episode 1,200
+total training iterations 20,000
+PPO
+clip range 0.2 entropy coefficient5.0e−4
+discount factorγ0.99 GAE balancing factorλ0.95
+desired KL-divergence 0.01 activation functionelu
+actor neural network MLP, hidden units [512, 256, 128]
+critic neural network MLP, hidden units [512, 256, 128]
+output layer Unbounded linear
+Specific
+joint action scalecj 0.25 rotor action scalecr 0.5
+REFERENCES
+[1] D. Floreano and R. J. Wood, “Science, technology and the future of
+small autonomous drones,”nature, vol. 521, no. 7553, pp. 460–466,
+2015.
+[2] Z. Li, Y . Yang, X. Yu, C. Liu, O. Kaynak, and H. Gao, “Fixed-time
+control of a novel thrust-vectoring aerial manipulator via high-order fully
+actuated system approach,”IEEE/ASME Transactions on Mechatronics,
+vol. 30, no. 2, pp. 1084–1095, 2024.
+[3] H. Guptaet al., “Umi-on-air: Embodiment-aware guidance
+for embodiment-agnostic visuomotor policies,”arXiv preprint
+arXiv:2510.02614, 2025.
+[4] M. Allenspachet al., “Design and optimal control of a tiltrotor micro-
+aerial vehicle for efficient omnidirectional flight,”The International
+Journal of Robotics Research, vol. 39, no. 10-11, pp. 1305–1325, 2020.
+[5] M. Zhao, T. Anzai, and T. Nishio, “Design, modeling, and control of
+a quadruped robot spidar: Spherically vectorable and distributed rotors
+assisted air-ground quadruped robot,”IEEE Robotics and Automation
+Letters, vol. 8, no. 7, pp. 3923–3930, 2023.
+[6] M. Zhao, K. Okada, and M. Inaba, “Versatile articulated aerial robot
+dragon: Aerial manipulation and grasping by vectorable thrust control,”
+The International Journal of Robotics Research, vol. 42, no. 4-5, pp.
+214–248, 2023.
+[7] D. Lee, B. Kim, and H. J. Kim, “Autonomous aerial manipulation at
+arbitrary pose in se (3) with robust control and whole-body planning,”
+The International Journal of Robotics Research, p. 02783649251378195,
+2025.
+[8] J. Sugihara, M. Zhao, T. Nishio, K. Okada, and M. Inaba, “Beatle—self-
+reconfigurable aerial robot: Design, control and experimental validation,”
+IEEE/ASME Transactions on Mechatronics, 2024.
+[9] J. Li, J. Sugihara, and M. Zhao, “Servo integrated nonlinear model
+predictive control for overactuated tiltable-quadrotors,”IEEE Robotics
+and Automation Letters, vol. 9, no. 10, pp. 8770–8777, 2024.
+[10] J. Li, J. Li, K. Kaneko, H. Liu, L. Shu, and M. Zhao, “Six-dof hand-
+based teleoperation for omnidirectional aerial robots,” in2025 IEEE/RSJ
+International Conference on Intelligent Robots and Systems (IROS).
+IEEE, 2025, pp. 15 482–15 488.
+[11] E. Cuniato, M. Allenspach, T. Stastny, H. Oleynikova, R. Siegwart, and
+M. Pantic, “Allocation for omnidirectional aerial robots: Incorporating
+power dynamics,”IEEE Transactions on Robotics, 2026.
+[12] J. Hwangbo, I. Sa, R. Siegwart, and M. Hutter, “Control of a quadrotor
+with reinforcement learning,”IEEE Robotics and Automation Letters,
+vol. 2, no. 4, pp. 2096–2103, 2017.
+[13] M. O’Connellet al., “Neural-fly enables rapid learning for agile flight
+in strong winds,”Science Robotics, vol. 7, no. 66, p. eabm6597, 2022.
+[14] Y . Song, A. Romero, M. M ¨uller, V . Koltun, and D. Scaramuzza, “Reach-
+ing the limit in autonomous racing: Optimal control versus reinforcement
+learning,”Science Robotics, vol. 8, no. 82, p. eadg1462, 2023.
+[15] E. Kaufmann, L. Bauersfeld, A. Loquercio, M. M ¨uller, V . Koltun, and
+D. Scaramuzza, “Champion-level drone racing using deep reinforcement
+learning,”Nature, vol. 620, no. 7976, pp. 982–987, 2023.
+[16] J. Eschmann, D. Albani, and G. Loianno, “Raptor: A foundation policy
+for quadrotor control,”Science Robotics, vol. 11, no. 114, p. eaec1481,
+2026.
+[17] M. Brunner, W. Zhang, A. Roumie, M. Tognon, and R. Siegwart, “Mpc
+with learned residual dynamics with application on omnidirectional
+mavs,”arXiv preprint arXiv:2207.01451, 2022.
+[18] E. Cuniato, O. Andersson, H. Oleynikova, R. Siegwart, and M. Pantic,
+“Learning to fly omnidirectional micro aerial vehicles with an end-to-end
+control network,” inInternational Symposium on Experimental Robotics.
+Springer, 2023, pp. 375–383.
+[19] H. Leeet al., “Low-level pose control of tilting multirotor for wall perch-
+ing tasks using reinforcement learning,” in2021 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS). IEEE, 2021, pp.
+9669–9676.
+[20] E. Kaufmann, L. Bauersfeld, and D. Scaramuzza, “A benchmark com-
+parison of learned control policies for agile quadrotor flight,” in2022
+International Conference on Robotics and Automation (ICRA). IEEE,
+2022, pp. 10 504–10 510.
+[21] M. Lauri, D. Hsu, and J. Pajarinen, “Partially observable markov deci-
+sion processes in robotics: A survey,”IEEE Transactions on Robotics,
+vol. 39, no. 1, pp. 21–40, 2022.
+[22] Y . Zhou, C. Barnes, J. Lu, J. Yang, and H. Li, “On the continuity of
+rotation representations in neural networks,” inComputer Vision and
+Pattern Recognition Conference (CVPR), 2019.
+[23] L. Pinto, M. Andrychowicz, P. Welinder, W. Zaremba, and P. Abbeel,
+“Asymmetric actor critic for image-based robot learning,” inRobotics:
+Science and Systems (RSS), Pittsburgh, Pennsylvania, 2018.
+[24] Q. Benet al., “Gallant: V oxel grid-based humanoid locomotion
+and local-navigation across 3d constrained terrains,”arXiv preprint
+arXiv:2511.14625, 2025.
+[25] J. Tanet al., “Sim-to-real: Learning agile locomotion for quadruped
+robots,” inRobotics: Science and Systems (RSS), Pittsburgh, Pennsylva-
+nia, 2018.
+[26] NVIDIA, “Isaac Sim,” https://github.com/isaac-sim/IsaacSim, apache-
+2.0 license.
+[27] M. Mittalet al., “Isaac Lab - A GPU-Accelerated Simulation Framework
+for Multi-Modal Robot Learning,”arXiv preprint arXiv:2511.04831,
+2025.
+[28] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Prox-
+imal policy optimization algorithms,”arXiv preprint arXiv:1707.06347,
+2017.
+[29] C. Schwarke, M. Mittal, N. Rudin, D. Hoeller, and M. Hutter, “Rsl-rl: A
+learning library for robotics research,”arXiv preprint arXiv:2509.10771,
+2025.
+[30] P. Kunapuli, J. Welde, D. Jayaraman, and V . Kumar, “Leveling the
+Playing Field: Carefully Comparing Classical and Learned Controllers
+for Quadrotor Trajectory Tracking,” inProceedings of Robotics: Science
+and Systems, LosAngeles, CA, USA, June 2025.

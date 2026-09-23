@@ -1,30 +1,13 @@
-# Python
+# Generated files: the source tree stays small.
 __pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-.mypy_cache/
+*.py[cod]
 *.egg-info/
-dist/
-*.egg
-venv/
 .venv/
-
-# ROS2 / colcon workspace artifacts (created starting Phase 4)
 build/
 install/
 log/
-
-# OS
+out/
 .DS_Store
 Thumbs.db
-
-# Editor / tool-local settings. The non-local .vscode/settings.json IS shared;
-# *.local.json is per-developer by convention and should not be committed.
-.claude/settings.local.json
-*.swp
-*.swo
-*~
-
-# tvc_view3d decimated-mesh caches (regenerated from tvc_vehicle.stl on demand)
-.tvc_vehicle_*mm.npz
+.vscode/
+.pytest_cache/

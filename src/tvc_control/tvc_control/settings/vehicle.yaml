@@ -1,0 +1,114 @@
+# Vehicle settings: manually editable. See docs/GUIDE.md.
+
+# Body +z is thrust/roll; +x is pitch; +y is yaw. All angles below are degrees unless stated.
+axis_convention: rocket_v2
+
+# EDIT HERE: mass [kg], CG [mm from gimbal pivot], inertia about CG [kg*m^2].
+# Existing design estimates are retained. No value is calculated from the final visual CAD.
+mass_properties:
+  mass_kg: 1.3280
+  cg_mm: [-1.7, -1.0, 211.1]
+  inertia_kg_m2:
+    ixx: 0.022616
+    iyy: 0.022581
+    izz: 0.001957
+    ixy: -0.000022
+    ixz: -0.000301
+    iyz: -0.000535
+
+# Lever arm uses either the gimbal pivot or the rotor plane as the thrust application point.
+geometry:
+  rotor_z_mm: 45.0
+  lever_arm_mode: pivot
+
+# Measured asymmetric travel, neutral offsets, slew rates and delay.
+gimbal:
+  max_deg: 7.0
+  rate_max_deg: 235.0
+  deadtime_s: 0.030
+  axes:
+    inner:
+      gain_deg_per_us: 0.037375
+      neutral_pwm: 1524.1
+      min_deg: -6.46
+      max_deg: 6.98
+      rate_max_deg: 403.0
+      bandwidth_hz: 13.0
+      resonance_db: 11.0
+      phase_lag_2hz_deg: 40.0
+      fit: {r2: 0.9977, rmse_deg: 0.197, mae_deg: 0.161,
+            nonlinearity_pct_span: 3.61, hysteresis_mean_deg: 0.24,
+            hysteresis_max_deg: 0.43}
+    outer:
+      gain_deg_per_us: 0.059912
+      neutral_pwm: 1525.3
+      min_deg: -6.77
+      max_deg: 6.86
+      rate_max_deg: 235.0
+      bandwidth_hz: 9.0
+      resonance_db: 5.0
+      phase_lag_2hz_deg: 53.0
+      fit: {r2: 0.9942, rmse_deg: 0.312, mae_deg: 0.263,
+            nonlinearity_pct_span: 6.61, hysteresis_mean_deg: 0.35,
+            hysteresis_max_deg: 0.65}
+
+# Gazebo solver constants. Simulated rotor speed is NOT physical RPM.
+rotors:
+  max_rot_velocity: 1300.0
+  motor_constant: 7.35e-06
+  moment_constant: 0.04
+  thrust_at_max_n: 17.79
+  rotor_drag_coefficient: 0.0
+  rolling_moment_coefficient: 0.0
+  tau_p_max_nm: null
+
+# Measured coupled motor fit: a=(PWM_A-1500)/500, b=(PWM_B-1500)/500.
+# Coefficient order: 1,a,b,a^2,ab,b^2,a^3,a^2*b,a*b^2,b^3. Commands cover 1000..2000 us.
+thrust_torque_surface:
+  type: cubic_ab
+  pwm_offset: 1500.0
+  pwm_scale: 500.0
+  pwm_min: 1000.0
+  pwm_max: 2000.0
+  thrust_n:  [ 6.876,  3.845,  4.999,  1.011, -0.978,  1.912,
+               0.302, -0.479,  0.138,  0.168]
+  torque_nm: [ 0.0017, -0.0795, 0.0870, -0.0277, 0.0030, 0.0322,
+              -0.0089, -0.0033, 0.0043, 0.0087]
+  fit:
+    thrust: {r2: 0.9984, rmse_n: 0.243, mae_n: 0.194}
+    torque: {r2: 0.9965, rmse_nm: 0.0032, mae_nm: 0.0025}
+
+# Analytic motor lag/delay. Gazebo uses its separate near-instantaneous speed filter.
+# Battery fit is from an older ~3S bench setup, not the research plan's 6S/6300mAh pack.
+# Battery sag is opt-in; do not treat this calibration as final-hardware data.
+motor_dynamics:
+  model: first_order
+  tau_s: 0.10
+  deadtime_s: 0.0
+  gazebo_time_constant_s: 0.001
+  response_delay_s: 0.10
+  peak_current_a: 34.7
+  efficiency_g_per_w: 4.9
+  thrust_sensitivity_n_per_v: 1.46
+  sustained_load:
+    voltage_start_v: 11.9
+    voltage_end_v: 10.0
+    thrust_start_n: 13.8
+    thrust_end_n: 12.0
+  battery:
+    v_full_v: 11.9
+    v_per_mah: -0.00035
+    capacity_mah: 4200
+    thrust_sensitivity_n_per_v: 1.90
+
+# Optional unmeasured estimates; disabled by default.
+aero:
+  enabled: false
+  cd: 0.8
+  ref_area_m2: 0.03
+  air_density: 1.225
+  rotor_radius_m: 0.12
+
+# Gravity [m/s^2].
+env:
+  gravity: 9.81

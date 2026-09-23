@@ -1,0 +1,1537 @@
+=== PDF PAGE 1 ===
+System identi ﬁcation of a
+thrust-vectoring, coaxial-rotor-based
+gun-launched micro air vehicle in
+hovering ﬂight
+Hunter Denton 1 , Moble Benedict 1 and Hao Kang 2
+Abstract
+The paper discusses ﬂight-test-based system identi ﬁcation of a compact, re-con ﬁgurable, rotary-wing micro air vehicle
+capable of sustained hover and could potentially be launched from a 40-mm grenade launcher. The objective was to
+extract a linear time-invariant model of the system to gain an understanding of a novel coaxial helicopter. The vehicle
+design features a cylindrical fuselage, coaxial rotors with foldable/deployable blades, thrust-vectoring mechanism for
+pitch/roll control, and differential rotational speed for yaw control. Flight experiments were conducted to excite the
+vehicle’s longitudinal, lateral, directional, and heave modes from a hovering state. A linearized state-space model was
+extracted from the ﬂight test data. The model showed that the lateral and longitudinal dynamic modes were decoupled
+from each other and from the other modes. Due to the axisymmetric vehicle design, the longitudinal and lateral stability
+and control coef ﬁcients and their eigenvalues were nearly identical. All the aerodynamic damping terms were negative
+and stabilizing except for the pitch and roll acceleration modes, which necessitated the need for pitch and roll feedback
+control.
+Keywords
+System identi ﬁcation, ﬂight testing, coaxial rotor, micro air vehicle, tube-launched, thrust-vectoring
+Received: 10 November 2024; accepted: 8 July 2025
+Introduction
+Micro Air Vehicles (MAVs) ﬁnd their use in a variety of
+applications such as intelligence, surveillance, reconnais-
+sance (ISR), as well as search and rescue missions.
+MAVs provide robust platforms for real-time video or other
+sensor feeds to the ground operator. The size and maneuver-
+ability of rotary-wing MAVs make them an especially
+promising solution for ISR in crowded urban environments.
+Despite these advantages, the altitude, range, and endurance
+of these predominantly electric platforms are restricted by
+the low energy density of current battery technology.
+1,2
+For example, the energy density of commercial lithium-ion
+cells can reach 200 Wh/kg in ideal settings; however, this
+energy density can decrease to 150 Wh/kg at the pack level
+in real conditions. 3–5 Limited battery capacity places more
+stringent constraints on rotary-wing systems compared to
+ﬁxed-wing aircraft due to the higher power requirement
+for hovering. Often, rotary-wing MAVs have a hover
+endurance of less than 20 minutes, 1,2,6 making it imperative
+to consider unconventional approaches to improve the
+effectiveness of hover-capable platforms for ISR missions.
+Although directly improving the endurance of MAVs
+poses a signi ﬁcant challenge, the overall range could be
+increased by launching the vehicle as a projectile toward
+the desired target location. Instead of draining a signi ﬁcant
+portion of the onboard battery energy to reach the intended
+altitude and range, the projectile phase of ﬂight would allow
+for saving the stored energy until the vehicle reaches its
+1Aerospace Engineering, Texas A&M University, College Station, TX, USA
+2Weapons and Materials Research Directorate, US Army DEVCOM Army
+Research Laboratory, Apg, Maryland, USA
+Corresponding author:
+Hunter Denton, Department of Aerospace Engineering, Texas A&M
+University, College Station, TX 77843, USA.
+Email: Hdenton17@tamu.edu
+Creative Commons Non Commercial CC BY-NC: This article is distributed under the terms of the Creative Commons Attribution-
+NonCommercial 4.0 License (https:/ /creativecommons.org/licenses/by-nc/4.0/) which permits non-commercial use, reproduction and
+distribution of the work without further permission provided the original work is attributed as speci ﬁed on the SAGE and Open Access page (https:/ /us.
+sagepub.com/en-us/nam/open-access-at-sage).
+Original research article
+International Journal of Micro Air
+Vehicles
+Volume 17: 1 –18
+© The Author(s) 2025
+Article reuse guidelines:
+sagepub.com/journals-permissions
+DOI: 10.1177/17568293251361078
+journals.sagepub.com/home/mav
+
+
+=== PDF PAGE 2 ===
+designated operating location. The projectile phase also
+facilitates the rapid deployment of the vehicle since the
+ﬂight time between the launch and target location is reduced
+because the deployment speed is limited by the launch
+speed rather than the maximum vehicle forward ﬂight vel-
+ocity. From there, the deployment of rotors allows the
+vehicle to transition to hover mode and perform its mission.
+This mission pro ﬁle is presented in Figure 1.
+The proposed projectile launch technique can be decom-
+posed into several distinct phases of ﬂight. The vehicle
+begins in a folded state and is inserted into the launcher.
+Once launched, the vehicle enters the projectile or ballistic
+phase, and soon after, a protective cap is released from the
+vehicle. The cap is intended to protect the vehicle from the
+explosive charge used for the launch. After the vehicle
+reaches the apex of the ﬂight path, the rotor system is
+deployed, and the rotors start spinning. Next, the crucial
+transition from the passive projectile phase to controlled
+powered descent begins with the application of rotor brak-
+ing thrust as the vehicle reaches the target altitude and
+range. Once suf ﬁciently slowed, hovering ﬂight is attained,
+and the vehicle can perform its desired mission and ﬂy back
+to the operator if necessary.
+Previous Tube-launched concepts
+There are a few existing military platforms that take advan-
+tage of a projectile ﬂight phase for rapid deployment and
+ease of launch without runways; however, most of these
+are ﬁxed-wing platforms such as Raytheon ’s Coyote
+7 and
+AeroVironment’s Switchblade. 8 Although ﬁxed-wing plat-
+forms tend to have higher endurance compared to
+rotary-wing ones, ﬁxed-wing vehicles lack the ability to
+focus on a single target for an extended duration or navigate
+in con ﬁned spaces. Additionally, almost all the existing
+platforms utilize specialized launching systems, which can
+be cumbersome for ground personnel to transport. This
+equipment must be added to the 87 –127 lbs of gear carried
+by the typical war ﬁghter.
+9 Leveraging existing equipment,
+such as a 40-mm grenade launcher, would signi ﬁcantly
+increase the convenience and practical applicability of air-
+launched systems.
+In recent years, the development of hover-capable, tube-
+launched platforms has begun to emerge, such as the
+Streamlined Quick Unfolding Investigation Drone
+(SQUID)
+10,11 developed by Caltech and the Gun-launched
+MAV (GLMAV) 12,13 developed by the French-German
+Research Institute at Saint Louis, and the Tube-Launched
+MAV (TLMAV) developed at Texas A&M University.
+14
+A size comparison of these platforms can be seen in
+Figure 2. The SQUID is a ballistically launched quad-copter
+with an 83 mm (3in) folded diameter that can be ﬁred from a
+moving platform. However, the GLMAV concept is a sig-
+niﬁcantly larger coaxial rotary-wing design with a folded
+diameter of 80 mm (3in). However, the TLMAV uses a
+mechanically simple thrust-vectoring mechanism instead
+of a swashplate. Moreover, the TLMAV is signi ﬁcantly
+smaller (folded diameter of 52 mm) than the other three con-
+cepts. While both coaxial-rotor and multi-rotor-based con-
+ﬁgurations could be scaled down to ﬁt within a grenade
+launcher, a study by Wereley and Pines
+15 determined that
+a coaxial rotor system was a better candidate for the pro-
+posed mission proﬁle. This assessment was based on factors
+such as ef ﬁciency, folding compactness, and ease of
+packing.
+Technical barriers
+The overarching goal of this research effort is to develop a
+coaxial rotor-based MAV that could be launched from a
+grenade launcher. However, developing this platform pre-
+sents some key technical barriers that stem from scaling
+the vehicle down to ﬁt within the barrel of a grenade
+launcher that has an inner diameter of 40 mm, in- ﬂight
+reconﬁguration (passive rotor deployment from a folded
+state) and the complex dynamics experienced during the
+transition from projectile to hovering mode. Some speci ﬁc
+challenges include (1) designing and building a compact
+rotorcraft with an outer diameter of less than 40 mm,
+(2) foldable coaxial rotor blades with passive unfolding
+strategies that avoid rotor collision, (3) simpli ﬁed and com-
+pact swashplateless pitch, roll and yaw control strategies,
+Figure 1. Gun-launched MAV concept: Flight phases.
+Figure 2. Size comparison of current tube-launch systems.
+2 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 3 ===
+(4) ultralight-weight autopilot with a small footprint, (5)
+ability to handle the high accelerations of an explosive take-
+off, (6) passive and active control strategies ensuring stable
+attitude dynamics in ﬂight, especially during the transition
+from the projectile mode to the hovering helicopter mode,
+(7) optimizing the rotor-motor-ESC (electronic speed con-
+troller) combination to maximize hover endurance, and
+(8) understanding and improving the controllability and dis-
+turbance rejection (gust tolerance) of the vehicle in hover
+for improved robustness in adverse conditions.
+The platform ’s compactness, in- ﬂight recon ﬁguration,
+and transition requirements necessitate a multifaceted
+approach to the vehicle design. The size constraint was
+slightly relaxed to facilitate development, and an intermedi-
+ate prototype was developed. The intermediate prototype
+had an outer diameter of 52 mm instead of the required
+40 mm diameter. Future iterations will miniaturize this
+intermediate prototype by optimizing and scaling the com-
+ponents for the ﬁnal 40-mm design. We have previously
+demonstrated the ability of the 52-mm TLMAV prototype
+to achieve a stable projectile phase, deploy the rotors, and
+then successfully transition from the projectile phase to a
+stable hover following a vertical launch.
+14 An experimental
+parametric study was performed to examine the perform-
+ance of the coaxial rotor at low Reynolds numbers.
+16 The
+objective of the present paper is to understand the ﬂight
+dynamics of the TLMAV using a linear time-invariant
+(LTI) model extracted via ﬂight testing based system
+identiﬁcation.
+Previous MAV system identi ﬁcation
+The creation of linear time-invariant (LTI) models for
+MAV-scale vehicles is an important step in understanding
+and predicting their ﬂight dynamics before pursuing more
+complex nonlinear modeling. These models provide initial
+insight into system stability, controllability, and dominant
+dynamic modes, forming a foundation for subsequent con-
+trol design. Additionally, they offer a simpli ﬁed framework
+for validating experimental data and benchmarking control
+strategies before applying them to nonlinear or adaptive
+systems.
+System identi ﬁcation can be performed in the time
+domain or frequency domain to create a mathematical
+model of a system. Time domain system identi ﬁcation takes
+the time history of the inputs and outputs of a system to
+extract a system model. The input excitations are generally
+in the form of step inputs and impulse responses. This
+approach is particularly well-suited for systems with limited
+test space or those prone to instability, as it allows for con-
+trolled, transient input sequences and avoids the need for
+sustained excitation. System IDenti ﬁcation Programs for
+AirCraft (SIDPAC)
+17 is often used to perform time domain
+system identi ﬁcation, where the time history of inputs and
+outputs is correlated using stochastic estimation methods.
+Alternatively, frequency domain requires control inputs
+across a range of frequencies to generate spectrally rich
+data to extract a model using Fourier or spectral analysis.
+Comprehensive Identi ﬁcation from FrEquency Responses
+(CIFERR®)
+18 is often used to generate automated inputs
+including chirps and doublets across a range of frequencies
+and analyze the vehicle response in the frequency domain.
+Additionally, these inputs can cause an unstable vehicle
+platform to crash if adequate space is not available for the
+vehicle to settle after an excitation. Due to limited test
+space, the risk of instability, and the complexity of automat-
+ing frequency sweeps, time domain system identi ﬁcation
+was the more practical choice for the TLMAV.
+Figure 3. Coaxial helicopter MAVs. (a) Tigermoth UAV 27;
+(b) Micro coaxial helicopter testbed 31; (c) COTS Coaxial
+helicopter32; (d) muFly 33
+Figure 4. Tube-launched MAV in hovering ﬂight.
+Denton et al. 3
+
+=== PDF PAGE 4 ===
+The linear model can be used as an initial condition
+for developing a non-linear model. These models could
+be open-loop or closed-loop ﬂight dynamics models.
+Open-loop models describe the system ’s dynamics without
+considering feedback or control inputs, making them useful
+for analyzing the bare airframe response under speci ﬁc con-
+ditions, as well as in identifying the stable and unstable
+modes of a system. In contrast, closed-loop models incorp-
+orate feedback control to represent how the aircraft, along
+with the control system, responds to various inputs and dis-
+turbances during ﬂight. The open-loop and closed-loop
+models provide a comprehensive understanding of aircraft
+stability, controllability, and response to external factors,
+aiding in the design and optimization of ﬂight control sys-
+tems for better performance.
+Before a closed-loop model can be derived, an open-loop
+model is often identi ﬁed. The identi ﬁcation of the open-
+loop dynamics via ﬂight testing tends to be challenging
+for MAV-scale rotorcraft because many of these systems
+are open-loop unstable.
+19–25 These vehicles could be dif ﬁ-
+cult for a pilot to ﬂy and control without the assistance of
+a stability augmentation system. Therefore, system identi ﬁ-
+cation of unstable systems gravitates towards ﬂight experi-
+ments performed on reduced degree-of-freedom test stands
+or experiments performed with reduced ﬂight controller
+gains in free ﬂight.
+System identiﬁcation of NASA ’s Mars Helicopter, 26 the
+Tiger Moth, 27 and the GLMAV 28 were performed using a
+combination of test stand and ﬂight test experiments. The
+identiﬁcation of MAV-scale cyclorotors and ﬂapping
+wing vehicles was performed using ﬂight test data with
+reduced controller gains. 21,22,29,30
+There have been previous studies on the system identi ﬁ-
+cation of MAV-scale coaxial helicopters.31–35 Most of these
+platforms used a ﬂybar on the upper rotor for passive roll/
+pitch stability and only had cyclic control on the lower rotor
+for pitch and roll control. However, the current coaxial-
+rotor-based TLMAV uses direct thrust-vectoring for pitch
+and roll control, which has not been systematically studied
+in the past. Therefore, developing a ﬂight dynamics model
+of the TLMAV in hover is the focus of the present paper,
+and this will lead to a better understanding of this unique
+platform. This model will have a broader impact beyond
+the present TLMAV platform because it is relevant (at
+least qualitatively) to any coaxial rotorcraft using thrust-
+vectoring based control.
+Vehicle overview
+The previous work by the authors details the design, devel-
+opment, and ﬂight testing of the current TLMAV prototype,
+which is a highly compact coaxial rotorcraft MAV amen-
+able to tube-launching and utilizes a thrust-vectoring mech-
+anism for pitch and roll control.
+14,36 The vehicle
+successfully demonstrated a vertical launch from a pneu-
+matic cannon, followed by a stable projectile phase utilizing
+the ﬁns, passive rotor unfolding, and a ﬁnal transition to a
+stable hover.
+The vehicle designed for this study was modi ﬁed from
+the previous conﬁguration to include a set of Vicon markers
+for the system identi ﬁcation experiments. The layout of the
+experimental platform and the weight breakdown are pro-
+vided in Figure 5 and Table 1, respectively. The vehicle
+conﬁguration includes the thrust-vectoring mechanism, pro-
+pulsion system, avionics, battery, and fuselage assembly.
+The thrust-vectoring mechanism enables pitch and roll con-
+trol using a two-axis gimbal actuated by two independent
+servos. Control moments are created by offsetting the thrust
+axis from the center of gravity (CG). The propulsion system
+consists of the coaxial motor unit, electronic speed control-
+lers (ESCs), and counter-rotating, folding rotors. The rotors
+and coaxial motor unit produce thrust and yaw control,
+using collective and differential rotational speed control,
+respectively. The avionics system is comprised of a
+1.7-gram custom-designed autopilot, receiver, and telem-
+etry module. The autopilot obtains pilot commands from
+Figure 5. Tube-launched MAV used for system identi ﬁcation
+experiments.
+Table 1. Weight breakdown of the vertical launch vehicle.
+Components Mass (g) % Total
+Propeller and Hubs 22 6.4
+Motor 62 18.0
+Fuselage 79 22.9
+Battery 102 29.6
+Electronics 34 9.9
+Servo Actuators 25 7.2
+Two Axis Gimbal 9 2.6
+Vicon markers and attachments 12 3.5
+Total 345 g 100.0 %
+4 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 5 ===
+the receivers, which are relayed to the feedback controller.
+Actuator and motor commands are also sent by the auto-
+pilot, and ﬂight telemetry is sent via the wireless communi-
+cation module to a ground station. All of the vehicle
+subsystems are powered by a 3-cell, lithium polymer bat-
+tery housed in the lower section of the vehicle.
+Thrust-vectoring mechanism
+The thrust-vectoring mechanism is a mechanically simpler
+way to implement pitch and roll control on a coaxial heli-
+copter platform. The mechanism consists of a dual-axis
+gimbal, which provides the ability to tilt the thrust vector
+in two orthogonal directions using two independent actua-
+tors. A cutaway of the vehicle depicted in Figure 6 reveals
+the gimbal, control rods, and actuators. The same ﬁgure also
+shows an example of a pitch moment being produced by tit-
+ling the thrust vector away from the center of gravity (CG).
+The combination of the dual-axis gimbal with the servo
+actuators allows the thrust vector, which normally passes
+through the CG, to be pointed forward/aft (pitch control)
+or left/right (roll control), similar to a teetering rotor. This
+tilt of the thrust vector creates moments about the CG that
+cause the vehicle to rotate and translate in the desired direc-
+tion. An example of a pitch moment being produced by the
+thrust-vectoring mechanism is shown alongside the cut-
+away in Figure 6. The maximum tilt angle of 30 degrees
+in either pitch or roll is limited to prevent the lower rotor
+from impacting the body.
+Propulsion
+The propulsion system for the vehicle consists of a specia-
+lized counter rotating-motor unit, electronic speed control-
+lers (ESCs), and folding rotors. The motor unit is fastened
+to the inside of the inner gimbal ring. The combined thrust
+of the two rotors provides enough excess thrust for ﬂight
+and control.
+The coaxial motor unit further reduced the mechanical
+complexity of the current TLMAV con ﬁguration. The
+motor unit consists of two brushless DC motors with
+windings mounted to a common body, as shown in
+Figure 7. The lower motor drives the upper rotor, while con-
+versely, the upper motor drives the lower rotor. A steel shaft
+connects the lower motor to the upper rotor while bypassing
+the upper motor. A set of bearings isolates the connecting
+shaft from the upper motor. On the other hand, the upper
+motor directly drives the lower rotor, which is bolted to
+the upper motor casing. Mechanically decoupling the two
+motors in this manner allows the propellers to rotate inde-
+pendently and provides separate interfaces for the ESCs.
+Additionally, the independent control of the motors allows
+for yaw control through differential rpm of the ﬁxed-pitch
+rotors.
+Another key component of the vehicle design is the pair
+of counter-rotating folding rotors, which were designed to
+conform to the body of the vehicle when folded. Since
+the rotor blades needed to fold against the body, a circular-
+cambered airfoil was chosen to reduce the volume needed
+by the slots for the blades. This also allowed the blades to
+be concentric with the body when folded. Moreover, thin,
+circular camber airfoils have been shown to be more ef ﬁ-
+cient for MAV scale rotors operating at low Reynolds num-
+bers.
+37,38 Additional information about the propulsion
+system can be found in [Ref. 14].
+Avionics
+The avionics system consists of an autopilot, telemetry
+module, radio receiver, and battery. All of these compo-
+nents are responsible for receiving commands from the pilot
+and translating the input to control outputs sent to the actua-
+tors, as well as transmitting ﬂight test data to a ground sta-
+tion. The autopilot is the crucial link that connects all of
+these components together. The vehicle ’s systems are pow-
+ered by a 3-cell lithium polymer battery.
+An autopilot called ELKA-R was selected for its small
+footprint (one-inch square) and the ability to be customized
+for various vehicle platforms.
+39 A size comparison of the
+1.7 g board is shown next to a quarter in Figure 8. The
+ELKA-R is equipped with an STM32F405 microprocessor
+for all onboard computations tasks. The integrated
+MPU9250 is equipped with tri-axial accelerometers,
+Figure 6. Cutaway showing the two-axis gimbal and the
+reaction moment produced about the CG
+Figure 7. Diagram of the counter-rotating motor unit.
+Denton et al. 5
+
+=== PDF PAGE 6 ===
+gyroscopes, and magnetometers. These sensor measure-
+ments are used to determine the attitude of the vehicle.
+The board supports up to 12 Pulse Width Modulation
+(PWM) actuators when two of the three Universal
+Asynchronous Receiver/Transmitter (UART) channels are
+converted to four PWM channels. The PWM channels are
+used to send control signals to the motors and actuators.
+The three UART channels can be used to read sensors or
+send data to other devices, such as the telemetry module
+and receiver.
+The telemetry module is an XBee 3 Pro Zigbee 3.0 that
+operates at 2.4 GHz and is connected to the autopilot using a
+breakout board. This module allows ELKA-R to transmit
+data such as attitude, gyroscope measurements, and the
+actuator signals to a second XBee connected at the ground
+station. The module also receives information from the
+ground station, such as updated controller parameters and
+actuator trim values.
+The pilot ’s inputs are routed from the transmitter to the
+receiver, which is directly connected to the autopilot. A
+Taranis X9D transmitter is used to relay pilot commands,
+and it is capable of sending up to nine different control
+inputs at the same time. These inputs are encoded and
+sent to a FrSky R-XSR PPM receiver capable of reading
+eight different input signals to be sent to the autopilot.
+The autopilot processes the pilot commands and sends sig-
+nals to the appropriate actuators.
+Control methodology
+For system identi ﬁcation experiments, ensuring that the
+vehicle could be ﬂown in a stable and controlled manner
+was imperative. From previous ﬂight testing, it was noted
+that the vehicle appeared unstable in open-loop in both pitch
+and roll. Attitude stabilization of the vehicle was accom-
+plished using a cascaded proportional-integral-derivative
+(PID) controller.
+Pitch, roll, and yaw control is accomplished by a com-
+bination of rotor plane tilting and rotor rotational speed con-
+trol. As previously mentioned, tilting the thrust-vector
+generates pitch and roll moment about the CG, as shown
+in Figure 6. Yaw control is accomplished by commanding
+differential rotational speeds between the individual motors
+of the counter-rotating motor unit. The reaction torque pro-
+duced about the CG by the differential aerodynamic rotor
+torque generates a yaw rate as depicted in Figure 9. In
+trimmed hovering ﬂight, there is no gyroscopic coupling;
+therefore, the pitch and roll dynamics are decoupled from
+the yaw dynamics.
+The pitch and roll attitudes of the vehicle were stabilized
+using a cascaded proportional –integral–derivative (PID)
+controller. The gyroscopes on the autopilot measure the
+body axis rates from which the pitch and roll attitudes are
+estimated via integrating the gyroscope measurements
+while using a complementary ﬁlter that uses the accelerom-
+eter data as a stable bias to reduce drift.
+40,41 The control
+structure is shown in Figure 10(a). Starting from the outer
+loop for pitch and roll control, the pilot commands a desired
+pitch and roll attitude using an RC transmitter. The pitch
+and roll sticks on the transmitter are mapped to produce
+the desired outputs between ±30 degrees. From there, the
+error between the desired and estimated attitude is scaled
+by the outer-loop proportional gain to get the angular
+desired rate. The desired rate is then passed as the setpoint
+for the inner loop. The error between the desired and mea-
+sured rates is passed through a PID feedback controller in
+the inner loop. The controller output is directly converted
+to servo commands for the thrust-vectoring mechanism
+that initiates the desired correction to the vehicle.
+The yaw rate of the vehicle was stabilized by just a PID
+controller. The control structure is shown in Figure 10(b).
+Since a heading estimator has not been implemented on
+the vehicle, the pilot commands a desired yaw rate mea-
+sured from the gyroscopes instead. The yaw stick on the
+transmitter is mapped between ± 250 degrees per second.
+As before, the desired rate is compared against the mea-
+sured yaw rate, and the difference is passed on to a PID
+feedback controller. The controller ’s output is a differential
+yaw command that increases rpm of one rotor while redu-
+cing rpm of the other. The torque imbalance of the rotors
+produces a yaw angular acceleration. However, for the sys-
+tem identiﬁcation experiments, the desired yaw rate was set
+to zero, and the pilot command was linearly added to the
+ﬁnal control output so that the pilot yaw command corre-
+sponded directly to a yaw disturbance. Since the inertia
+about the vehicle ’s vertical axis is signi ﬁcantly smaller
+than the pitch and roll moments of inertia, vibrations gener-
+ated from rotors tended to affect the yaw feedback
+adversely. Therefore, the gyros measurements needed to
+be ﬁltered below the rotor operating frequencies, and the
+derivative term of the controller was set to zero to mitigate
+excessive yaw oscillations.
+System identi ﬁcation methodology
+System identi ﬁcation was performed on the vehicle in
+hovering ﬂight with the goal of creating a linearized ﬂight
+Figure 8. Compact 1.7g ELKA-R autopilot. 39
+6 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 7 ===
+dynamics model of the open-loop response for the same
+ﬂight condition. The model will be used to get a better
+understanding of the design and control of a coaxial heli-
+copter platform that uses a thrust-vectoring mechanism
+for pitch and roll control. The insights gained should
+help guide the future development of these types of aircraft.
+Once a system model is derived, robust and adaptive con-
+trollers could be developed to augment the stability and
+controllability of the system to reject disturbances.
+Model structure
+The linearized ﬂight dynamics model developed for the
+vehicle was formulated in the continuous time-invariant
+state-space form:
+˙x = Ax + Bu
+y = Cx + Du (1)
+The state vector x = [u, v, w, p, q, r, ϕ, θ, ψ ]T includes
+the body-axis velocities ( u, v, w), body-axis angular rates
+(p, q, r), and the attitude Euler angles ( ϕ, θ, ψ ). The time
+derivative of the state vector is represented by
+˙x = [˙u, ˙v, ˙w, ˙p, ˙q, ˙r, ˙ϕ, ˙θ, ˙ψ ]T . The control input vector
+u = [δlat , δlong , δrud , δthr]T contains the lateral (roll), longi-
+tudinal (pitch), directional (yaw), and heave (thrust) control
+inputs. Each of the control inputs corresponds to the ﬁnal
+pulse width modulation (PWM) signal sent to the actuators
+and is scaled such that −1 ≥ δn ≥ 1 where n corresponds to
+an independent actuator input. The sign convention for con-
+trol inputs was selected such that positive inputs produce a
+negative angular rate, but the throttle input was de ﬁned as
+positive for a negative heave velocity. The A matrix is the
+state transition matrix that describes the vehicle ’s open-loop
+dynamics. Each term in the matrix corresponds to the
+Figure 10. Controller feedback diagram. (a) Pitch and roll
+attitude feedback; (b) Yaw rate feedback.
+Figure 9. Yawing moment created by differentially varying the
+rpm of the motors.
+Figure 11. TLMAV in Vicon motion capture space.
+Figure 12. Body reference frame used for system identi ﬁcation.
+Denton et al. 7
+
+=== PDF PAGE 8 ===
+aerodynamic coef ﬁcients. The B matrix corresponds to the
+control coefﬁcients that describe how the control input vec-
+tor affects the system dynamics. The output vector is y, and
+based on the measured states, the output vector is equal to
+the state vector in this case. The output matrix, C, maps
+the state vector to the output vector, and D is the feedback
+or feedthrough matrix.
+For a lower-order linear analysis, it is assumed that the
+time derivative of each of the states is a linear combination
+of the states and control inputs. In this form, the coef ﬁcients
+of the A and B matrices can be determined from the solution
+to the least-squares problem. This study was limited to a
+time-domain analysis due to the unstable nature of the sys-
+tem and the limited space for ﬂight testing. This prevented
+the collection of spectrally rich ﬂight test data needed for
+frequency domain system identi ﬁcation. The ﬂight test
+data was processed using a software package called
+SIDPAC, which was developed by Morelli for time domain
+system identi ﬁcation.
+17 The theory behind the software is
+discussed in detail in Morelli ’s companion book for the
+software package.42 This software has been used to identify
+models for ﬁxed-wing aircraft, rotorcraft, and ﬂapping wing
+vehicles.21,22,29,30
+A model for the system was postulated for hovering
+ﬂight based on previous ﬂight tests of the vehicle. It
+was observed that the longitudinal and lateral dynamic
+modes were decoupled from each other. Also, the longi-
+tudinal and lateral dynamics were decoupled from the
+directional modes. Both pitch and roll control inputs
+result in translations and rotations about their respective
+axes. A yaw input results in a rotation about the yaw
+axis, and a heave input results in only translation in the
+z-direction. The gravity terms, denoted by g, were popu-
+lated in the ˙u and ˙v equations. These observations were
+later tested during the development of the ﬁnal LTI
+model. With this prior knowledge, a postulated model
+is given as follows:
+˙u
+˙v
+˙w
+˙p
+˙q
+˙r
+˙ϕ
+˙θ
+˙ψ
+⎛
+⎜⎜⎜⎜
+⎜⎜⎜⎜⎜
+⎜⎜⎜⎝
+⎞
+⎟⎟⎟⎟
+⎟⎟⎟⎟⎟
+⎟⎟⎟⎠
+=
+X
+u 000 Xq 00 −g 0
+0 Yv 0 Yp 00 g 00
+00 Zw 000 0 0 0
+0 Lv 0 Lp 00 0 0 0
+Mu 000 Mq 00 0 0
+00000 Nr 000
+000100 0 0 0
+000010 0 0 0
+000001 0 0 0
+⎡
+⎢⎢⎢⎢
+⎢⎢⎢⎢⎢
+⎢⎢⎢⎣
+⎤
+⎥⎥⎥⎥
+⎥⎥⎥⎥⎥
+⎥⎥⎥⎦
+u
+v
+w
+p
+q
+r
+ϕ
+θ
+ψ
+⎛
+⎜⎜⎜⎜
+⎜⎜⎜⎜⎜
+⎜⎜⎜⎝
+⎞
+⎟⎟⎟⎟
+⎟⎟⎟⎟⎟
+⎟⎟⎟⎠
++
+0 X
+long 00
+Ylat 00 0
+00 0 Zthr
+Llat 00 0
+0 Mlong 00
+00 Ndir 0
+00 0 0
+00 0 0
+00 0 0
+⎡
+⎢⎢⎢⎢⎢
+⎢⎢⎢⎢⎢
+⎢⎢⎣
+⎤
+⎥⎥⎥⎥⎥
+⎥⎥⎥⎥⎥
+⎥⎥⎦
+δ
+lat
+δlong
+δdir
+δthr
+⎛
+⎜⎜⎝
+⎞
+⎟⎟⎠
+(2)
+Closed-loop state space formulation
+PID feedback was used to augment the vehicle ’s stability,
+so the feedback controller was represented in state space
+form to calculate the vehicle ’s closed-loop response.
+Reference 43 was used to formulate the closed-loop state
+space representation of a propor tional-integral-derivative
+controller. Figure 13 shows the lateral and longitudinal
+feedback diagrams. The feedback control for both axes
+incorporated a cascaded PID control structure where the
+inner loop controls the body axis rates and the outer
+loop controls the attitude angles. Since longitudinal, lat-
+eral, and directional vehicle dynamics were later found to
+be decoupled, the formulation was performed separately
+for each axis. The formulation for the longitudinal axis
+is shown below. The procedure for the lateral and direc-
+tional axes followed the same approach.
+˙u
+˙q
+˙θ
+⎛
+⎝
+⎞
+⎠ =
+X
+u Xq −g
+Mu Mq 0
+010
+⎡
+⎣
+⎤
+⎦
+u
+q
+θ
+⎛
+⎝
+⎞
+⎠ +
+Xlong
+Mlong
+0
+⎛
+⎝
+⎞
+⎠ δlong
+()
+(3)
+The closed-loop formulation begins with the same for-
+mulation as the open-loop state space models, but the
+feedback controls are initially incorporated in the control
+input vector. The reduced state space equation for the
+longitudinal axis is shown in Eq. 3. Figure 13a shows
+the longitudinal feedback control diagram. In the longitu-
+dinal axis, the pilot commands a desired pitch attitude
+Figure 13. Lateral and longitudinal cascaded feedback control
+diagrams. (a) Longitudinal feedback diagram; (b) Lateral feedback
+diagram.
+8 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 9 ===
+angle, θdesired or the setpoint. The error, e1(t) is the differ-
+ence between θdesired and θ where θ is the estimated pitch
+attitude angle.
+e1(t) = θdesired (t) − θ(t) (4)
+The outer loop controller consisted only of a propor-
+tional controller with the gain K p1 . The output follows
+the following form:
+u1(t) = K p1 (θdesired (t) − θ(t)) = K p1 e1(t) (5)
+The output of the previous equation is effectively the
+desired pitch rate, ˙θdesired , and this is the input of the inner
+loop controller. The inner loop PID controller was imple-
+mented in parallel form, where the control output is the
+sum of the proportional ( u
+2p ), integral ( u2i ), and deriva-
+tive ( u2d ) terms, and the gains are given by K p2 , Ki,a n d
+Kd , respectively.
+u2(t) = u2p (t) + u2i (t) + u2d (t) = K p2 e2(t)
++Ki
+∫t
+0
+e2(τ) dτ + Kd ˙e2(t) (6)
+The rate error, e2(t), is calculated between the desired
+pitch rate and the measured pitch rate, ˙θ.
+e2(t) = ˙θdesired (t) − ˙θ(t) (7)
+The proportional term of the inner loop is multiplied
+by the rate error.
+u2p (t) = K p2 (˙θdesired (t) − ˙θ(t)) = K p2 e2(t) (8)
+For the integral term, a new state variable, z,i sd e ﬁned
+to represent the integral action in terms of the rate error.
+˙z(t) = e2(t)
+u2i (t) = Kiz(t) (9)
+The derivative term is de ﬁned using the derivative
+of the pitch rate or the angular pitch acceleration
+instead of the derivative of the error rate. This avoids dis-
+continuities in the feedback when the setpoint suddenly
+changes.
+u
+2d (t) = Kd ˙q (10)
+The expression for the ˙q state from the reduced state
+space form (Eq. 3) substituted into the derivative term,
+and the simpli ﬁcation is as follows:
+u2d (t) = Kd ˙q
+u2d (t) = Kd (Muu + Mqq + Mlong u2d (t))
+(1 − Mlong Kd )u2d (t) = Kd (Muu + Mqq)
+u2d (t) = Kd Mu
+1 − Mlong Kd
+u + Kd Mq
+1 − Mlong Kd
+q
+(11)
+With the expressions for each term of the PID controller
+in terms of the state vector and the setpoint ( θdesired ), the
+state space form of the closed-loop response can be
+assembled.
+˙u
+˙q
+˙θ
+˙z
+⎛
+⎜⎜
+⎝
+⎞
+⎟⎟
+⎠ =
+X
+u Xq −g 0
+Mu Mq 00
+01 0 0
+0 −1 −K p1 0
+⎡
+⎢⎢
+⎣
+⎤
+⎥⎥
+⎦
+u
+q
+θ
+z
+⎛
+⎜⎜
+⎝
+⎞
+⎟⎟
+⎠
++
+X
+long 0
+Mlong 0
+00
+0 K
+p1
+⎡
+⎢⎢⎣
+⎤
+⎥⎥⎦
+u2p + u2i + u2d
+θdesired
+()
+(12)
+u2p + u2i + u2d
+θdesired
+()
+=
+KaMu KaMq − K p2 −K p1 K p1 Ki
+00 0 0
+[] u
+q
+θ
+z
+⎛
+⎜⎜
+⎝
+⎞
+⎟⎟
+⎠
++ K
+p1 K p2
+1
+[]
+θdesired
+()
+(13)
+where
+Ka = Kd
+1 − Mlong Kd
+The terms of the control input vector can be combined
+with the open-loop A matrix to get the closed-loop A
+matrix, Acl . The remaining terms are regrouped in the
+closed-loop Bcl matrix, and the new control input vector
+is reduced to ucl = [θdesired ].
+Acl =
+a11 a12 a13 a14
+a21 a22 a23 a24
+01 0 0
+0 −1 −K p1 0
+⎡
+⎢⎢⎣
+⎤
+⎥⎥⎦
+Bcl =
+Xlong K p1 K p2
+Mlong K p1 K p2
+0
+K p1
+⎡
+⎢⎢⎣
+⎤
+⎥⎥⎦
+(14)
+where
+a11 = Xu + Xlong KaMu
+a12 = Xq + Xlong (KaMq − K p2 )
+a13 =− g − Xlong K p1 K p2
+a14 = Xlong Ki
+a21 = Mu + Mlong KaMu
+a22 = Mq + Mlong (KaMq − K p2 )
+a23 =− Mlong K p1 K p2
+a24 = Mlong Ki
+Denton et al. 9
+
+=== PDF PAGE 10 ===
+Flight testing
+To estimate the model coef ﬁcients, ﬂight tests were per-
+formed to systematically excite each of the vehicle states,
+and each of the states ( x) and inputs ( u) were measured.
+The interrogation volume of the space was 15 ft (length)
+x 15 ft (width)x 8 ft (height). A set of six infrared
+(Vicon) motion capture cameras was used to track the pos-
+ition of the retro-re ﬂective markers placed on the vehicle.
+The vehicle in the motion capture space is shown in
+Figure 11. With the position of the re ﬂective markers
+with respect to the CG of the vehicle known, the Vicon sys-
+tem can determine the inertial position and the attitude of
+the vehicle using Euler parameters (quaternions) during
+ﬂight testing. The Euler parameters were converted to roll
+(ϕ), pitch ( θ), and yaw ( ψ ) Euler angles and body angular
+velocities after ﬂight testing. The Euler angles and body
+angular velocities estimated by the Vicon system were com-
+pared against the telemetry transmitted from the autopilot ’s
+inertial measurement unit (IMU), and there was good agree-
+ment between the two independent state measurements.
+Additionally, the ﬁnal control outputs were also included
+in the telemetry data from the autopilot. All of the states
+and control inputs from both Vicon and the autopilot
+were recorded at a ground station at a rate of 40 Hz.
+The ﬂight experiments were divided into three categor-
+ies: lateral and longitudinal experiments, directional experi-
+ments, and heave experiments. This was based on previous
+observations of the system ’s behaviors to different pilot
+inputs. Figure 14 demonstrates the type of excitation given
+for each set of experiments. Since the doublet excitations
+were manually executed by the pilot, enough variation
+was created in the measured output to ensure adequate exci-
+tation of the system for parameter estimation. Only longitu-
+dinal and lateral coef ﬁcients were determined from the
+separate pitch and roll excitation data sets. This ensured a
+good signal-to-noise ratio for a higher degree of con ﬁdence
+in the resulting coefﬁcients. Similarly, directional and heave
+experiments were performed separately from each other.
+For each category of ﬂight test experiments, over 50 excita-
+tions were given. The individual parameters were selected
+and averaged based on criteria discussed in the Results sec-
+tion. The results of the different types of ﬂight experiments
+were combined into a single ﬂight dynamics model.
+Methodology for exciting longitudinal and lateral
+dynamics
+The ﬁrst set of systematic ﬂight experiments targeted the
+vehicle’s longitudinal and lateral dynamic modes because
+they appeared to be decoupled from directional and heave
+dynamics. Since the current vehicle design is approximately
+axisymmetric, the model coef ﬁcients for the pitch and roll
+were expected to be similar in value. For these experiments,
+the pitch and roll gains were reduced as much as possible
+while ensuring that the pilot could still control the vehicle
+to obtain the near open-loop vehicle response. The yaw
+gains remained at the values determined from previous
+ﬂight testing since the yaw axis should be decoupled from
+the present axes of interest.
+The vehicle was brought to a stable hover in the motion
+capture space, and the longitudinal and lateral dynamics
+were excited by the pilot ’s commanding pitch and roll
+doublets. Each excitation was provided for a single axis,
+and the vehicle returned to hovering ﬂight before the next
+excitation input was applied. During each ﬂight experiment,
+10 to 20 separate excitations could be performed over a 6 to
+8 minute period.
+Methodology for exciting directional and heave
+dynamics
+The directional dynamics of the vehicle were targeted in the
+second set of ﬂight experiments. To prevent off-axis distur-
+bances, the pitch and roll gains were increased to allow the
+Figure 14. Categories of ﬂight experiments performed to
+extract the ﬂight dynamics model. (a) Lateral and longitudinal
+experiments: excitation given by tilting thrust vector ( δlat or δlong );
+(b) Directional experiments: excitation given by generating
+differential rotor torque ( δ
+dir); (c) Heave experiments: excitation
+given by varying rotor thrust from hover ( δthr).
+10 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 11 ===
+pilot to easily command yaw excitations with minimal drift.
+The yaw gains were reduced enough to prevent the vehicle
+from oscillating. Since the directional axis has the smallest
+moment of inertia of the three principal axes, only small
+inputs are required to yaw the vehicle. This also means
+that very small gains are needed to stabilize yaw compared
+to pitch and roll. To adequately perturb the yaw axis, the
+desired yaw rate was set to zero, and the pilot yaw input
+was added to the output of the yaw control loop. This
+was done because the reduced gains prevented the vehicle
+from achieving the high yaw rates needed to increase the
+signal-to-noise ratio for model identi ﬁcation. As before,
+the vehicle was brought to a stable hovering state in the
+motion capture space, and a yaw disturbance was com-
+manded. The vehicle was then allowed to return to hovering
+ﬂight before the next excitation was provided.
+For the ﬁnal set of experiments, the heave dynamics
+were targeted. Similar to the yaw experiments, the pitch
+and roll gains were increased to prevent drift, and the yaw
+gains remained low. After the vehicle obtained a hovering
+state, a throttle doublet was commanded, causing the
+vehicle to accelerate upwards and then descend before
+returning to hover.
+Time history data
+During the longitudinal and lateral ﬂight dynamics experi-
+ments, it was observed that the off-axis response was neg-
+ligible. This con ﬁrmed the previous hypothesis that this
+vehicle’s longitudinal and lateral ﬂight dynamic modes
+are decoupled from each other. The time history from a rep-
+resentative set of ﬂight test data, including longitudinal and
+lateral excitations, are shown in Figs. 15 and 16, respect-
+ively, including the control inputs and vehicle states. The
+cross coupling coef ﬁcients such as Xv, Xp, Yu, Yq, Lq, and
+Mp were not included in the model. An attempt was made
+to include these other terms in the model, but correlations
+were insuf ﬁcient to include them in the ﬁnal model struc-
+ture. Note the magnitudes of the excitations of these six
+states are signi ﬁcant: a maximum translational velocity of
+2 m/s (6.5 ft/s) and a rotational velocity of 5 rad/s (290
+deg/s) were generated. These disturbances were large
+enough to generate a model for the longitudinal and lateral
+states.
+The directional ﬂight experiments were performed separ-
+ately from the other ﬂight experiments. This was done pri-
+marily because the vertical axis is very sensitive to a yaw
+control input, and it was dif ﬁcult to provide a pure yaw
+input without also imparting a heave input. The time history
+from a sample set of ﬂight test data is shown in Figure 17,
+which includes the control input and vehicle states. Here,
+the size of the control input is less than 10% of the max-
+imum possible inputs, and the vehicle can achieve yaw rates
+up to 10 rad/s (600 deg/s) or more within a quarter of a
+second. Compared to the pitch and roll rates, large yaw
+rate excitations were needed to identify coef ﬁcients for
+the ˙r and ˙ψ models.
+Finally, the heave ﬂight experiments were conducted to
+complete the linear model of the vehicle. The time history
+from a sample set of ﬂight test data is shown in
+Figure 18, which includes the throttle input and w body vel-
+ocity. For these experiments, the maximum heave transla-
+tional velocity attained was 2 m/s (6.5 ft/s), suf ﬁcient to
+extract a model for ˙w.
+Using the ﬂight test data from each type of experiment,
+the coef ﬁcients of the A and B matrices were determined
+from the least squares solutions using ˙x as the output and
+a combination of the measured states and control signals
+as inputs. The method of step-wise regression was used to
+determine the linear model structure for each output state.
+In this framework, each input state is termed a regressor,
+and the statistical correlation between the output and the
+regressor is calculated. Only regressors with a signi ﬁcant
+correlation with the output are included in each model.
+Figure 16. Time history of lateral data from a roll excitation.
+Figure 15. Time history of longitudinal data from a pitch
+excitation.
+Denton et al. 11
+
+=== PDF PAGE 12 ===
+Two statistical metrics were used to determine the signi ﬁ-
+cance of each regressor: the partial F-ratio and the coef ﬁ-
+cient of determination ( R2). An F-ratio of at least 20
+corresponds to a con ﬁdence level of 95%. Regressors not
+included in the postulated model were tested, and the
+regressors with F-ratios less than 20 were removed from
+the model. This meant the regressors did not have a signi ﬁ-
+cant enough correlation with output to be included in the
+identiﬁed model. In addition to the F-ratio threshold, coef-
+ﬁcients from individual datasets with R2 values less than
+75% were not included, with the average used to determine
+the value of each coef ﬁcient. These statistical metrics are
+incorporated in the SIDPAC software package. 17
+The values of each coef ﬁcient were averaged over all of
+the datasets from the ﬂight experiments. The numerical
+value of each resulting coef ﬁcient is presented in Table 2.
+The standard errors as a percentage of the coef ﬁcient values
+are also shown in the table. The standard errors for these
+coefﬁcients are less than 15%, which means the uncertainty
+in the experimentally derived parameters is relatively small.
+To verify the resulting model, The derived state-space
+model was compared against independent measured data
+sets. The R2 values were calculated for each state of the
+model. These results and R2 values are shown in Figs.
+19–22. The comparison of the measured and modeled lon-
+gitudinal states ˙u, ˙θ, and ˙q are shown in Figure 19, and the
+corresponding comparison of lateral states are shown in
+Figure 20. The comparison of the measured and modeled
+directional states ˙ψ and ˙r are shown in Figure 21, and the
+corresponding comparison of the heave state is shown in
+Figure 22. For each model, the R2 values were between
+Figure 17. Time history of directional data from a yaw
+excitation.
+Figure 18. Time history of heave data from a throttle
+excitation.
+Table 2. Experimentally derived linear model parameters for the
+TLMAV.
+Parameter Value Standard error, %
+Longitudinal mode
+X
+u, 1/s −0.299 7.2
+Mu, rad/m/s 6.77 3.3
+Xq, m/s/rad −0.165 5.6
+Mq, 1/s 1.42 14.0
+Xlong , m/s 2 3.95 2.6
+Mlong , rad/s 2 −61.8 1.0
+Lateral mode
+Y
+v , 1/s −0.250 11.0
+Lv , rad/m/s −7.08 4.6
+Yp, m/s/rad 0.173 4.6
+Lp, 1/s 1.54 14.0
+Ylat, m/s 2 3.75 2.5
+Llat, rad/s 2 66.1 0.9
+Directional mode
+Nr , 1/s −2.84 8.5
+Ndir , rad/s2 −1430 2.0
+Heave mode
+Z
+w , 1/s −0.353 3.1
+Zthr, m/s 2 −14.3 0.8
+Figure 19. Comparison between experimental and modeled
+outputs for longitudinal dynamics.
+12 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 13 ===
+84% and 100%, indicating that the model agrees well with
+the experimental data.
+Lateral and longitudinal modes
+The identiﬁed stability and control derivatives for the longi-
+tudinal and lateral modes are given in Table 2. The values of
+the coef ﬁcients for the longitudinal and lateral modes are
+nearly identical, which is reasonable given the axisymmet-
+ric nature of the vehicle. However, there are some differ-
+ences in signs, which can be attributed to the de ﬁnition of
+the body- ﬁxed frame.
+To better interpret meanings of the lateral and longitu-
+dinal stability derivatives, Figure 23 shows the response
+to a u and v translational velocity perturbation. The negative
+sign on the X
+u and Yv terms suggests that both are stabiliz-
+ing. In the presence of a velocity perturbation in either the X
+or Y direction, a stabilizing drag force from the vehicle
+fuselage and rotors acting above the CG will tend to miti-
+gate the perturbation. The same disturbance will also cause
+a nose-up (positive) moment in the case of a positive u
+Figure 20. Comparison between experimental and modeled
+outputs for lateral dynamics.
+Figure 21. Comparison between experimental and modeled
+outputs for directional dynamics.
+Figure 23. Interpretation of the lateral and longitudinal stability
+derivatives. (a) Longitudinal response to positive u perturbation;
+(b) Lateral reponse to positive v perturbation.
+Figure 22. Comparison between experimental and modeled
+outputs for directional dynamics.
+Denton et al. 13
+
+=== PDF PAGE 14 ===
+disturbance or a roll left (negative) moment in the case of a
+positive v disturbance, according to the signs of Mu and Lv.
+This will cause the vehicle to rotate about the CG in the dir-
+ection of the disturbance.
+The signs of both M
+q and Lp are positive, which indicates
+that the pitch and roll rate damping terms make the system
+unstable. The unstable angular rate damping terms, in com-
+bination with the larger M
+u and Lv terms, create an unstable
+oscillatory mode. This is likely because the center of pres-
+sure (CP) for the fuselage, in the wake of the rotors, is above
+the CG, as shown in Figure 23. The moment about the CG
+due to translational velocity has no natural damping, so the
+rotation continues unabated. This behavior is why pitch and
+roll feedback is necessary to stabilize the vehicle in ﬂight.
+The vehicle response to positive lateral and longitudinal
+control inputs is shown in Figure 24. A longitudinal control
+input, δ
+long , imparts an angular acceleration, Mlong , due to
+the moment generated by displacing the thrust vector
+away from the CG and a translation acceleration, Xlong ,
+will develop as the component of the thrust is along the
+x-axis. An analogous response will occur with a lateral con-
+trol input, δlat. It was calculated from the value of Mlong and
+Llat that the maximum pitch or roll angular acceleration was
+between 62 and 66 rad/s2. The maximum translational accel-
+eration based on Xlong and Ylat was nearly 4 m/s 2 (13 ft/s2).
+Directional mode
+The identiﬁed stability and control derivatives for the direc-
+tional mode are given in Table 2. The negative sign on the
+yaw damping term Nr suggests that both are stabilizing. Of
+Figure 24. Interpretation of the lateral and longitudinal control
+derivatives. (a) Lateral response to positive control input, δlong ; (b)
+Longitutdinal reponse to positive control input, δlat.
+Figure 25. Directional and Heaves reponse to control inputs.
+(a) Directional response to positive control input, δdir; (b) Heave
+reponse to positive control input, δthr.
+14 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 15 ===
+all the control derivatives, the yaw control derivative Ndir is
+the largest. Figure 25a shows the directional response to a
+yaw input, δdir. This is primarily because the yaw inertia
+of the vehicle is signi ﬁcantly smaller compared to the other
+two axes. For a unit yaw control input, the maximum yaw
+angular acceleration of the vehicle is 1,430 rad/s 2, which
+is the largest possible angular acceleration among roll,
+pitch, and yaw. During a typical ﬂight test, the yaw control
+input rarely exceeds 3% of its maximum value. The extreme
+sensitivity of the yaw control revealed the need for a small
+amount of feedback control to dampen the pilot ’s yaw con-
+trol inputs during normal ﬂight.
+Heave mode
+The identiﬁed stability and control derivatives for the direc-
+tional mode are given in Table 2. The heave mode is
+decoupled from the other modes, and only Z
+w and Zthr terms
+could be identiﬁed. The negative sign of the Zw implies that
+the heave mode is stable. Figure 26 shows the heave
+response to w perturbation. The coef ﬁcient Z
+w likely corre-
+sponds to the acceleration due to drag acting on the fuselage
+and rotors, which explains the damping effect of the coef ﬁ-
+cient. Figure 25(b) shows the heave response to a thrust
+input, δthr. It was calculated from the value of Zthr that the
+maximum heave acceleration was 14 m/s 2 (46 ft/s 2).
+Eigenstates
+The eigenvalues of the open-loop state transition matrix
+from Table 2 were computed. The resulting eigenvalues
+are shown in Table 3 and Figure27. The damping ratio, ζ,
+and the natural frequency, ω n, are also included. Both the
+longitudinal and lateral modes have two sets of nearly iden-
+tical eigenvalues, which is expected for an axisymmetric
+body with the axis of symmetry along the vertical axis.
+One is stable and critically damped, while the other is
+undamped and unstable ( ζ < 0) and oscillatory. The
+unstable modes demonstrate the need for feedback control
+to stabilize the vehicle in ﬂight. Both the directional and
+heave modes are critically damped. An additional eigen-
+value exists at the origin due to the yaw angle being
+included as a state; however, it is not shown.
+The lateral and longitudinal closed-loop eigenvalues
+were calculated using the previously identi ﬁed coef ﬁcients
+and the controller gains that were used for free ﬂight.
+Speciﬁcally, the cascaded PID controller employed an
+outer-loop proportional gain of K
+p1 = 3.50, and inner-loop
+gains of K p2 =− 0.180, Ki =− 1.47 ∗10−4, and
+Kd = 1.64 ∗10−4. Figure 28 compares the open-loop and
+closed-loop eigenvalues for lateral and longitudinal modes.
+The closed-loop eigenvalues are shown in Table 4. The
+feedback controller shifts the two previously identi ﬁed
+unstable pole pairs from the right half-plane to the left half-
+plane. This means that the unstable models from the loop-
+loop model are now stable and damped with the addition
+of the feedback controller. The damping ratios for the pre-
+viously unstable modes became positive, indicating that
+the controller provides a signi ﬁcant increase in damping
+to the oscillatory response of the system. The key insight
+is that the same controller gains can stabilize both the math-
+ematical and physical models of the vehicle, further demon-
+strating the validity of the extracted model and feedback
+structure.
+Summary and conclusions
+In this study, the ﬂight dynamics of a novel coaxial helicop-
+ter MAV with a thrust vectoring mechanism for pitch and
+roll control were investigated using ﬂight test data. This
+type of vehicle is more compact, ef ﬁcient, and quieter
+than a multirotor con ﬁguration and also represents a mech-
+anically simpler alternative to traditional coaxial con ﬁgura-
+tions with swashplate-based control. The vehicle is
+designed in such a way that it could potentially be launched
+Figure 26. Heave response to w perturbation.
+Table 3. Open-loop eigenvalues for TLMAV in hover.
+Mode Eigenvalues ζω n, rad/s
+Longitudinal: u, q, θ −3.67
+Longitudinal: u, q, θ 2.43±3.56i −0.56 4.31
+Lateral: v, p, ϕ −3.66
+Lateral: v, p, ϕ 2.48±3.66i −0.57 4.35
+Directional: r, ψ −2.84
+Heave: w −0.353
+Denton et al. 15
+
+=== PDF PAGE 16 ===
+from a grenade launcher to extend the range and minimize
+response time. The objective of the ﬂight experiments was
+to identify the open-loop response of the vehicle and to
+develop a linear time-invariant ﬂight dynamics model in
+hovering ﬂight. The cascaded PID feedback controller
+implemented on the lateral and longitudinal axes was repre-
+sented in the state space form. Systematic ﬂight tests were
+performed to excite the system ’s longitudinal, directional,
+and heave dynamic modes. The least-squares approach
+based on SIDPAC was used to extract an open-loop system
+model using vehicle states and controls as inputs and the
+derivative of vehicle states as output. The results included
+the stability and control derivatives for the A and B state-
+space matrices. The derived state-space model was com-
+pared with independent measured data sets. The R
+2 values
+of the identi ﬁed model were greater than 80% for each
+vehicle state. The eigenvalues of the open-loop and
+closed-loop state transition matrices were calculated. The
+identiﬁed LTI model can be used as the basis for establish-
+ing a non-linear model.
+The key conclusions are enumerated below:
+1. Longitudinal and lateral modes are decoupled
+and symmetric. The longitudinal and lateral
+dynamics were found to be decoupled from each
+other and from the heave and directional modes,
+consistent with the vehicle ’s near-axisymmetric
+design. Stability and control derivatives in both
+axes were similar in magnitude. The translational
+damping terms ( X
+u and Yv) were negative and thus
+stabilizing, while the rotational damping terms ( Mq
+and Lp) were positive and destabilizing. This com-
+bination produced one stable, critically damped
+mode and one unstable oscillatory mode in each
+axis. The presence of these unstable modes con ﬁrms
+the need for feedback control to maintain stable
+pitch and roll control.
+2. Heave and directional modes are decoupled, with
+high sensitivity and control effectiveness in yaw.
+The heave and direction dynamics were found to
+be decoupled from each other. Both damping terms
+are negative and, therefore, stable and damped. The
+large N
+rud term, as compared to the other control
+coefﬁcients, means that the vehicle can achieve
+extremely high yaw angular accelerations. This is
+due to the low moment of inertia about the vertical
+axis. This extreme yaw sensitivity reveals that small
+feedback gains are necessary to dampen the pilot ’s
+yaw control inputs.
+3. PID controller stabilized both the linear and phys-
+ical vehicle models. The cascaded feedback control-
+ler implemented on the lateral and longitudinal axes
+stabilized the open-loop unstable modes of the linear
+mathematical model. The damping on the previously
+unstable models was increased. The same controller
+gains also stabilized the physical vehicle.
+The dual-swashplate mechanism for the cyclic pitch con-
+trol of a coaxial rotor system is extremely complex and adds
+signiﬁcant drag in forward ﬂight. These are the reasons why
+there are not many coaxial helicopters in existence today.
+The current study sheds light on the ﬂight dynamics of a
+novel coaxial rotorcraft that uses rotor-head tilting, which
+is mechanically much simpler than cyclic blade pitching
+via two swashplates for pitch and roll control. This has
+broader impact beyond the current TLMAV concept, such
+as larger UAVs and even full-scale VTOL aircraft.
+Figure 27. Open-loop eigenvalues for TLMAV in hover.
+Figure 28. Comparison of the open-loop and closed-loop
+eigenvalues for lateral and longitudinal modes of the TLMAV in
+hover.
+Table 4. Closed-loop eigenvalues for TLMAV in hover.
+Mode Eigenvalues ζω n, rad/s
+Longitudinal: u, q, θ −4.297
+Longitudinal: u, q, θ −2.858±2.295i 0.78 3.67
+Lateral: v, p, ϕ −4.589
+Lateral: v, p, ϕ −3.058±1.804i 0.86 3.55
+16 International Journal of Micro Air Vehicles
+
+=== PDF PAGE 17 ===
+Acknowledgements
+The authors would like to thank Dr. Vikram Hrishikeshavan for his
+assistance with programming the ELKA-R autopilot. The authors
+would also like to thank Dr. Manoranjan Majji for allowing us to
+use the Vicon® motion capture space at the Land, Air, and Space
+Robotics (LASR) Laboratory to collect ﬂight testing data.
+ORCID iD
+Hunter Denton https:/ /orcid.org/0000-0002-9683-4645
+Moble Benedict https://orcid.org/0009-0002-1551-8710
+Funding
+The authors disclosed receipt of the following ﬁnancial support for
+the research, authorship, and/or publication of this article:
+Research was sponsored by the Army Research Laboratory and
+was accomplished under Cooperative Agreement Numbers
+W911NF-19-2-0057 and W911NF-21-2-0188. The views and
+conclusions contained in this document are those of the authors
+and should not be interpreted as representing the of ﬁcial policies,
+either expressed or implied, of the Army Research Laboratory or
+the U.S. Government. The U.S. Government is authorized to
+reproduce and distribute reprints for Government purposes, not-
+withstanding any copyright notation herein.
+Declaration of con ﬂicting interests
+The authors declared no potential con ﬂicts of interest with respect
+to the research, authorship, and/or publication of this article.
+References
+1. Pines D and Bohorquez F. Challenges facing future
+micro-air-vehicle development. J Aircr 2006; 43: 290 –305.
+2. Kumar V and Michael N. Opportunities and challenges with
+autonomous micro aerial vehicles. Int J Rob Res 2012; 31:
+1279–1291.
+3. Coleman D, Halder A, Saemi F et al. Development of “aria”,
+a compact, quiet personal electric helicopter. Journal of the
+American Helicopter Society 2023; 68: 42011 –42024.
+4. National Academies of Sciences, Engineering, and Medicine.
+Commercial aircraft propulsion and energy systems
+research: Reducing global carbon emissions . Washington,
+DC: THE NATIONAL ACADEMIES PRESS, 2016.
+DOI:10.17226/23490.
+5. Brown A and Harris WL. Vehicle design and optimization
+model for urban air mobility. J Aircr 2020; 57: 1003 –1013.
+6. Lidor A, Weihs D and Sher E. Novel propulsion systems for
+micro aerial vehicles. J Propul Power 2019; 35: 243 –267.
+7. Raytheon. Coyote uas. https:/ /www.raytheonmissilesand
+defense.com/capabilities/products/coyote, (accessed June
+2020).
+8. AeroViroment. Switchblade. https:/ /www.avinc.com/tms/
+switchblade, (accessed June 2020).
+9. Hauschild V. Foot marching, load carriage, and injury risk.
+Technical Report, Army Public Health Center 2016. DOI:
+10.13140/RG.2.2.25160.52483.
+10. Pastor D, Izraelevitz J, Nadan P et al. Design of a
+ballistically-launched foldable multirotor. In 2019 IEEE/
+RSJ International Conference on Intelligent Robots and
+Systems (IROS) . Macau, China, pp. 5212 –5218. DOI:10.
+1109/IROS40897.2019.8968549.
+11. Bouman A, Nadan P, Anderson M et al. Design and autono-
+mous stabilization of a ballistically-launched multirotor. In
+2020 IEEE International Conference on Robotics and
+Automation (ICRA) . Paris, France, pp. 8511 –8517. DOI:10.
+1109/ICRA40945.2020.9197542.
+12. Gnemmi P, Changey S, Meder K et al. Conception and manu-
+facturing of a projectile-drone hybrid system. IEEE ASME
+Trans Mechatron 2017; 22: 940 –951.
+13. Gnemmi P, Meder K and Rey C. Aerodynamic performance
+of a gun launched micro air vehicle. Int J Micro Air Vehicl
+2012; 4: 251 –272.
+14. Denton H, Benedict M and Kang H. Design, development,
+and ﬂight testing of a tube-launched coaxial-rotor based
+micro air vehicle. Int J Micro Air Vehicl 2022; 14: 1 –12.
+15. Wereley N and Pines D. Feasibility study of a smart submuni-
+tion: Deployment from a conventional weapon. Technical
+report ARL-CR-0475, Army Research Laboratory, 2001.
+16. Denton H, Benedict M and Kang H. Experimental investiga-
+tion of coaxial rotor performance for a tube-launched micro
+air vehicle. J Am Helicopter Soc 2025; 70: 1 –15.
+17. Morelli E. System identi ﬁ
+cation programs for aircraft (sidpac).
+In AIAA Atmospheric Flight Mechanics Conference and
+Exhibit. Monterey, CA. DOI:10.2514/6.2002-4704.
+18. Tischler M. System identi ﬁcation methods for aircraft ﬂight
+control development and validation. Technical Report
+NASA TM-110369, National Aeronautics and Space
+Administration, Moffett Field, California,, 1995.
+19. Hrishikeshavan V, Benedict M and Chopra I. Identi ﬁcation of
+ﬂight dynamics of a cylcocopter micro air vehicle in hover. J
+Aircr 2015; 52: 116 –129.
+20. Hrishikeshavan V, Humbert JS and Chopra I. Gramian ana-
+lysis of a shrouded rotor micro air vehicle in hover. J Guid
+Control Dyn 2014; 37: 1684 –1691.
+21. Runco C and Benedict M. Design, development, and ﬂight
+testing of a 70-gram micro quad-cyclocopter. Int J Micro
+Air Vehicl 2023; 15: 1 –16.
+22. Coleman D and Benedict M. Flight dynamics identi ﬁcation,
+maneuverability, and gust tolerance of a robotic humming-
+bird in hover. In Vertical Flight Society 75th Annual
+Forum Proceedings . Philadelphia, PA, pp. 1 –13. DOI:10.
+4050/F-0075-2019-14485.
+23. Keennon M, Klingebiel K and Won H. Development of the
+nano hummingbird: A tailless ﬂapping wing micro air
+vehicle. In 50th AIAA Aerospace Sciences Meeting including
+the New Horizons Forum and Aerospace Exposition .
+Nashville, TN. DOI:10.2514/6.2012-588.
+24. Yuksek B, Saldiran E, Cetin A et al. System identi ﬁcation
+and model-based ﬂight control system design for an agile
+maneuvering quadrotor platform. In AIAA Scitech 2020
+Forum. Orlando, FL, pp. 1 –25. DOI:10.2514/6.2020-1835.
+Denton et al. 17
+
+=== PDF PAGE 18 ===
+25. Leshikar C, Eves K, Ninan N et al. Asymmetric quadrotor
+modeling and state-space system identi ﬁcation. In 2021
+International Conference on Unmanned Aircraft Systems
+(ICUAS). Athens, Greece, pp. 1422 –1431. DOI:10.1109/
+ICUAS51884.2021.9476871.
+26. Grip HF, Johnson W, Malpica C et al. Modeling and identi-
+ﬁcation of hover ﬂight dynamics for nasa’s mars helicopter. J
+Guid Control Dyn 2020; 43: 179 –194.
+27. Fujiawa BT, Tischler MB, Arlton PE et al. Control system
+development and ﬂight testing of the tiger moth uav. In
+American Helicopter Society 68th Annual Forum
+Proceedings. Fort Worth, TX, pp. 1 –11.
+28. Koehl A, Rafaralahy H, Martinez B et al. Modeling and identi-
+ﬁcation of a launched micro air vehicle: Design and experimen-
+tal results. In AIAA Modeling and Simulation Technologies
+Conference.p p .1 –18. DOI:10.2514/6.2010-8360.
+29. Hrishikeshavan V, Benedict M and Chopra I. Identi ﬁcation of
+ﬂight dynamics of a cylcocopter micro air vehicle in hover. J
+Aircr 2015; 52: 116 –129.
+30. Runco C and Benedict M. Flight dynamics model identi ﬁca-
+tion of a meso-scale twin-cyclocopter in hover. Int J Micro
+Air Vehicl 2023; 15. DOI: 10.1177/17568293231206943.
+31. Robinson DC, Doherty E, Tsai S et al. Design and system
+identiﬁcation of a micro coaxial helicopter testbed. In 2013
+IEEE/ASME International Conference on Advanced
+Intelligent Mechatronics . Wollongong, NSW, Australia,
+pp. 1423–1428. DOI:10.1109/AIM.2013.6584294.
+32. Muresan B, Folea S, Nascu I et al. Identi ﬁcation and model-
+ing of the three rotational movements of a miniature coaxial
+helicopter. SIMULATION 2013; 89: 1490 –1504.
+33. Schafroth D, Bermes C, Bouabdallah S et al. Modeling
+and System Identi ﬁcation of the muFly Micro Helicopter ,
+chapter 3. Reno, Nevada: Springer, Dordrecht. ISBN
+978-90-481-8764-5, 2010. pp. 27 –47. DOI:10.1007/
+978-90-481-8764-5_3.
+34. Roussel E, Gassmann V and Laroche E. Modelling and iden-
+tiﬁcation of a coaxial birotor uav from scarce ﬂight data. In
+2016 European Control Conference (ECC) . Aalborg,
+Denmark, pp. 2158 –2164. DOI:10.1109/ECC.2016.
+7810611.
+35. Nemati A and Kumar M. Control of microcoaxial helicopter
+based on a reduced-order observer. J Aerosp Eng 2016; 29.
+DOI: 10.1061/(ASCE)AS.1943-5525.0000563.
+36. Denton H. Design, Development and Flight Testing of a
+Tube-launched, Rotary-wing, Micro Air Vehicle . Master ’s
+Thesis, Texas A&M University, College Station, TX, 2021.
+37. Winslow J, Benedict M, Hrishikeshavan V et al. Design,
+development, and ﬂight testing of a high endurance
+micro quadrotor helicopter. Int J Micro Air Vehicl 2016; 8:
+155–169.
+38. Bohorquez F. ROTOR HOVER PERFORMANCE AND
+SYSTEM DESIGN OF AN EFFICIENT COAXIAL ROTARY
+WING MICRO AIR VEHICLE . PhD dissertation, University
+of Maryland, College Park, MD,, 2007.
+39. Hrishikeshavan V and Chopra I. Re ﬁned lightweight inertial
+navigation system for micro air vehicle applications. Int J
+Micro Air Vehicl 2017; 9: 124 –135.
+40. Georgy J, Noureldin A, Korenberg M et al. Modeling the sto-
+chastic drift of a mems-based gyroscope in gyro/odometer/
+gps integrated navigation. IEEE trans Intell Transp Syst
+2010; 11: 856 –872.
+41. Thong YK, Woolfson MS, Crowe JA et al. Dependence of
+inertial measurements of distance on accelerometer noise.
+Meas Sci Technol 2002; 13: 1163 –1172.
+42. Morelli EA and Klein V. Aircraft system identi ﬁcation: the-
+ory and practice . 2th ed. Williamsburg, VA: Sun ﬂyte
+Enterprises, 2016. ISBN 0997430613.
+43. Åström KJ and Murray RM. Feedback systems: an introduc-
+tion for scientists and engineers . 2th ed. Princeton, NJ:
+Princeton University Press, 2021. ISBN 9780691193984.
+18 International Journal of Micro Air Vehicles

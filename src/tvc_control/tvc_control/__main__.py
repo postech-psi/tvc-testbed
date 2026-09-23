@@ -1,123 +1,80 @@
-"""
-The one entry point. Everything runnable in this repository is a subcommand.
-================================================================================
-    python tvc.py --help
-
-WHY ONE ENTRY POINT
-    There used to be six executable scripts scattered across three directories,
-    each with its own `sys.path.insert` prelude, and no way to discover them
-    except by reading a README that listed five of them. `--help` is now the
-    list, and the path setup happens once in tvc.py.
-
-Subcommands are grouped by what they need:
-
-    no dependencies beyond Python
-        validate   the five closed-loop scenarios (the fast inner loop)
-        trace      every computation in one control step, with the numbers
-                   (docs/2-WALKTHROUGH.md is this output, annotated)
-        golden     capture or check the frozen numerical baseline
-        params     print every vehicle parameter with its provenance
-        plot       render a Gazebo flight log as plots
-
-    needs a display
-        gui        the Tkinter parameter/gains form over the analytic plant
-        view3d     animate a run on the real CAD mesh
-
-    needs the devcontainer (gz-transport)
-        hover      fly the Gazebo vehicle under the shared flight code
-        record     capture the Gazebo chase camera into a GIF
-
-Each subcommand's own `--help` documents its options. `--` is not needed:
-    python tvc.py validate --verbose
-    python tvc.py hover --duration 30 --altitude 2.0
-"""
+"""Four commands for running and inspecting the TVC simulation."""
 import argparse
+import shutil
+import subprocess
 import sys
-
-# (name, help line, "module:function" resolved lazily)
-#
-# Lazy on purpose. `gui` needs tkinter, `hover` needs gz-transport, `plot` needs
-# matplotlib -- and none of those exist everywhere. Importing them all up front
-# would make `python tvc.py validate` fail on a machine that merely lacks a
-# display, which is the machine most likely to be running it.
-COMMANDS = [
-    ("validate", "run the five closed-loop scenarios (no ROS, no Gazebo)",
-     "tvc_control.verify.scenarios:main"),
-    ("golden", "capture (or --check) the frozen numerical baseline",
-     "tvc_control.verify.golden:main"),
-    ("cross-plant", "compare the analytic hover against the frozen Gazebo golden",
-     "tvc_control.verify.cross_plant:main"),
-    ("params", "print every vehicle parameter with its provenance",
-     None),
-    ("trace", "print every computation in one control step, with numbers",
-     "tvc_control.verify.trace:main"),
-    ("gui", "open the Tkinter simulator GUI (needs a display)",
-     "tvc_control.apps.gui:main"),
-    ("view3d", "animate a run on the CAD mesh (needs a display)",
-     "tvc_control.apps.view3d:main"),
-    ("plot", "plot a Gazebo flight log CSV",
-     "tvc_control.apps.plot:main"),
-    ("hover", "fly the Gazebo vehicle (needs the devcontainer)",
-     "tvc_control.harness.gz:main"),
-    ("record", "record the Gazebo chase camera to a GIF (devcontainer)",
-     "tvc_control.apps.record:main"),
-]
-
-
-def _resolve(spec):
-    mod_name, func_name = spec.split(":")
-    import importlib
-    return getattr(importlib.import_module(mod_name), func_name)
-
-
-def _params(argv):
-    ap = argparse.ArgumentParser(prog="tvc.py params")
-    ap.add_argument("--markdown", action="store_true",
-                    help="emit the markdown table docs/5-PARAMETERS.md carries")
-    args = ap.parse_args(argv)
-    from .config import format_parameter_table, load, parameter_rows
-    if args.markdown:
-        print(format_parameter_table(markdown=True))
-        return 0
-
-    v, rows = load(), parameter_rows()
-    tally = {}
-    for _, _, _, _, src, _ in rows:
-        tally[src] = tally.get(src, 0) + 1
-    print("%.4f kg, T/W %.2f, hover at %.0f%% throttle"
-          % (v.mass, v.thrust_at_max_n / v.weight_n,
-             100 * v.weight_n / v.thrust_at_max_n))
-    print("%d parameters: %s"
-          % (len(rows), ", ".join("%d %s" % (n, s) for s, n
-                                  in sorted(tally.items(), key=lambda kv: -kv[1]))))
-    print("provenance and uncertainty: docs/5-PARAMETERS.md")
-    print(format_parameter_table(rows, markdown=False))
-    return 0
+from pathlib import Path
 
 
 def main(argv=None):
-    """Dispatch one subcommand. With no arguments, print the command list."""
+    parser = argparse.ArgumentParser(prog="tvc.py", description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    sim = commands.add_parser("sim", help="run the Python simulation; save CSV and PNG")
+    sim.add_argument("--duration", type=float, default=5.0, help="simulated seconds")
+    sim.add_argument("--dt", type=float, default=0.01, help="control period, seconds")
+    sim.add_argument("--altitude", type=float, default=2.0, help="target altitude, metres")
+    sim.add_argument("--initial-altitude", type=float, default=2.0)
+    sim.add_argument("--pitch", type=float, default=0.0, help="target pitch, degrees (requires --no-position-hold)")
+    sim.add_argument("--yaw", type=float, default=0.0, help="target yaw, degrees (requires --no-position-hold)")
+    sim.add_argument("--roll", type=float, default=0.0, help="target roll, degrees")
+    sim.add_argument("--initial-pitch", type=float, default=3.0)
+    sim.add_argument("--initial-yaw", type=float, default=-4.0)
+    sim.add_argument("--altitude-hold", action=argparse.BooleanOptionalAction, default=True)
+    sim.add_argument("--position-hold", action=argparse.BooleanOptionalAction, default=True)
+    sim.add_argument("--battery-sag", action="store_true", help="enable the older bench battery fit")
+    sim.add_argument("--output", type=Path, default=Path("out/simulation"), help="output prefix")
+    commands.add_parser("gui", help="open settings, plots and CAD playback")
+    gazebo = commands.add_parser("gazebo", help="run Gazebo through ROS 2 (Linux/container)")
+    gazebo.add_argument("--headless", action="store_true", help="run without the Gazebo window")
+    gazebo.add_argument("--altitude", type=float, default=2.0)
+    gazebo.add_argument("--log", type=Path, default=Path("out/gazebo.csv"))
+    plot = commands.add_parser("plot", help="plot a saved simulation CSV")
+    plot.add_argument("log", type=Path)
+    plot.add_argument("output", nargs="?", type=Path, default=Path("out/flight.png"))
     argv = list(sys.argv[1:] if argv is None else argv)
-    names = [c[0] for c in COMMANDS]
-
-    if not argv or argv[0] in ("-h", "--help", "help"):
-        width = max(len(n) for n in names)
-        print(__doc__.strip().split("\n\n")[0])
-        print("\nusage: python tvc.py <command> [options]\n")
-        for name, helptext, _ in COMMANDS:
-            print("  %-*s  %s" % (width, name, helptext))
-        print("\n  python tvc.py <command> --help   for that command's options")
+    if not argv:
+        parser.print_help()
         return 0
+    args = parser.parse_args(argv)
 
-    cmd, rest = argv[0], argv[1:]
-    if cmd not in names:
-        print("unknown command %r. Known: %s" % (cmd, ", ".join(names)),
-              file=sys.stderr)
-        return 2
+    if args.command == "gui":
+        from .gui import main as gui_main
+        return gui_main()
+    if args.command == "plot":
+        from .plotting import main as plot_main
+        return plot_main([str(args.log), str(args.output)])
+    if args.command == "gazebo":
+        if shutil.which("ros2") is None:
+            parser.error("ROS 2 is unavailable. Use the Linux devcontainer and source install/setup.bash; see README.md.")
+        return subprocess.call([
+            "ros2", "launch", "tvc_control", "gazebo.launch.py",
+            f"gui:={'false' if args.headless else 'true'}",
+            f"z_des:={args.altitude}", f"log_path:={args.log.resolve()}",
+        ])
 
-    if cmd == "params":
-        return _params(rest)
-    return _resolve(dict((c[0], c[2]) for c in COMMANDS)[cmd])(rest) or 0
+    from .config import load_gains, load_vehicle_params
+    from .simulation import SimConfig, simulate
+    from .plotting import four_panel, save_run, series_from_run
+    cfg = SimConfig(
+        t_final=args.duration, dt_ctrl=args.dt, z_des=args.altitude,
+        init_z=args.initial_altitude, att_pitch_des_deg=args.pitch,
+        att_yaw_des_deg=args.yaw, att_roll_des_deg=args.roll,
+        init_att_pitch_deg=args.initial_pitch, init_att_yaw_deg=args.initial_yaw,
+        altitude_hold=args.altitude_hold, position_hold=args.position_hold,
+        battery_sag=args.battery_sag,
+    )
+    if cfg.t_final <= 0 or cfg.dt_ctrl <= 0:
+        parser.error("duration and dt must be positive")
+    result = simulate(load_vehicle_params(), load_gains(), cfg)
+    save_run(result, str(args.output) + ".csv")
+    four_panel(series_from_run(result), str(args.output) + ".png",
+               target_m=cfg.z_des if cfg.altitude_hold else None)
+    m = result["metrics"]
+    print(f"Final altitude {m['final_z_m']:.3f} m; "
+          f"pitch {m['final_pitch_deg']:.2f}, yaw {m['final_yaw_deg']:.2f}, "
+          f"roll {m['final_roll_deg']:.2f} degrees")
+    print(f"CSV: {args.output}.csv")
+    return 0
 
 
 if __name__ == "__main__":

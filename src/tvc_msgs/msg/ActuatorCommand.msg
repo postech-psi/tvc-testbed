@@ -6,7 +6,7 @@
 # topics lets a subscriber pair values from different control steps and quietly
 # fly a different vehicle.
 #
-# Frames, axis names and signs: docs/4-CONVENTIONS.md. The convention token
+# Frames, axis names and signs: docs/GUIDE.md. The convention token
 # travels WITH the data so a stale node talking to a fresh one fails loudly
 # instead of reinterpreting numbers under the wrong names -- the failure mode
 # that makes an axis rename dangerous.

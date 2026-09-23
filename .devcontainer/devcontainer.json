@@ -1,32 +1,9 @@
 {
-  "name": "TVC VTVL UGRP - ROS2 Jazzy Development",
+  "name": "TVC simulation — ROS 2 and Gazebo",
   "runArgs": ["--name=tvc-devcontainer"],
   "dockerFile": "../Dockerfile",
   "context": "..",
   "remoteUser": "ros",
   "workspaceFolder": "/workspace",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
-  "postCreateCommand": "bash -c 'sudo chown -R ros:ros /workspace && sudo apt-get update -qq && rosdep install --from-paths /workspace/src -i -y --rosdistro jazzy'",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {}
-  },
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-python.python",
-        "ms-vscode.cpptools",
-        "ms-vscode.cmake-tools",
-        "ms-ros.ros"
-      ],
-      "settings": {
-        "ROS.sourceSpaceDir": "${workspaceFolder}/src",
-        "files.exclude": {
-          "**/__pycache__": true,
-          "build/**": true,
-          "install/**": true,
-          "log/**": true
-        }
-      }
-    }
-  }
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind"
 }

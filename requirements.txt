@@ -1,6 +1,4 @@
 numpy
 scipy
 matplotlib
-pyyaml     # config loading; tools/mass_properties.py
-pillow     # tvc.py record assembles the Gazebo flight GIF
-pytest     # tests/
+PyYAML
